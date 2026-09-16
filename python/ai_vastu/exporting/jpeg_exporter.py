@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ai_vastu.plan_schema import IntPolygon
 
+from .dimension_units import format_dimension_length_mm
 from .geometry import (
     offset_segment,
     opening_segments,
@@ -111,7 +112,10 @@ def render_jpeg(scene: DrawingScene, config: RasterExportConfig) -> ExportArtifa
                     dimension.end.y_mm - dimension.start.y_mm,
                 )
             )
-            label = dimension.label_override or f"{length} mm"
+            label = dimension.label_override or format_dimension_length_mm(
+                length,
+                config.dimension_unit,
+            )
             midpoint = ((p1[0] + p2[0]) / 2.0, (p1[1] + p2[1]) / 2.0)
             draw.text(midpoint, label, fill=(71, 84, 103), font=font, anchor="mm")
 

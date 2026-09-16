@@ -6,6 +6,7 @@ from typing import Any
 import ezdxf
 from ezdxf.enums import InsertUnits, TextEntityAlignment
 
+from .dimension_units import format_dimension_length_mm
 from .geometry import (
     north_vector,
     opening_segments,
@@ -57,6 +58,7 @@ def render_dxf(scene: DrawingScene, config: DxfExportConfig) -> ExportArtifact:
         assert scene.scene_hash is not None
         doc.header.custom_vars.append("AIA_SCENE_HASH", scene.scene_hash)
         doc.header.custom_vars.append("AIA_REVISION_ID", str(scene.revision_id))
+        doc.header.custom_vars.append("AIA_DIMENSION_UNITS", config.dimension_unit.value)
         for name, color in _LAYER_SPECS:
             if name not in doc.layers:
                 doc.layers.add(name=name, color=color)
@@ -111,7 +113,14 @@ def render_dxf(scene: DrawingScene, config: DxfExportConfig) -> ExportArtifact:
 
         if config.show_dimensions:
             for dimension in scene.dimensions:
-                text = dimension.label_override or "<>"
+                length = (
+                    (dimension.end.x_mm - dimension.start.x_mm) ** 2
+                    + (dimension.end.y_mm - dimension.start.y_mm) ** 2
+                ) ** 0.5
+                text = dimension.label_override or format_dimension_length_mm(
+                    length,
+                    config.dimension_unit,
+                )
                 override = {
                     "dimtxt": float(config.dimension_text_height_mm),
                     "dimasz": float(config.dimension_arrow_size_mm),

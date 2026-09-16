@@ -1,6 +1,7 @@
 "use client";
 
 import type { LayerVisibility } from "../../editor/types.ts";
+import type { DisplayLengthUnit } from "../../units/length.ts";
 
 interface EditorToolbarProps {
   readonly tool: "select" | "pan";
@@ -8,12 +9,14 @@ interface EditorToolbarProps {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly stagedCount: number;
+  readonly displayUnit: DisplayLengthUnit;
   readonly onTool: (tool: "select" | "pan") => void;
   readonly onFit: () => void;
   readonly onUndo: () => void;
   readonly onRedo: () => void;
   readonly onClear: () => void;
   readonly onLayer: (layer: keyof LayerVisibility, visible: boolean) => void;
+  readonly onDisplayUnit: (unit: DisplayLengthUnit) => void;
   readonly onSubmit: () => void;
   readonly canSubmit: boolean;
 }
@@ -81,6 +84,19 @@ export function EditorToolbar(props: EditorToolbarProps) {
           {layer}
         </label>
       ))}
+      <label className="layer-toggle">
+        Units
+        <select
+          aria-label="Display units"
+          value={props.displayUnit}
+          onChange={(event) => {
+            props.onDisplayUnit(event.target.value as DisplayLengthUnit);
+          }}
+        >
+          <option value="ft-in">Feet &amp; Inches</option>
+          <option value="m">Metres</option>
+        </select>
+      </label>
       <span className="toolbar-spacer" />
       <span className="staged-count">{props.stagedCount} staged</span>
       <button

@@ -8,6 +8,7 @@ import {
   worldToScreen,
   zoomAtScreenPoint,
 } from "./math.ts";
+import { formatLengthMm, parseLengthToMm } from "../units/length.ts";
 
 void test("world/screen transform preserves +Y-up canonical coordinates", () => {
   const viewport = { pixelsPerMm: 0.1, originXPx: 100, originYPx: 500 };
@@ -37,4 +38,12 @@ void test("fit and snap stay deterministic", () => {
   assert.equal(viewport.pixelsPerMm, 0.07466666666666667);
   assert.equal(snapMm(1_249, 100), 1_200);
   assert.equal(snapMm(1_251, 100), 1_300);
+});
+
+void test("architectural display units preserve canonical mm inputs", () => {
+  assert.equal(formatLengthMm(9_144, "ft-in"), `30'-0"`);
+  assert.equal(formatLengthMm(15_240, "m"), "15.240 m");
+  assert.equal(parseLengthToMm(`10'-6 1/2"`, "ft-in"), 3_213);
+  assert.equal(parseLengthToMm("9.144 m", "m"), 9_144);
+  assert.equal(parseLengthToMm("30", "ft-in"), 9_144);
 });

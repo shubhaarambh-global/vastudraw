@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { roomLocked, wallPreview } from "../../editor/document.ts";
 import { segmentLengthMm } from "../../editor/math.ts";
@@ -9,42 +9,97 @@ import type {
   EditorFloorIndex,
   EditorSelection,
 } from "../../editor/types.ts";
+import {
+  formatLengthMm,
+  parseLengthToMm,
+  type DisplayLengthUnit,
+} from "../../units/length.ts";
 
 interface InspectorPanelProps {
   readonly index: EditorFloorIndex;
   readonly selection: EditorSelection | null;
   readonly commands: readonly EditorCommand[];
+  readonly displayUnit: DisplayLengthUnit;
   readonly onStage: (command: EditorCommand) => void;
 }
 
-function NumericField(props: {
+function LengthField(props: {
   readonly label: string;
-  readonly value: number;
-  readonly min?: number;
-  readonly onChange: (value: number) => void;
+  readonly valueMm: number | null;
+  readonly displayUnit: DisplayLengthUnit;
+  readonly minMm?: number;
+  readonly onChangeMm: (value: number | null) => void;
 }) {
+  const [text, setText] = useState(
+    props.valueMm === null
+      ? ""
+      : formatLengthMm(props.valueMm, props.displayUnit),
+  );
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setText(
+        props.valueMm === null
+          ? ""
+          : formatLengthMm(props.valueMm, props.displayUnit),
+      );
+    }
+  }, [editing, props.displayUnit, props.valueMm]);
+
   return (
     <label className="numeric-field">
       <span>{props.label}</span>
       <input
-        type="number"
-        step={1}
-        min={props.min}
-        value={props.value}
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onFocus={() => {
+          setEditing(true);
+        }}
         onChange={(event) => {
-          props.onChange(Number(event.target.value));
+          const nextText = event.target.value;
+          setText(nextText);
+          try {
+            const nextMm = parseLengthToMm(nextText, props.displayUnit);
+            if (props.minMm !== undefined && nextMm < props.minMm) {
+              throw new RangeError(
+                `Value must be at least ${formatLengthMm(
+                  props.minMm,
+                  props.displayUnit,
+                )}.`,
+              );
+            }
+            setError(null);
+            props.onChangeMm(nextMm);
+          } catch (cause) {
+            setError(
+              cause instanceof Error ? cause.message : "Invalid length.",
+            );
+            props.onChangeMm(null);
+          }
+        }}
+        onBlur={() => {
+          setEditing(false);
+          if (props.valueMm !== null) {
+            setText(formatLengthMm(props.valueMm, props.displayUnit));
+          }
         }}
       />
-      <small>mm</small>
+      <small>
+        {props.displayUnit === "ft-in" ? "feet + inches" : "metres"}
+        {error ? ` · ${error}` : ""}
+      </small>
     </label>
   );
 }
 
 export function InspectorPanel(props: InspectorPanelProps) {
-  const [wallDelta, setWallDelta] = useState(100);
-  const [roomTarget, setRoomTarget] = useState(3_600);
-  const [openingOffset, setOpeningOffset] = useState(0);
-  const [openingWidth, setOpeningWidth] = useState(900);
+  const [wallDelta, setWallDelta] = useState<number | null>(100);
+  const [roomTarget, setRoomTarget] = useState<number | null>(3_600);
+  const [openingOffset, setOpeningOffset] = useState<number | null>(0);
+  const [openingWidth, setOpeningWidth] = useState<number | null>(900);
 
   const selected = useMemo(() => {
     if (props.selection === null) return null;
@@ -66,8 +121,8 @@ export function InspectorPanel(props: InspectorPanelProps) {
         <h2>Inspector</h2>
         <p className="muted">Select a room, wall, opening, or dimension.</p>
         <p className="authority-note">
-          Canvas pixels are display-only. All edit commands use integer
-          millimetres.
+          Display units are presentation-only. All edit commands remain exact
+          integer millimetres.
         </p>
       </aside>
     );
@@ -83,9 +138,14 @@ export function InspectorPanel(props: InspectorPanelProps) {
         <code>{wall.id}</code>
         <dl>
           <dt>Length</dt>
-          <dd>{Math.round(segmentLengthMm(preview.start, preview.end))} mm</dd>
+          <dd>
+            {formatLengthMm(
+              Math.round(segmentLengthMm(preview.start, preview.end)),
+              props.displayUnit,
+            )}
+          </dd>
           <dt>Thickness</dt>
-          <dd>{wall.thickness_mm} mm</dd>
+          <dd>{formatLengthMm(wall.thickness_mm, props.displayUnit)}</dd>
         </dl>
         <button
           type="button"
@@ -99,15 +159,17 @@ export function InspectorPanel(props: InspectorPanelProps) {
         >
           {preview.locked ? "Unlock wall" : "Lock wall"}
         </button>
-        <NumericField
+        <LengthField
           label="Parallel move"
-          value={wallDelta}
-          onChange={setWallDelta}
+          valueMm={wallDelta}
+          displayUnit={props.displayUnit}
+          onChangeMm={setWallDelta}
         />
         <button
           type="button"
-          disabled={preview.locked}
+          disabled={preview.locked || wallDelta === null}
           onClick={() => {
+            if (wallDelta === null) return;
             props.onStage({
               kind: "WALL_MOVE_PARALLEL",
               wall_id: wall.id,
@@ -141,17 +203,19 @@ export function InspectorPanel(props: InspectorPanelProps) {
         >
           {locked ? "Unlock room" : "Lock room"}
         </button>
-        <NumericField
+        <LengthField
           label="Target dimension"
-          value={roomTarget}
-          min={1}
-          onChange={setRoomTarget}
+          valueMm={roomTarget}
+          displayUnit={props.displayUnit}
+          minMm={1}
+          onChangeMm={setRoomTarget}
         />
         <div className="button-row">
           <button
             type="button"
-            disabled={locked}
+            disabled={locked || roomTarget === null}
             onClick={() => {
+              if (roomTarget === null) return;
               props.onStage({
                 kind: "ROOM_SET_DIMENSION",
                 room_id: room.id,
@@ -164,8 +228,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
           </button>
           <button
             type="button"
-            disabled={locked}
+            disabled={locked || roomTarget === null}
             onClick={() => {
+              if (roomTarget === null) return;
               props.onStage({
                 kind: "ROOM_SET_DIMENSION",
                 room_id: room.id,
@@ -192,15 +257,18 @@ export function InspectorPanel(props: InspectorPanelProps) {
       <aside className="inspector-panel">
         <h2>{opening.kind}</h2>
         <code>{opening.id}</code>
-        <NumericField
+        <LengthField
           label="Offset"
-          value={openingOffset}
-          min={0}
-          onChange={setOpeningOffset}
+          valueMm={openingOffset}
+          displayUnit={props.displayUnit}
+          minMm={0}
+          onChangeMm={setOpeningOffset}
         />
         <button
           type="button"
+          disabled={openingOffset === null}
           onClick={() => {
+            if (openingOffset === null) return;
             props.onStage({
               kind: "OPENING_MOVE",
               opening_id: opening.id,
@@ -210,15 +278,18 @@ export function InspectorPanel(props: InspectorPanelProps) {
         >
           Stage move
         </button>
-        <NumericField
+        <LengthField
           label="Width"
-          value={openingWidth}
-          min={1}
-          onChange={setOpeningWidth}
+          valueMm={openingWidth}
+          displayUnit={props.displayUnit}
+          minMm={1}
+          onChangeMm={setOpeningWidth}
         />
         <button
           type="button"
+          disabled={openingWidth === null}
           onClick={() => {
+            if (openingWidth === null) return;
             props.onStage({
               kind: "OPENING_RESIZE",
               opening_id: opening.id,
@@ -237,8 +308,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
       <h2>Dimension</h2>
       <code>{props.selection.id}</code>
       <p className="muted">
-        Dimensions are derived annotations in Phase 12 and are not directly
-        editable.
+        Dimensions are derived annotations and are not directly editable.
       </p>
     </aside>
   );

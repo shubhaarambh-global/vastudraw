@@ -37,6 +37,11 @@ class ExportFormat(StrEnum):
     DXF = "DXF"
 
 
+class DimensionDisplayUnit(StrEnum):
+    FEET_INCHES = "ft-in"
+    METRES = "m"
+
+
 class SceneRoad(FrozenModel):
     id: UUID
     name: str | None = None
@@ -102,6 +107,7 @@ class RasterExportConfig(FrozenModel):
     show_dimensions: bool = True
     show_annotations: bool = True
     show_north_arrow: bool = True
+    dimension_unit: DimensionDisplayUnit = DimensionDisplayUnit.FEET_INCHES
 
 
 class PdfExportConfig(FrozenModel):
@@ -112,6 +118,7 @@ class PdfExportConfig(FrozenModel):
     show_dimensions: bool = True
     show_annotations: bool = True
     show_north_arrow: bool = True
+    dimension_unit: DimensionDisplayUnit = DimensionDisplayUnit.FEET_INCHES
 
 
 class DxfExportConfig(FrozenModel):
@@ -125,6 +132,7 @@ class DxfExportConfig(FrozenModel):
     show_dimensions: bool = True
     show_annotations: bool = True
     show_north_arrow: bool = True
+    dimension_unit: DimensionDisplayUnit = DimensionDisplayUnit.FEET_INCHES
 
 
 @dataclass(frozen=True, slots=True)

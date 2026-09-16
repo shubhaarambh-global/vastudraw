@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
+
+import {
+  DEFAULT_DISPLAY_LENGTH_UNIT,
+  formatLengthMm,
+  parseLengthToMm,
+  type DisplayLengthUnit,
+} from "../../units/length.ts";
 
 type Proposed<T> = {
   value: T;
@@ -40,6 +47,86 @@ type Draft = {
 const API_BASE =
   process.env.NEXT_PUBLIC_AI_VASTU_API_BASE_URL ?? "http://127.0.0.1:8000";
 
+const inputStyle = {
+  width: "100%",
+  border: "1px solid #d9ded9",
+  borderRadius: "10px",
+  padding: "10px 12px",
+  background: "#fff",
+} as const;
+
+function LengthReviewField(props: {
+  readonly label: string;
+  readonly valueMm: number | null;
+  readonly displayUnit: DisplayLengthUnit;
+  readonly onChangeMm: (value: number | null) => void;
+}) {
+  const [text, setText] = useState(
+    props.valueMm === null
+      ? ""
+      : formatLengthMm(props.valueMm, props.displayUnit),
+  );
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setText(
+        props.valueMm === null
+          ? ""
+          : formatLengthMm(props.valueMm, props.displayUnit),
+      );
+    }
+  }, [editing, props.displayUnit, props.valueMm]);
+
+  return (
+    <label>
+      {props.label}
+      <input
+        style={inputStyle}
+        type="text"
+        inputMode="decimal"
+        value={text}
+        placeholder={
+          props.displayUnit === "ft-in" ? `Example: 30'-6"` : "Example: 9.296 m"
+        }
+        onFocus={() => {
+          setEditing(true);
+        }}
+        onChange={(event) => {
+          const nextText = event.target.value;
+          setText(nextText);
+          try {
+            const nextMm = parseLengthToMm(nextText, props.displayUnit);
+            if (nextMm <= 0) {
+              throw new RangeError("Dimension must be greater than zero.");
+            }
+            setError(null);
+            props.onChangeMm(nextMm);
+          } catch (cause) {
+            setError(
+              cause instanceof Error ? cause.message : "Invalid length.",
+            );
+            props.onChangeMm(null);
+          }
+        }}
+        onBlur={() => {
+          setEditing(false);
+          if (props.valueMm !== null) {
+            setText(formatLengthMm(props.valueMm, props.displayUnit));
+          }
+        }}
+      />
+      <small style={{ color: error ? "#a12622" : "#667066" }}>
+        {props.displayUnit === "ft-in"
+          ? "Feet + inches · supports 10'-6 1/2\""
+          : "Metres · displayed to 0.001 m"}
+        {error ? ` · ${error}` : ""}
+      </small>
+    </label>
+  );
+}
+
 export function RequirementsReviewPage() {
   const [projectId, setProjectId] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -48,9 +135,12 @@ export function RequirementsReviewPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [displayUnit, setDisplayUnit] = useState<DisplayLengthUnit>(
+    DEFAULT_DISPLAY_LENGTH_UNIT,
+  );
 
-  const [width, setWidth] = useState("");
-  const [depth, setDepth] = useState("");
+  const [widthMm, setWidthMm] = useState<number | null>(null);
+  const [depthMm, setDepthMm] = useState<number | null>(null);
   const [north, setNorth] = useState("");
   const [road, setRoad] = useState("");
   const [entrance, setEntrance] = useState("");
@@ -62,15 +152,15 @@ export function RequirementsReviewPage() {
     () =>
       Boolean(
         draft &&
-        width &&
-        depth &&
+        widthMm !== null &&
+        depthMm !== null &&
         north &&
         road &&
         floors &&
         bedrooms &&
         parking,
       ),
-    [draft, width, depth, north, road, floors, bedrooms, parking],
+    [draft, widthMm, depthMm, north, road, floors, bedrooms, parking],
   );
 
   async function interpret(event: SyntheticEvent<HTMLFormElement>) {
@@ -97,8 +187,8 @@ export function RequirementsReviewPage() {
         throw new Error(result.detail ?? "Interpretation failed.");
       }
       setDraft(result.draft);
-      setWidth(String(result.draft.plot_width_mm?.value ?? ""));
-      setDepth(String(result.draft.plot_depth_mm?.value ?? ""));
+      setWidthMm(result.draft.plot_width_mm?.value ?? null);
+      setDepthMm(result.draft.plot_depth_mm?.value ?? null);
       setNorth(String(result.draft.north_rotation_deg?.value ?? ""));
       setRoad(result.draft.road_side?.value ?? "");
       setEntrance(result.draft.entrance_facing?.value ?? "");
@@ -115,7 +205,7 @@ export function RequirementsReviewPage() {
   }
 
   async function confirm() {
-    if (!draft) return;
+    if (!draft || widthMm === null || depthMm === null) return;
     setError("");
     setStatus("Saving confirmed requirements…");
 
@@ -125,8 +215,8 @@ export function RequirementsReviewPage() {
       user_id: draft.user_id,
       project_id: draft.project_id,
       user_confirmed: true,
-      plot_width_mm: Number(width),
-      plot_depth_mm: Number(depth),
+      plot_width_mm: widthMm,
+      plot_depth_mm: depthMm,
       north_rotation_deg: Number(north),
       road_side: road,
       entrance_facing: entrance || null,
@@ -162,21 +252,13 @@ export function RequirementsReviewPage() {
         throw new Error(result.detail ?? "Confirmation failed.");
       }
       setStatus(
-        "Confirmed. Requirements are now ready for deterministic Phase 24B generation binding.",
+        "Confirmed. Requirements are ready for deterministic generation.",
       );
     } catch (cause) {
       setStatus("");
       setError(cause instanceof Error ? cause.message : "Confirmation failed.");
     }
   }
-
-  const inputStyle = {
-    width: "100%",
-    border: "1px solid #d9ded9",
-    borderRadius: "10px",
-    padding: "10px 12px",
-    background: "#fff",
-  } as const;
 
   return (
     <main style={{ padding: "30px", maxWidth: "1080px", margin: "0 auto" }}>
@@ -247,7 +329,37 @@ export function RequirementsReviewPage() {
 
       {draft ? (
         <section style={{ marginTop: "22px" }}>
-          <h2>Review extracted values</h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "end",
+              gap: "16px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <h2>Review extracted values</h2>
+              <p style={{ color: "#667066" }}>
+                Canonical geometry stays in integer millimetres. Switching
+                display units never changes the stored dimensions.
+              </p>
+            </div>
+            <label>
+              Display units
+              <select
+                style={{ ...inputStyle, minWidth: "180px" }}
+                value={displayUnit}
+                onChange={(event) => {
+                  setDisplayUnit(event.target.value as DisplayLengthUnit);
+                }}
+              >
+                <option value="ft-in">Feet &amp; Inches</option>
+                <option value="m">Metres</option>
+              </select>
+            </label>
+          </div>
+
           <div
             style={{
               display: "grid",
@@ -255,9 +367,19 @@ export function RequirementsReviewPage() {
               gap: "12px",
             }}
           >
+            <LengthReviewField
+              label="Plot width"
+              valueMm={widthMm}
+              displayUnit={displayUnit}
+              onChangeMm={setWidthMm}
+            />
+            <LengthReviewField
+              label="Plot depth"
+              valueMm={depthMm}
+              displayUnit={displayUnit}
+              onChangeMm={setDepthMm}
+            />
             {[
-              ["Plot width (mm)", width, setWidth],
-              ["Plot depth (mm)", depth, setDepth],
               ["North rotation (°)", north, setNorth],
               ["Road side", road, setRoad],
               ["Entrance facing", entrance, setEntrance],

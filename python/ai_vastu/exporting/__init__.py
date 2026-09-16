@@ -3,6 +3,7 @@ from .errors import ExportError, ExportRenderError, ExportSceneError
 from .jpeg_exporter import render_jpeg
 from .models import (
     EXPORT_SCENE_VERSION,
+    DimensionDisplayUnit,
     DrawingScene,
     DxfExportConfig,
     ExportArtifact,
@@ -17,6 +18,7 @@ from .service import export_plan_bundle
 
 __all__ = [
     "EXPORT_SCENE_VERSION",
+    "DimensionDisplayUnit",
     "DrawingScene",
     "DxfExportConfig",
     "ExportArtifact",

@@ -9,6 +9,7 @@ from reportlab.pdfgen.canvas import Canvas
 
 from ai_vastu.plan_schema import IntPoint
 
+from .dimension_units import format_dimension_length_mm
 from .geometry import (
     offset_segment,
     opening_segments,
@@ -137,7 +138,10 @@ def render_pdf(scene: DrawingScene, config: PdfExportConfig) -> ExportArtifact:
                     dimension.end.y_mm - dimension.start.y_mm,
                 )
             )
-            label = dimension.label_override or f"{length} mm"
+            label = dimension.label_override or format_dimension_length_mm(
+                length,
+                config.dimension_unit,
+            )
             canvas.drawCentredString((p1[0] + p2[0]) / 2.0, (p1[1] + p2[1]) / 2.0 + 2.0, label)
 
     if config.show_annotations:
@@ -177,7 +181,10 @@ def render_pdf(scene: DrawingScene, config: PdfExportConfig) -> ExportArtifact:
     canvas.drawRightString(
         page_width - margin,
         margin + 8 * mm,
-        "Plan geometry stored at 1 mm resolution",
+        (
+            "Canonical geometry: integer mm · dimensions: "
+            + ("feet + inches" if config.dimension_unit.value == "ft-in" else "metres")
+        ),
     )
     canvas.drawRightString(
         page_width - margin,

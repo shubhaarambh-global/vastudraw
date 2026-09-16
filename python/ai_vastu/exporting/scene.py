@@ -27,9 +27,13 @@ def build_drawing_scene(document: PlanDocument, *, floor_id: UUID | None = None)
     if not document.floors:
         raise ExportSceneError("PlanDocument has no floor to export.")
 
-    floor = document.floors[0] if floor_id is None else next(
-        (item for item in document.floors if item.id == floor_id),
-        None,
+    floor = (
+        document.floors[0]
+        if floor_id is None
+        else next(
+            (item for item in document.floors if item.id == floor_id),
+            None,
+        )
     )
     if floor is None:
         raise ExportSceneError("Requested export floor is not present in PlanDocument.")

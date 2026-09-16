@@ -21,6 +21,11 @@ import {
   worldToScreen,
 } from "../../editor/math.ts";
 import { useEditorStore } from "../../editor/store.ts";
+import {
+  DEFAULT_DISPLAY_LENGTH_UNIT,
+  formatLengthMm,
+  type DisplayLengthUnit,
+} from "../../units/length.ts";
 import type {
   CanvasSize,
   EditorChangeSet,
@@ -84,7 +89,10 @@ function GridLayer(props: { readonly size: CanvasSize }) {
   return <Layer listening={false}>{lines}</Layer>;
 }
 
-function RulerLayer(props: { readonly size: CanvasSize }) {
+function RulerLayer(props: {
+  readonly size: CanvasSize;
+  readonly displayUnit: DisplayLengthUnit;
+}) {
   const viewport = useEditorStore((state) => state.viewport);
   const bounds = visibleWorldBounds(viewport, props.size);
   const tickMm =
@@ -134,7 +142,7 @@ function RulerLayer(props: { readonly size: CanvasSize }) {
         key={`rxt-${String(x)}`}
         x={screen.xPx + 3}
         y={4}
-        text={String(x)}
+        text={formatLengthMm(x, props.displayUnit)}
         fontSize={9}
         fill="#475467"
         listening={false}
@@ -162,7 +170,7 @@ function RulerLayer(props: { readonly size: CanvasSize }) {
         key={`ryt-${String(y)}`}
         x={2}
         y={screen.yPx - 10}
-        text={String(y)}
+        text={formatLengthMm(y, props.displayUnit)}
         fontSize={8}
         fill="#475467"
         rotation={-90}
@@ -184,6 +192,9 @@ export function PlanEditor({ document, onSubmitChangeSet }: PlanEditorProps) {
     widthPx: 1_000,
     heightPx: 680,
   });
+  const [displayUnit, setDisplayUnit] = useState<DisplayLengthUnit>(
+    DEFAULT_DISPLAY_LENGTH_UNIT,
+  );
 
   const stateDocument = useEditorStore((state) => state.document);
   const activeFloorId = useEditorStore((state) => state.activeFloorId);
@@ -266,6 +277,7 @@ export function PlanEditor({ document, onSubmitChangeSet }: PlanEditorProps) {
         canUndo={history.staged.length > 0}
         canRedo={history.redo.length > 0}
         stagedCount={history.staged.length}
+        displayUnit={displayUnit}
         onTool={setTool}
         onFit={() => {
           fitToDocument(canvasSize);
@@ -274,6 +286,7 @@ export function PlanEditor({ document, onSubmitChangeSet }: PlanEditorProps) {
         onRedo={redo}
         onClear={clearStaged}
         onLayer={handleLayer}
+        onDisplayUnit={setDisplayUnit}
         onSubmit={submit}
         canSubmit={onSubmitChangeSet !== undefined && history.staged.length > 0}
       />
@@ -467,7 +480,7 @@ export function PlanEditor({ document, onSubmitChangeSet }: PlanEditorProps) {
                           align="center"
                           text={
                             dimension.label_override ??
-                            `${String(Math.round(length))} mm`
+                            formatLengthMm(Math.round(length), displayUnit)
                           }
                           fontSize={10}
                           fill="#475467"
@@ -487,11 +500,14 @@ export function PlanEditor({ document, onSubmitChangeSet }: PlanEditorProps) {
                 />
               ) : null}
             </Layer>
-            {layers.rulers ? <RulerLayer size={canvasSize} /> : null}
+            {layers.rulers ? (
+              <RulerLayer size={canvasSize} displayUnit={displayUnit} />
+            ) : null}
           </Stage>
           <div className="viewport-readout">
             {Math.round(viewport.pixelsPerMm * 1000) / 1000} px/mm · grid{" "}
-            {snap.gridMm} mm
+            {formatLengthMm(snap.gridMm, displayUnit)} · display{" "}
+            {displayUnit === "ft-in" ? "feet + inches" : "metres"}
           </div>
         </div>
         <InspectorPanel
@@ -499,6 +515,7 @@ export function PlanEditor({ document, onSubmitChangeSet }: PlanEditorProps) {
           index={index}
           selection={selection}
           commands={history.staged}
+          displayUnit={displayUnit}
           onStage={(command: EditorCommand) => {
             stage(command);
           }}

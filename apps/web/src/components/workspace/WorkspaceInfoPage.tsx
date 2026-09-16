@@ -214,7 +214,11 @@ function SettingsContent() {
         <dl className="saas-settings-list">
           <div>
             <dt>Canonical units</dt>
-            <dd>Integer millimetres</dd>
+            <dd>Integer millimetres (internal authority)</dd>
+          </div>
+          <div>
+            <dt>Display units</dt>
+            <dd>Feet + inches (default) or metres</dd>
           </div>
           <div>
             <dt>Plan history</dt>
@@ -239,8 +243,8 @@ function SettingsContent() {
         <h2>No silent defaults</h2>
         <p className="saas-muted">
           Missing authoritative geometry stays missing. Browser display pixels,
-          demo fixtures, and unspecified room dimensions never become canonical
-          data.
+          display-unit labels, demo fixtures, and unspecified room dimensions
+          never become canonical data.
         </p>
       </aside>
     </div>
