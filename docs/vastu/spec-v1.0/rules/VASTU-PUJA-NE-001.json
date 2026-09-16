@@ -1,0 +1,55 @@
+{
+  "interpretation_notes": "The source directly identifies the ishana/northeast corner for worship and meditation. This candidate deliberately encodes the recommendation as a SOFT planning preference so building safety, access, structure and statutory constraints remain authoritative. The eight-sector zone and centroid test are implementation proposals pending geometry-semantics review.",
+  "normalized_statement": "Prefer the puja or meditation room in the northeast zone of the dwelling.",
+  "review": {
+    "attestations": [
+      {
+        "decision": "APPROVE",
+        "note": "I reviewed the Phase 20A Vastu v1.0 review summary and approve all four normalized source-backed statements for the MVP; the current eight-sector direction model and CENTROID_IN_ZONE geometry semantics; SE-only primary kitchen placement without an inferred NW fallback; the master_bedroom-only S/SW predicate; separate bath and toilet treatment; and the current SOFT weights/severities.",
+        "reviewed_at": "2026-09-15T16:36:30.739097+05:30",
+        "reviewer_id": "VASTU-EXPERT-001",
+        "role": "VASTU_EXPERT"
+      }
+    ],
+    "geometry_semantics_reviewed": true,
+    "source_validation_passed": true,
+    "status": "APPROVED"
+  },
+  "rule": {
+    "category": "ROOM_PLACEMENT",
+    "classification": "SOFT",
+    "exception_rule_ids": [],
+    "explanation_template": "The puja/meditation room is evaluated against the northeast Vastu zone using the frozen directional rule evidence.",
+    "geometry_semantic": "CENTROID_IN_ZONE",
+    "lifecycle": "FROZEN",
+    "precedence": 100,
+    "predicate": {
+      "allowed_values": [
+        "NE"
+      ],
+      "kind": "ENUM_SET",
+      "metric_key": "zone_direction_8"
+    },
+    "rule_id": "VASTU-PUJA-NE-001",
+    "rule_version": "1.0.0",
+    "severity": "MAJOR",
+    "source_refs": [
+      {
+        "interpretation_note": "Candidate implementation maps ishana to the canonical eight-sector NE zone. Exact centroid/overlap semantics still require human geometry review before freezing.",
+        "locator": "Translated directional list in the article section beginning with the meaning of the cited Sanskrit verse; worship/meditation chamber is assigned to the ishana (northeast) corner.",
+        "source_id": "AWGP-VASTU-2004-NE"
+      }
+    ],
+    "spec_version": "1.0.0",
+    "subject": {
+      "attributes": [
+        {
+          "key": "room_type",
+          "value": "puja"
+        }
+      ],
+      "entity_type": "room"
+    },
+    "weight": 1000
+  }
+}

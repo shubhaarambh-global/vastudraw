@@ -1,0 +1,49 @@
+name: production-gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.17.1"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install Python
+        run: pip install -e ".[dev]"
+
+      - name: Install Node
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate repository
+        run: pnpm validate
+
+      - name: Third-party inventory
+        run: python scripts/audit-third-party.py
+
+      - name: Upload dependency inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: third-party-inventory
+          path: THIRD_PARTY.generated.md

@@ -1,0 +1,163 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { demoDocument } from "../editor/demo-document.ts";
+import { ApiRequestError, ProjectApiClient } from "./client.ts";
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (input instanceof URL) {
+    return input.toString();
+  }
+  return input.url;
+}
+
+void test("project API client uses immutable revision endpoints", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const fetchImpl: typeof fetch = (input, init) => {
+    const url = requestUrl(input);
+    calls.push({ url, ...(init === undefined ? {} : { init }) });
+    if (url.endsWith("/projects/project-1")) {
+      return Promise.resolve(
+        jsonResponse({
+          project_id: "project-1",
+          name: "House",
+          created_at: "2026-09-15T00:00:00+00:00",
+          current_revision_id: "revision-1",
+          current_revision_number: 1,
+        }),
+      );
+    }
+    return Promise.resolve(
+      jsonResponse({
+        project_id: "project-1",
+        revision_id: "revision-1",
+        revision_number: 1,
+        parent_revision_id: null,
+        created_at: "2026-09-15T00:00:00+00:00",
+        document: {},
+        plan_document_hash: "a".repeat(64),
+        payload_hash: "b".repeat(64),
+      }),
+    );
+  };
+
+  const client = new ProjectApiClient("http://api.example.test/", fetchImpl);
+  const revision = await client.loadCurrentRevision("project-1");
+  assert.equal(revision?.revision_id, "revision-1");
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    [
+      "http://api.example.test/projects/project-1",
+      "http://api.example.test/projects/project-1/revisions/revision-1",
+    ],
+  );
+});
+
+void test("append revision sends canonical document and optimistic parent", async () => {
+  let body: unknown;
+  const fetchImpl: typeof fetch = (_input, init) => {
+    const rawBody = init?.body;
+    if (typeof rawBody !== "string") {
+      throw new TypeError("Expected request body to be a JSON string.");
+    }
+    body = JSON.parse(rawBody) as unknown;
+    return Promise.resolve(jsonResponse({ revision_id: "next" }, 201));
+  };
+  const client = new ProjectApiClient("http://api.example.test", fetchImpl);
+  const document = {
+    ...demoDocument,
+    revision_id: "99999999-9999-9999-9999-999999999999",
+  };
+
+  await client.appendRevision(demoDocument.project_id, {
+    document,
+    expected_parent_revision_id: "revision-1",
+    note: "Saved from Phase 19 authenticated workflow",
+  });
+
+  assert.deepEqual(body, {
+    document,
+    expected_parent_revision_id: "revision-1",
+    note: "Saved from Phase 19 authenticated workflow",
+  });
+});
+
+void test("authenticated requests include bearer access token", async () => {
+  let authorization: string | null = null;
+  const fetchImpl: typeof fetch = (_input, init) => {
+    authorization = new Headers(init?.headers).get("Authorization");
+    return Promise.resolve(jsonResponse([]));
+  };
+  const client = new ProjectApiClient(
+    "http://api.example.test",
+    fetchImpl,
+    () => Promise.resolve("signed-access-token"),
+  );
+
+  await client.listProjects();
+  assert.equal(authorization, "Bearer signed-access-token");
+});
+
+void test("API failures preserve HTTP status and server detail", async () => {
+  const client = new ProjectApiClient("http://api.example.test", () =>
+    Promise.resolve(jsonResponse({ detail: "stale parent" }, 409)),
+  );
+  await assert.rejects(
+    client.getProject("project-1"),
+    (error: unknown) =>
+      error instanceof ApiRequestError && error.status === 409,
+  );
+});
+
+void test("generation intake uploads prompt and reference files as multipart form data", async () => {
+  let requestBody: BodyInit | null | undefined;
+  let requestHeaders: Headers | null = null;
+  const fetchImpl: typeof fetch = (_input, init) => {
+    requestBody = init?.body;
+    requestHeaders = new Headers(init?.headers);
+    return Promise.resolve(
+      jsonResponse(
+        {
+          intake_id: "intake-1",
+          project_id: "project-1",
+          created_at: "2026-09-15T00:00:00+00:00",
+          prompt: "Client brief",
+          attachments: [],
+          authoritative_geometry: false,
+          content_hash: "c".repeat(64),
+        },
+        201,
+      ),
+    );
+  };
+  const client = new ProjectApiClient("http://api.example.test", fetchImpl);
+  const file = new File(["%PDF-1.7\nreference"], "brief.pdf", {
+    type: "application/pdf",
+  });
+
+  const result = await client.createGenerationIntake(
+    "project-1",
+    "Client brief",
+    [file],
+  );
+
+  assert.equal(result.intake_id, "intake-1");
+  assert.ok(requestBody instanceof FormData);
+  assert.equal(requestBody.get("prompt"), "Client brief");
+  assert.equal((requestBody.get("files") as File).name, "brief.pdf");
+  assert.ok(requestHeaders);
+  assert.equal(
+    (requestHeaders as unknown as Headers).get("Content-Type"),
+    null,
+  );
+});

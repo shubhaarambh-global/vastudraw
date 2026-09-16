@@ -1,0 +1,44 @@
+{
+  "classification": "SOFT",
+  "geometry_semantic": "CENTROID_IN_ZONE",
+  "interpretation_notes": "This rule intentionally targets the PlanDocument bath room type, not attached_toilet, common_toilet or powder_room. The source contains additional bathroom/toilet cautions, but those are not collapsed into a single rule because the functional categories differ and require expert interpretation.",
+  "normalized_statement": "Prefer a dedicated bath room in the east zone of the dwelling.",
+  "precedence": 60,
+  "resolved_sources": [
+    {
+      "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+      "edition": "May-Jun 2004, Version 1",
+      "notes": "Practical room-location article. The bathroom section places bathrooms in the east and discusses exclusions/constraints. Candidate source only until domain review is complete.",
+      "publication_date": "2004",
+      "source_id": "AWGP-VASTU-2004-ROOMS",
+      "title": "Vastu Shastra: An Established Science III: The Ideal Locations of Different Rooms in Your House",
+      "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/May_Jun/v1.VastuShastra"
+    }
+  ],
+  "review": {
+    "attestations": [
+      {
+        "decision": "APPROVE",
+        "note": "I reviewed the Phase 20A Vastu v1.0 review summary and approve all four normalized source-backed statements for the MVP; the current eight-sector direction model and CENTROID_IN_ZONE geometry semantics; SE-only primary kitchen placement without an inferred NW fallback; the master_bedroom-only S/SW predicate; separate bath and toilet treatment; and the current SOFT weights/severities.",
+        "reviewed_at": "2026-09-15T16:36:30.739097+05:30",
+        "reviewer_id": "VASTU-EXPERT-001",
+        "role": "VASTU_EXPERT"
+      }
+    ],
+    "geometry_semantics_reviewed": true,
+    "source_validation_passed": true,
+    "status": "APPROVED"
+  },
+  "rule_id": "VASTU-BATH-EAST-001",
+  "rule_version": "1.0.0",
+  "severity": "MODERATE",
+  "source_references": [
+    {
+      "interpretation_note": "This candidate encodes only the positively stated East placement for RoomType.bath. Toilet placement is not inferred from this rule.",
+      "locator": "Bathroom section states that bathrooms should be constructed in the East and separately discusses exclusions and attached-toilet constraints.",
+      "source_id": "AWGP-VASTU-2004-ROOMS"
+    }
+  ],
+  "spec_version": "1.0.0",
+  "weight": 600
+}

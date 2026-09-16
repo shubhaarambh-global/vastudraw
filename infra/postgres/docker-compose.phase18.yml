@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ai-vastu-phase18-postgres
+    environment:
+      POSTGRES_DB: ai_vastu
+      POSTGRES_USER: ai_vastu
+      POSTGRES_PASSWORD: ai_vastu_local_only
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_vastu -d ai_vastu"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data

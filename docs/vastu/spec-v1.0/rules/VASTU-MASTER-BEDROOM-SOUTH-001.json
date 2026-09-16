@@ -1,0 +1,56 @@
+{
+  "interpretation_notes": "The source cites several traditional authorities for southern bedroom placement and later describes South/Southwest as the preferred practical range. The rule applies only to RoomType.master_bedroom; guest, children, parents and generic bedroom rules are deliberately deferred rather than inferred.",
+  "normalized_statement": "Prefer the master bedroom in the south or southwest zone of the dwelling.",
+  "review": {
+    "attestations": [
+      {
+        "decision": "APPROVE",
+        "note": "I reviewed the Phase 20A Vastu v1.0 review summary and approve all four normalized source-backed statements for the MVP; the current eight-sector direction model and CENTROID_IN_ZONE geometry semantics; SE-only primary kitchen placement without an inferred NW fallback; the master_bedroom-only S/SW predicate; separate bath and toilet treatment; and the current SOFT weights/severities.",
+        "reviewed_at": "2026-09-15T16:36:30.739097+05:30",
+        "reviewer_id": "VASTU-EXPERT-001",
+        "role": "VASTU_EXPERT"
+      }
+    ],
+    "geometry_semantics_reviewed": true,
+    "source_validation_passed": true,
+    "status": "APPROVED"
+  },
+  "rule": {
+    "category": "ROOM_PLACEMENT",
+    "classification": "SOFT",
+    "exception_rule_ids": [],
+    "explanation_template": "The master bedroom is evaluated against the south or southwest Vastu zone using the frozen directional rule evidence.",
+    "geometry_semantic": "CENTROID_IN_ZONE",
+    "lifecycle": "FROZEN",
+    "precedence": 90,
+    "predicate": {
+      "allowed_values": [
+        "S",
+        "SW"
+      ],
+      "kind": "ENUM_SET",
+      "metric_key": "zone_direction_8"
+    },
+    "rule_id": "VASTU-MASTER-BEDROOM-SOUTH-001",
+    "rule_version": "1.0.0",
+    "severity": "MAJOR",
+    "source_refs": [
+      {
+        "interpretation_note": "Candidate rule narrows the encoded primary master-bedroom set to S and SW, matching the practical summary in the same source. Other bedroom occupant-specific guidance is deferred.",
+        "locator": "Bedroom-direction discussion: South and West are described as suitable, South as best; later practical guidance gives South and Southwest in order of suitability and discusses master-bedroom placement in South/Southwest.",
+        "source_id": "AWGP-VASTU-2004-BEDROOMS"
+      }
+    ],
+    "spec_version": "1.0.0",
+    "subject": {
+      "attributes": [
+        {
+          "key": "room_type",
+          "value": "master_bedroom"
+        }
+      ],
+      "entity_type": "room"
+    },
+    "weight": 900
+  }
+}

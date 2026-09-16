@@ -1,0 +1,14 @@
+{
+  "expected_rule_bundle_hash": "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667",
+  "lifecycle": "FROZEN",
+  "notes": "Phase 20B production freeze. Four source-verified SOFT rules carry explicit human VASTU_EXPERT approval and reviewed geometry semantics.",
+  "production_rule_count": 4,
+  "rule_ids": [
+    "VASTU-BATH-EAST-001",
+    "VASTU-KITCHEN-SE-001",
+    "VASTU-MASTER-BEDROOM-SOUTH-001",
+    "VASTU-PUJA-NE-001"
+  ],
+  "spec_version": "1.0.0",
+  "title": "AI Vastu Architect \u2014 Vastu Specification v1.0"
+}

@@ -1,0 +1,1771 @@
+{
+  "$defs": {
+    "AdjacencyPreference": {
+      "additionalProperties": false,
+      "properties": {
+        "max_gap_mm": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Gap Mm"
+        },
+        "min_shared_length_mm": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Shared Length Mm"
+        },
+        "target_room_type": {
+          "$ref": "#/$defs/RoomType"
+        },
+        "weight": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Weight",
+          "type": "integer"
+        }
+      },
+      "required": ["target_room_type", "weight"],
+      "title": "AdjacencyPreference",
+      "type": "object"
+    },
+    "AdjacencyProhibition": {
+      "additionalProperties": false,
+      "properties": {
+        "hard": {
+          "default": true,
+          "title": "Hard",
+          "type": "boolean"
+        },
+        "target_room_type": {
+          "$ref": "#/$defs/RoomType"
+        }
+      },
+      "required": ["target_room_type"],
+      "title": "AdjacencyProhibition",
+      "type": "object"
+    },
+    "Annotation": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/IntPoint"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": ["id", "anchor", "text", "category"],
+      "title": "Annotation",
+      "type": "object"
+    },
+    "AspectRatioRange": {
+      "additionalProperties": false,
+      "properties": {
+        "max_ratio_milli": {
+          "exclusiveMinimum": 0,
+          "title": "Max Ratio Milli",
+          "type": "integer"
+        },
+        "min_ratio_milli": {
+          "exclusiveMinimum": 0,
+          "title": "Min Ratio Milli",
+          "type": "integer"
+        }
+      },
+      "required": ["min_ratio_milli", "max_ratio_milli"],
+      "title": "AspectRatioRange",
+      "type": "object"
+    },
+    "Assumption": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_entity_ids": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Affected Entity Ids",
+          "type": "array"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "confirmed_by_user": {
+          "title": "Confirmed By User",
+          "type": "boolean"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/AssumptionSource"
+        }
+      },
+      "required": ["id", "code", "description", "source", "confirmed_by_user"],
+      "title": "Assumption",
+      "type": "object"
+    },
+    "AssumptionSource": {
+      "enum": ["USER", "DOCUMENTED_DEFAULT", "AI_SUGGESTED", "SYSTEM_DERIVED"],
+      "title": "AssumptionSource",
+      "type": "string"
+    },
+    "AxisSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/IntPoint"
+        },
+        "start": {
+          "$ref": "#/$defs/IntPoint"
+        }
+      },
+      "required": ["start", "end"],
+      "title": "AxisSegment",
+      "type": "object"
+    },
+    "BuildableArea": {
+      "additionalProperties": false,
+      "properties": {
+        "polygon": {
+          "$ref": "#/$defs/IntPolygon"
+        },
+        "setbacks": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Setback"
+          },
+          "title": "Setbacks",
+          "type": "array"
+        }
+      },
+      "required": ["polygon"],
+      "title": "BuildableArea",
+      "type": "object"
+    },
+    "ClosureReport": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "closure_error_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Closure Error Mm",
+          "type": "integer"
+        },
+        "tolerance_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Tolerance Mm",
+          "type": "integer"
+        }
+      },
+      "required": ["closure_error_mm", "tolerance_mm", "accepted"],
+      "title": "ClosureReport",
+      "type": "object"
+    },
+    "DeclaredMeasurement": {
+      "additionalProperties": false,
+      "properties": {
+        "exact_mm_decimal": {
+          "title": "Exact Mm Decimal",
+          "type": "string"
+        },
+        "input_unit": {
+          "$ref": "#/$defs/LengthUnit"
+        },
+        "input_value": {
+          "title": "Input Value",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "quantized_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Quantized Mm",
+          "type": "integer"
+        },
+        "rounding_delta_mm_decimal": {
+          "title": "Rounding Delta Mm Decimal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "input_value",
+        "input_unit",
+        "exact_mm_decimal",
+        "quantized_mm",
+        "rounding_delta_mm_decimal"
+      ],
+      "title": "DeclaredMeasurement",
+      "type": "object"
+    },
+    "Dimension": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/IntPoint"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Override"
+        },
+        "offset_mm": {
+          "default": 0,
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Offset Mm",
+          "type": "integer"
+        },
+        "start": {
+          "$ref": "#/$defs/IntPoint"
+        }
+      },
+      "required": ["id", "start", "end"],
+      "title": "Dimension",
+      "type": "object"
+    },
+    "DoorHinge": {
+      "enum": ["LEFT", "RIGHT"],
+      "title": "DoorHinge",
+      "type": "string"
+    },
+    "DoorSwing": {
+      "enum": ["IN", "OUT", "SLIDING", "NONE"],
+      "title": "DoorSwing",
+      "type": "string"
+    },
+    "EvidenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": ["key", "value"],
+      "title": "EvidenceItem",
+      "type": "object"
+    },
+    "Fixture": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fixture_type": {
+          "title": "Fixture Type",
+          "type": "string"
+        },
+        "footprint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntPolygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "rotation_udeg": {
+          "default": 0,
+          "exclusiveMaximum": 360000000,
+          "minimum": 0,
+          "title": "Rotation Udeg",
+          "type": "integer"
+        }
+      },
+      "required": ["id", "fixture_type"],
+      "title": "Fixture",
+      "type": "object"
+    },
+    "Floor": {
+      "additionalProperties": false,
+      "properties": {
+        "annotations": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Annotation"
+          },
+          "title": "Annotations",
+          "type": "array"
+        },
+        "boundary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntPolygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dimensions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Dimension"
+          },
+          "title": "Dimensions",
+          "type": "array"
+        },
+        "elevation_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": -9223372036854775808,
+          "title": "Elevation Mm",
+          "type": "integer"
+        },
+        "fixtures": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Fixture"
+          },
+          "title": "Fixtures",
+          "type": "array"
+        },
+        "floor_to_floor_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Floor To Floor Mm",
+          "type": "integer"
+        },
+        "furniture": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Furniture"
+          },
+          "title": "Furniture",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "openings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Opening"
+          },
+          "title": "Openings",
+          "type": "array"
+        },
+        "rooms": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RoomGeometry"
+          },
+          "title": "Rooms",
+          "type": "array"
+        },
+        "stairs": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Stair"
+          },
+          "title": "Stairs",
+          "type": "array"
+        },
+        "walls": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Wall"
+          },
+          "title": "Walls",
+          "type": "array"
+        }
+      },
+      "required": ["id", "index", "name", "elevation_mm", "floor_to_floor_mm"],
+      "title": "Floor",
+      "type": "object"
+    },
+    "Furniture": {
+      "additionalProperties": false,
+      "properties": {
+        "footprint": {
+          "$ref": "#/$defs/IntPolygon"
+        },
+        "furniture_type": {
+          "title": "Furniture Type",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "rotation_udeg": {
+          "default": 0,
+          "exclusiveMaximum": 360000000,
+          "minimum": 0,
+          "title": "Rotation Udeg",
+          "type": "integer"
+        }
+      },
+      "required": ["id", "furniture_type", "footprint"],
+      "title": "Furniture",
+      "type": "object"
+    },
+    "GenerationMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        },
+        "input_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Hash"
+        },
+        "rule_bundle_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Bundle Hash"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "solver_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Solver Name"
+        },
+        "solver_parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MetadataItem"
+          },
+          "title": "Solver Parameters",
+          "type": "array"
+        },
+        "solver_step_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Solver Step Mm"
+        },
+        "solver_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Solver Version"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        }
+      },
+      "title": "GenerationMetadata",
+      "type": "object"
+    },
+    "IntPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "x_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": -9223372036854775808,
+          "title": "X Mm",
+          "type": "integer"
+        },
+        "y_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": -9223372036854775808,
+          "title": "Y Mm",
+          "type": "integer"
+        }
+      },
+      "required": ["x_mm", "y_mm"],
+      "title": "IntPoint",
+      "type": "object"
+    },
+    "IntPolygon": {
+      "additionalProperties": false,
+      "description": "Canonical integer-mm polygon storage.\n\nTopological validity is intentionally not proven in Phase 1; that belongs to the\ngeometry/validation phases. Rings are open: callers must not repeat the first point.",
+      "properties": {
+        "holes": {
+          "default": [],
+          "items": {
+            "items": {
+              "$ref": "#/$defs/IntPoint"
+            },
+            "minItems": 3,
+            "type": "array"
+          },
+          "title": "Holes",
+          "type": "array"
+        },
+        "outer": {
+          "items": {
+            "$ref": "#/$defs/IntPoint"
+          },
+          "minItems": 3,
+          "title": "Outer",
+          "type": "array"
+        }
+      },
+      "required": ["outer"],
+      "title": "IntPolygon",
+      "type": "object"
+    },
+    "LengthUnit": {
+      "enum": ["mm", "cm", "m", "in", "ft"],
+      "title": "LengthUnit",
+      "type": "string"
+    },
+    "MetadataItem": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": ["key", "value"],
+      "title": "MetadataItem",
+      "type": "object"
+    },
+    "Opening": {
+      "additionalProperties": false,
+      "properties": {
+        "height_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Height Mm",
+          "type": "integer"
+        },
+        "hinge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DoorHinge"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/OpeningKind"
+        },
+        "offset_from_wall_start_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Offset From Wall Start Mm",
+          "type": "integer"
+        },
+        "sill_height_mm": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sill Height Mm"
+        },
+        "swing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DoorSwing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "wall_id": {
+          "format": "uuid",
+          "title": "Wall Id",
+          "type": "string"
+        },
+        "width_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Width Mm",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "wall_id",
+        "kind",
+        "offset_from_wall_start_mm",
+        "width_mm",
+        "height_mm"
+      ],
+      "title": "Opening",
+      "type": "object"
+    },
+    "OpeningKind": {
+      "enum": ["DOOR", "WINDOW", "OPENING"],
+      "title": "OpeningKind",
+      "type": "string"
+    },
+    "Orientation": {
+      "additionalProperties": false,
+      "properties": {
+        "north_rotation_udeg": {
+          "exclusiveMaximum": 360000000,
+          "minimum": 0,
+          "title": "North Rotation Udeg",
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/OrientationSource"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": ["north_rotation_udeg", "source", "verified"],
+      "title": "Orientation",
+      "type": "object"
+    },
+    "OrientationSource": {
+      "enum": ["USER", "SURVEY", "DOCUMENT_EXTRACTION", "IMPORT"],
+      "title": "OrientationSource",
+      "type": "string"
+    },
+    "Plot": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary": {
+          "$ref": "#/$defs/IntPolygon"
+        },
+        "closure_report": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClosureReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "declared_measurements": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DeclaredMeasurement"
+          },
+          "title": "Declared Measurements",
+          "type": "array"
+        },
+        "edge_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Edge Ids",
+          "type": "array"
+        },
+        "geometry_type": {
+          "$ref": "#/$defs/PlotGeometryType"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "input_source": {
+          "$ref": "#/$defs/PlotInputSource"
+        },
+        "verification_status": {
+          "$ref": "#/$defs/VerificationStatus"
+        }
+      },
+      "required": [
+        "id",
+        "geometry_type",
+        "boundary",
+        "edge_ids",
+        "input_source",
+        "verification_status"
+      ],
+      "title": "Plot",
+      "type": "object"
+    },
+    "PlotGeometryType": {
+      "enum": ["RECTANGLE", "POLYGON"],
+      "title": "PlotGeometryType",
+      "type": "string"
+    },
+    "PlotInputSource": {
+      "enum": [
+        "MANUAL",
+        "INTERACTIVE",
+        "SURVEY",
+        "DOCUMENT_EXTRACTION",
+        "IMPORT"
+      ],
+      "title": "PlotInputSource",
+      "type": "string"
+    },
+    "Road": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "plot_edge_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Plot Edge Ids",
+          "type": "array"
+        },
+        "primary_access": {
+          "default": false,
+          "title": "Primary Access",
+          "type": "boolean"
+        },
+        "width_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width Mm"
+        }
+      },
+      "required": ["id", "plot_edge_ids"],
+      "title": "Road",
+      "type": "object"
+    },
+    "RoomGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "polygon": {
+          "$ref": "#/$defs/IntPolygon"
+        },
+        "requirement_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirement Id"
+        },
+        "room_type": {
+          "$ref": "#/$defs/RoomType"
+        }
+      },
+      "required": ["id", "room_type", "polygon"],
+      "title": "RoomGeometry",
+      "type": "object"
+    },
+    "RoomRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "adjacency_preferences": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AdjacencyPreference"
+          },
+          "title": "Adjacency Preferences",
+          "type": "array"
+        },
+        "adjacency_prohibitions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AdjacencyProhibition"
+          },
+          "title": "Adjacency Prohibitions",
+          "type": "array"
+        },
+        "aspect_ratio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AspectRatioRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "daylight_priority": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Daylight Priority",
+          "type": "integer"
+        },
+        "floor_preference": {
+          "default": [],
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Floor Preference",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "max_area_mm2": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Area Mm2"
+        },
+        "max_depth_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Depth Mm"
+        },
+        "max_width_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Width Mm"
+        },
+        "min_area_mm2": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Min Area Mm2",
+          "type": "integer"
+        },
+        "min_depth_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Min Depth Mm",
+          "type": "integer"
+        },
+        "min_width_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Min Width Mm",
+          "type": "integer"
+        },
+        "preferred_area_mm2": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preferred Area Mm2"
+        },
+        "preferred_depth_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preferred Depth Mm"
+        },
+        "preferred_width_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preferred Width Mm"
+        },
+        "privacy_priority": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Privacy Priority",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "room_type": {
+          "$ref": "#/$defs/RoomType"
+        },
+        "user_priority": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "User Priority",
+          "type": "integer"
+        },
+        "vastu_profile_refs": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Vastu Profile Refs",
+          "type": "array"
+        },
+        "ventilation_priority": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Ventilation Priority",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "room_type",
+        "min_width_mm",
+        "min_depth_mm",
+        "min_area_mm2"
+      ],
+      "title": "RoomRequirement",
+      "type": "object"
+    },
+    "RoomType": {
+      "enum": [
+        "living",
+        "drawing",
+        "dining",
+        "kitchen",
+        "utility",
+        "pantry",
+        "store",
+        "puja",
+        "master_bedroom",
+        "bedroom",
+        "parents_bedroom",
+        "guest_bedroom",
+        "children_bedroom",
+        "attached_toilet",
+        "common_toilet",
+        "powder_room",
+        "bath",
+        "dressing",
+        "wardrobe",
+        "staircase",
+        "lift",
+        "lobby",
+        "corridor",
+        "foyer",
+        "verandah",
+        "balcony",
+        "terrace",
+        "courtyard",
+        "parking",
+        "garage",
+        "home_office",
+        "servant_room",
+        "servant_toilet",
+        "laundry",
+        "study",
+        "family_lounge"
+      ],
+      "title": "RoomType",
+      "type": "string"
+    },
+    "ScoreComponent": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "score_basis_points": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Score Basis Points",
+          "type": "integer"
+        },
+        "weight_basis_points": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Weight Basis Points",
+          "type": "integer"
+        }
+      },
+      "required": ["key", "score_basis_points", "weight_basis_points"],
+      "title": "ScoreComponent",
+      "type": "object"
+    },
+    "ScoringSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "components": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScoreComponent"
+          },
+          "title": "Components",
+          "type": "array"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "overall_basis_points": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Overall Basis Points",
+          "type": "integer"
+        }
+      },
+      "required": ["mode", "overall_basis_points"],
+      "title": "ScoringSummary",
+      "type": "object"
+    },
+    "Setback": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary_edge_id": {
+          "format": "uuid",
+          "title": "Boundary Edge Id",
+          "type": "string"
+        },
+        "distance_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Distance Mm",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "regulation_rule_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Regulation Rule Id"
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Ref"
+        }
+      },
+      "required": ["id", "boundary_edge_id", "distance_mm"],
+      "title": "Setback",
+      "type": "object"
+    },
+    "Stair": {
+      "additionalProperties": false,
+      "properties": {
+        "direction_udeg": {
+          "exclusiveMaximum": 360000000,
+          "minimum": 0,
+          "title": "Direction Udeg",
+          "type": "integer"
+        },
+        "floor_height_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Floor Height Mm",
+          "type": "integer"
+        },
+        "footprint": {
+          "$ref": "#/$defs/IntPolygon"
+        },
+        "headroom_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headroom Mm"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "landing_depth_mm": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Landing Depth Mm",
+          "type": "integer"
+        },
+        "number_of_risers": {
+          "exclusiveMinimum": 0,
+          "title": "Number Of Risers",
+          "type": "integer"
+        },
+        "riser_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Riser Mm",
+          "type": "integer"
+        },
+        "stair_type": {
+          "$ref": "#/$defs/StairType"
+        },
+        "tread_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Tread Mm",
+          "type": "integer"
+        },
+        "width_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Width Mm",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "stair_type",
+        "footprint",
+        "width_mm",
+        "riser_mm",
+        "tread_mm",
+        "number_of_risers",
+        "floor_height_mm",
+        "landing_depth_mm",
+        "direction_udeg"
+      ],
+      "title": "Stair",
+      "type": "object"
+    },
+    "StairType": {
+      "enum": [
+        "STRAIGHT",
+        "L_SHAPED",
+        "U_SHAPED",
+        "DOG_LEGGED",
+        "SPIRAL",
+        "OTHER"
+      ],
+      "title": "StairType",
+      "type": "string"
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "errors": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ValidationResult"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "informational": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ValidationResult"
+          },
+          "title": "Informational",
+          "type": "array"
+        },
+        "valid": {
+          "title": "Valid",
+          "type": "boolean"
+        },
+        "warnings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ValidationResult"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": ["valid"],
+      "title": "ValidationReport",
+      "type": "object"
+    },
+    "ValidationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "entity_refs": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Entity Refs",
+          "type": "array"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EvidenceItem"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "message_code": {
+          "title": "Message Code",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        },
+        "validator_version": {
+          "title": "Validator Version",
+          "type": "string"
+        }
+      },
+      "required": ["check_id", "severity", "message_code", "validator_version"],
+      "title": "ValidationResult",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "enum": ["ERROR", "WARNING", "INFO"],
+      "title": "ValidationSeverity",
+      "type": "string"
+    },
+    "VastuAnalysis": {
+      "additionalProperties": false,
+      "properties": {
+        "major_violations": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Major Violations",
+          "type": "integer"
+        },
+        "minor_compromises": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Minor Compromises",
+          "type": "integer"
+        },
+        "overall_basis_points": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Overall Basis Points"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/VastuResult"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "spec_version": {
+          "title": "Spec Version",
+          "type": "string"
+        }
+      },
+      "required": ["spec_version"],
+      "title": "VastuAnalysis",
+      "type": "object"
+    },
+    "VastuResult": {
+      "additionalProperties": false,
+      "properties": {
+        "earned_weight": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Earned Weight",
+          "type": "integer"
+        },
+        "entity_refs": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Entity Refs",
+          "type": "array"
+        },
+        "geometry_evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EvidenceItem"
+          },
+          "title": "Geometry Evidence",
+          "type": "array"
+        },
+        "measured_evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EvidenceItem"
+          },
+          "title": "Measured Evidence",
+          "type": "array"
+        },
+        "raw_weight": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Raw Weight",
+          "type": "integer"
+        },
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/VastuStatus"
+        }
+      },
+      "required": ["rule_id", "rule_version", "status"],
+      "title": "VastuResult",
+      "type": "object"
+    },
+    "VastuStatus": {
+      "enum": ["PASS", "PARTIAL", "COMPROMISE", "FAIL", "NOT_APPLICABLE"],
+      "title": "VastuStatus",
+      "type": "string"
+    },
+    "VerificationStatus": {
+      "enum": ["UNVERIFIED", "USER_VERIFIED", "SURVEY_VERIFIED"],
+      "title": "VerificationStatus",
+      "type": "string"
+    },
+    "Wall": {
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/AxisSegment"
+        },
+        "category": {
+          "$ref": "#/$defs/WallCategory"
+        },
+        "construction_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Construction Type"
+        },
+        "height_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Height Mm",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "thickness_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 9223372036854775807,
+          "title": "Thickness Mm",
+          "type": "integer"
+        }
+      },
+      "required": ["id", "axis", "thickness_mm", "height_mm", "category"],
+      "title": "Wall",
+      "type": "object"
+    },
+    "WallCategory": {
+      "enum": ["EXTERNAL", "INTERNAL", "SHAFT", "PARAPET"],
+      "title": "WallCategory",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assumptions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Assumption"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "buildable_area": {
+      "$ref": "#/$defs/BuildableArea"
+    },
+    "canonical_units": {
+      "const": "mm",
+      "title": "Canonical Units",
+      "type": "string"
+    },
+    "content_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Content Hash"
+    },
+    "floors": {
+      "items": {
+        "$ref": "#/$defs/Floor"
+      },
+      "title": "Floors",
+      "type": "array"
+    },
+    "generation_metadata": {
+      "$ref": "#/$defs/GenerationMetadata"
+    },
+    "orientation": {
+      "$ref": "#/$defs/Orientation"
+    },
+    "plot": {
+      "$ref": "#/$defs/Plot"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "regulation_spec_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regulation Spec Version"
+    },
+    "revision_id": {
+      "format": "uuid",
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "roads": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Road"
+      },
+      "title": "Roads",
+      "type": "array"
+    },
+    "room_requirements": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RoomRequirement"
+      },
+      "title": "Room Requirements",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scoring": {
+      "$ref": "#/$defs/ScoringSummary"
+    },
+    "validation": {
+      "$ref": "#/$defs/ValidationReport"
+    },
+    "vastu_analysis": {
+      "$ref": "#/$defs/VastuAnalysis"
+    },
+    "vastu_spec_version": {
+      "title": "Vastu Spec Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "revision_id",
+    "canonical_units",
+    "plot",
+    "orientation",
+    "buildable_area",
+    "floors",
+    "vastu_spec_version",
+    "vastu_analysis",
+    "validation",
+    "scoring",
+    "generation_metadata"
+  ],
+  "title": "PlanDocument",
+  "type": "object"
+}

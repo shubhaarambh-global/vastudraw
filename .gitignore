@@ -1,0 +1,38 @@
+# Node
+node_modules/
+.pnpm-store/
+.next/
+dist/
+coverage/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Env / local
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+.idea/
+
+# Generated artifacts
+artifacts/
+exports/
+*.dwg
+*.dxf
+*.pdf
+*.jpg
+*.jpeg
+*.png
+.env.production
+.env.local
+.env.*.local
+.local/
+*.tsbuildinfo

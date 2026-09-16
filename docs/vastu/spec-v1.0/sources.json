@@ -1,0 +1,47 @@
+[
+  {
+    "source_id": "AWGP-VASTU-2004-BEDROOMS",
+    "title": "Vastu Shastra: An established science - VI: Vastu guidelines on bedrooms",
+    "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+    "edition": "Nov-Dec 2004, Version 1",
+    "publication_date": "2004",
+    "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/Nov_Dec/v1.VastuShastra_VI",
+    "notes": "Secondary interpretive source that explicitly cites Vastu Ratnawali, Maharshi Kashyap, Muhurtamartand, Muhurta Chintamani and Vrahadvastumala for bedroom and kitchen placement. Used only for source-backed candidate rules pending independent domain review."
+  },
+  {
+    "source_id": "AWGP-VASTU-2004-KITCHEN",
+    "title": "Vastu Shastra: An Established Science IV: Ideal position of kitchen in your house",
+    "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+    "edition": "Jul-Aug 2004, Version 1",
+    "publication_date": "2004",
+    "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/Jul_Aug/v1.VastuShastra_IV",
+    "notes": "Practical article in the 2004 Vastu series describing the kitchen as an agni-oriented space and discussing its directional placement. Used as a candidate source, not as a substitute for expert attestation."
+  },
+  {
+    "source_id": "AWGP-VASTU-2004-NE",
+    "title": "Vastu Shastra: An Established Science-II: The importance of northeast angle in Vastu Shastra",
+    "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+    "edition": "Mar-Apr 2004, Version 1",
+    "publication_date": "2004",
+    "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/Mar_Apr/v1.VastuShastra",
+    "notes": "Contains an explicit translated directional list including worship/meditation in the northeast and kitchen in the southeast. Used as a source-verified candidate reference."
+  },
+  {
+    "source_id": "AWGP-VASTU-2004-ROOMS",
+    "title": "Vastu Shastra: An Established Science III: The Ideal Locations of Different Rooms in Your House",
+    "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+    "edition": "May-Jun 2004, Version 1",
+    "publication_date": "2004",
+    "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/May_Jun/v1.VastuShastra",
+    "notes": "Practical room-location article. The bathroom section places bathrooms in the east and discusses exclusions/constraints. Candidate source only until domain review is complete."
+  },
+  {
+    "source_id": "NITC-IKS-ARCHITECTURE",
+    "title": "Centre for Indian Knowledge Systems — Sanskrit Texts on Architecture",
+    "author_or_institution": "National Institute of Technology Calicut",
+    "edition": "Web reference",
+    "publication_date": "2026",
+    "uri": "https://nitc.ac.in/multidiscilplinary-centres/centre-for-indian-knowledge-systems",
+    "notes": "Institutional bibliography identifying classical architectural sources including Manasara, Mayamata, Samarangana-Sutradhara, Visvakarma-Prakasa and Brhat Samhita. Background provenance only; it is not used as a direct locator for any directional rule."
+  }
+]

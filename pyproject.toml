@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-vastu-architect"
+version = "0.0.0"
+description = "Deterministic AI-assisted Vastu architectural planning platform"
+requires-python = ">=3.12"
+dependencies = [
+  "ezdxf==1.4.4",
+  "fastapi>=0.116,<1",
+  "ortools==9.15.6755",
+  "Pillow==12.3.0",
+  "PyJWT[crypto]>=2.10,<3",
+  "psycopg[binary,pool]>=3.2,<4",
+  "pydantic>=2.11,<3",
+  "pyclipr==0.1.8",
+  "python-multipart>=0.0.20,<1",
+  "reportlab==5.0.1",
+  "shapely==2.1.2",
+  "uvicorn[standard]>=0.35,<1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "hypothesis==6.168.0",
+  "mypy>=1.17,<2",
+  "pytest>=8.4,<9",
+  "pytest-cov>=6.2,<7",
+  "ruff>=0.12,<1",
+  "types-reportlab==5.0.0.20260911",
+  "types-shapely==2.1.0.20260728"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/ai_vastu"]
+
+[tool.pytest.ini_options]
+pythonpath = ["python", "apps/api"]
+testpaths = ["tests", "apps/api/tests"]
+addopts = "-q --strict-markers --strict-config"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["python", "apps/api"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["python", "apps/api"]
+packages = ["ai_vastu", "app"]

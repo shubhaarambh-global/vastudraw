@@ -1,0 +1,199 @@
+{
+  "content_hash": "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667",
+  "production": true,
+  "rules": [
+    {
+      "category": "ROOM_PLACEMENT",
+      "classification": "SOFT",
+      "exception_rule_ids": [],
+      "explanation_template": "The bath room is evaluated against the east Vastu zone using the frozen directional rule evidence.",
+      "geometry_semantic": "CENTROID_IN_ZONE",
+      "lifecycle": "FROZEN",
+      "precedence": 60,
+      "predicate": {
+        "allowed_values": [
+          "E"
+        ],
+        "kind": "ENUM_SET",
+        "metric_key": "zone_direction_8"
+      },
+      "rule_id": "VASTU-BATH-EAST-001",
+      "rule_version": "1.0.0",
+      "severity": "MODERATE",
+      "source_refs": [
+        {
+          "interpretation_note": "This candidate encodes only the positively stated East placement for RoomType.bath. Toilet placement is not inferred from this rule.",
+          "locator": "Bathroom section states that bathrooms should be constructed in the East and separately discusses exclusions and attached-toilet constraints.",
+          "source_id": "AWGP-VASTU-2004-ROOMS"
+        }
+      ],
+      "spec_version": "1.0.0",
+      "subject": {
+        "attributes": [
+          {
+            "key": "room_type",
+            "value": "bath"
+          }
+        ],
+        "entity_type": "room"
+      },
+      "weight": 600
+    },
+    {
+      "category": "ROOM_PLACEMENT",
+      "classification": "SOFT",
+      "exception_rule_ids": [],
+      "explanation_template": "The kitchen is evaluated against the southeast Vastu zone using the frozen directional rule evidence.",
+      "geometry_semantic": "CENTROID_IN_ZONE",
+      "lifecycle": "FROZEN",
+      "precedence": 100,
+      "predicate": {
+        "allowed_values": [
+          "SE"
+        ],
+        "kind": "ENUM_SET",
+        "metric_key": "zone_direction_8"
+      },
+      "rule_id": "VASTU-KITCHEN-SE-001",
+      "rule_version": "1.0.0",
+      "severity": "MAJOR",
+      "source_refs": [
+        {
+          "interpretation_note": "Direct directional support for SE as the primary zone.",
+          "locator": "Translated directional list assigns the kitchen/pakasadana to the agneya (southeast) angle.",
+          "source_id": "AWGP-VASTU-2004-NE"
+        },
+        {
+          "interpretation_note": "Used as corroborating practical interpretation. Alternative placements discussed in the wider source are intentionally not encoded until expert review defines precedence/exception semantics.",
+          "locator": "Article IV, section discussing the ideal position of the kitchen and the role of agni tatva.",
+          "source_id": "AWGP-VASTU-2004-KITCHEN"
+        }
+      ],
+      "spec_version": "1.0.0",
+      "subject": {
+        "attributes": [
+          {
+            "key": "room_type",
+            "value": "kitchen"
+          }
+        ],
+        "entity_type": "room"
+      },
+      "weight": 1000
+    },
+    {
+      "category": "ROOM_PLACEMENT",
+      "classification": "SOFT",
+      "exception_rule_ids": [],
+      "explanation_template": "The master bedroom is evaluated against the south or southwest Vastu zone using the frozen directional rule evidence.",
+      "geometry_semantic": "CENTROID_IN_ZONE",
+      "lifecycle": "FROZEN",
+      "precedence": 90,
+      "predicate": {
+        "allowed_values": [
+          "S",
+          "SW"
+        ],
+        "kind": "ENUM_SET",
+        "metric_key": "zone_direction_8"
+      },
+      "rule_id": "VASTU-MASTER-BEDROOM-SOUTH-001",
+      "rule_version": "1.0.0",
+      "severity": "MAJOR",
+      "source_refs": [
+        {
+          "interpretation_note": "Candidate rule narrows the encoded primary master-bedroom set to S and SW, matching the practical summary in the same source. Other bedroom occupant-specific guidance is deferred.",
+          "locator": "Bedroom-direction discussion: South and West are described as suitable, South as best; later practical guidance gives South and Southwest in order of suitability and discusses master-bedroom placement in South/Southwest.",
+          "source_id": "AWGP-VASTU-2004-BEDROOMS"
+        }
+      ],
+      "spec_version": "1.0.0",
+      "subject": {
+        "attributes": [
+          {
+            "key": "room_type",
+            "value": "master_bedroom"
+          }
+        ],
+        "entity_type": "room"
+      },
+      "weight": 900
+    },
+    {
+      "category": "ROOM_PLACEMENT",
+      "classification": "SOFT",
+      "exception_rule_ids": [],
+      "explanation_template": "The puja/meditation room is evaluated against the northeast Vastu zone using the frozen directional rule evidence.",
+      "geometry_semantic": "CENTROID_IN_ZONE",
+      "lifecycle": "FROZEN",
+      "precedence": 100,
+      "predicate": {
+        "allowed_values": [
+          "NE"
+        ],
+        "kind": "ENUM_SET",
+        "metric_key": "zone_direction_8"
+      },
+      "rule_id": "VASTU-PUJA-NE-001",
+      "rule_version": "1.0.0",
+      "severity": "MAJOR",
+      "source_refs": [
+        {
+          "interpretation_note": "Candidate implementation maps ishana to the canonical eight-sector NE zone. Exact centroid/overlap semantics still require human geometry review before freezing.",
+          "locator": "Translated directional list in the article section beginning with the meaning of the cited Sanskrit verse; worship/meditation chamber is assigned to the ishana (northeast) corner.",
+          "source_id": "AWGP-VASTU-2004-NE"
+        }
+      ],
+      "spec_version": "1.0.0",
+      "subject": {
+        "attributes": [
+          {
+            "key": "room_type",
+            "value": "puja"
+          }
+        ],
+        "entity_type": "room"
+      },
+      "weight": 1000
+    }
+  ],
+  "sources": [
+    {
+      "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+      "edition": "Nov-Dec 2004, Version 1",
+      "notes": "Secondary interpretive source that explicitly cites Vastu Ratnawali, Maharshi Kashyap, Muhurtamartand, Muhurta Chintamani and Vrahadvastumala for bedroom and kitchen placement. Used only for source-backed candidate rules pending independent domain review.",
+      "publication_date": "2004",
+      "source_id": "AWGP-VASTU-2004-BEDROOMS",
+      "title": "Vastu Shastra: An established science - VI: Vastu guidelines on bedrooms",
+      "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/Nov_Dec/v1.VastuShastra_VI"
+    },
+    {
+      "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+      "edition": "Jul-Aug 2004, Version 1",
+      "notes": "Practical article in the 2004 Vastu series describing the kitchen as an agni-oriented space and discussing its directional placement. Used as a candidate source, not as a substitute for expert attestation.",
+      "publication_date": "2004",
+      "source_id": "AWGP-VASTU-2004-KITCHEN",
+      "title": "Vastu Shastra: An Established Science IV: Ideal position of kitchen in your house",
+      "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/Jul_Aug/v1.VastuShastra_IV"
+    },
+    {
+      "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+      "edition": "Mar-Apr 2004, Version 1",
+      "notes": "Contains an explicit translated directional list including worship/meditation in the northeast and kitchen in the southeast. Used as a source-verified candidate reference.",
+      "publication_date": "2004",
+      "source_id": "AWGP-VASTU-2004-NE",
+      "title": "Vastu Shastra: An Established Science-II: The importance of northeast angle in Vastu Shastra",
+      "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/Mar_Apr/v1.VastuShastra"
+    },
+    {
+      "author_or_institution": "Akhand Jyoti / All World Gayatri Pariwar",
+      "edition": "May-Jun 2004, Version 1",
+      "notes": "Practical room-location article. The bathroom section places bathrooms in the east and discusses exclusions/constraints. Candidate source only until domain review is complete.",
+      "publication_date": "2004",
+      "source_id": "AWGP-VASTU-2004-ROOMS",
+      "title": "Vastu Shastra: An Established Science III: The Ideal Locations of Different Rooms in Your House",
+      "uri": "https://www.awgp.org/en/literature/akhandjyoti/2004/May_Jun/v1.VastuShastra"
+    }
+  ],
+  "spec_version": "1.0.0"
+}

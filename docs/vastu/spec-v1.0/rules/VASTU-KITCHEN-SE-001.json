@@ -1,0 +1,60 @@
+{
+  "interpretation_notes": "Multiple passages in the selected 2004 series identify agneya/southeast as the primary kitchen location. Some traditions and practical guidance permit alternatives such as northwest when southeast is unavailable; Phase 20 does not silently encode those alternatives because their precedence requires domain review. The rule remains SOFT and cannot override statutory, structural, fire-safety or accessibility constraints.",
+  "normalized_statement": "Prefer the kitchen in the southeast zone of the dwelling.",
+  "review": {
+    "attestations": [
+      {
+        "decision": "APPROVE",
+        "note": "I reviewed the Phase 20A Vastu v1.0 review summary and approve all four normalized source-backed statements for the MVP; the current eight-sector direction model and CENTROID_IN_ZONE geometry semantics; SE-only primary kitchen placement without an inferred NW fallback; the master_bedroom-only S/SW predicate; separate bath and toilet treatment; and the current SOFT weights/severities.",
+        "reviewed_at": "2026-09-15T16:36:30.739097+05:30",
+        "reviewer_id": "VASTU-EXPERT-001",
+        "role": "VASTU_EXPERT"
+      }
+    ],
+    "geometry_semantics_reviewed": true,
+    "source_validation_passed": true,
+    "status": "APPROVED"
+  },
+  "rule": {
+    "category": "ROOM_PLACEMENT",
+    "classification": "SOFT",
+    "exception_rule_ids": [],
+    "explanation_template": "The kitchen is evaluated against the southeast Vastu zone using the frozen directional rule evidence.",
+    "geometry_semantic": "CENTROID_IN_ZONE",
+    "lifecycle": "FROZEN",
+    "precedence": 100,
+    "predicate": {
+      "allowed_values": [
+        "SE"
+      ],
+      "kind": "ENUM_SET",
+      "metric_key": "zone_direction_8"
+    },
+    "rule_id": "VASTU-KITCHEN-SE-001",
+    "rule_version": "1.0.0",
+    "severity": "MAJOR",
+    "source_refs": [
+      {
+        "interpretation_note": "Direct directional support for SE as the primary zone.",
+        "locator": "Translated directional list assigns the kitchen/pakasadana to the agneya (southeast) angle.",
+        "source_id": "AWGP-VASTU-2004-NE"
+      },
+      {
+        "interpretation_note": "Used as corroborating practical interpretation. Alternative placements discussed in the wider source are intentionally not encoded until expert review defines precedence/exception semantics.",
+        "locator": "Article IV, section discussing the ideal position of the kitchen and the role of agni tatva.",
+        "source_id": "AWGP-VASTU-2004-KITCHEN"
+      }
+    ],
+    "spec_version": "1.0.0",
+    "subject": {
+      "attributes": [
+        {
+          "key": "room_type",
+          "value": "kitchen"
+        }
+      ],
+      "entity_type": "room"
+    },
+    "weight": 1000
+  }
+}
