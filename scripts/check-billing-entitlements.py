@@ -13,10 +13,10 @@ user = "11111111-1111-1111-1111-111111111111"
 free_project = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 paid_project = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
-assert get_product("project_single").amount_paise == 39_900
-assert get_product("project_pack_10").amount_paise == 339_900
-assert get_product("pro_monthly").amount_paise == 249_900
-assert get_product("pro_yearly").amount_paise == 2_499_900
+assert get_product("project_single").amount_paise == 49_900
+assert get_product("project_pack_10").amount_paise == 489_900
+assert get_product("pro_monthly").amount_paise == 999_900
+assert get_product("pro_yearly").amount_paise == 6_999_900
 
 with tempfile.TemporaryDirectory() as directory:
     repository = SqliteBillingRepository(Path(directory) / "billing.sqlite3")

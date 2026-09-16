@@ -20,6 +20,7 @@ class BillingProduct:
     currency: str = "INR"
     project_credits: int = 0
     billing_period: str | None = None
+    generation_limit_per_project: int | None = None
 
 
 CATALOG: tuple[BillingProduct, ...] = (
@@ -33,28 +34,30 @@ CATALOG: tuple[BillingProduct, ...] = (
         sku="project_single",
         name="Single Project",
         kind=ProductKind.PROJECT,
-        amount_paise=39_900,
+        amount_paise=49_900,
         project_credits=1,
+        generation_limit_per_project=3,
     ),
     BillingProduct(
         sku="project_pack_10",
         name="10 Project Pack",
         kind=ProductKind.PROJECT_PACK,
-        amount_paise=339_900,
+        amount_paise=489_900,
         project_credits=10,
+        generation_limit_per_project=5,
     ),
     BillingProduct(
         sku="pro_monthly",
         name="Pro Monthly",
         kind=ProductKind.SUBSCRIPTION,
-        amount_paise=249_900,
+        amount_paise=999_900,
         billing_period="monthly",
     ),
     BillingProduct(
         sku="pro_yearly",
         name="Pro Yearly",
         kind=ProductKind.SUBSCRIPTION,
-        amount_paise=2_499_900,
+        amount_paise=6_999_900,
         billing_period="yearly",
     ),
 )
@@ -79,6 +82,7 @@ def public_catalog() -> list[dict[str, object]]:
             "currency": item.currency,
             "project_credits": item.project_credits,
             "billing_period": item.billing_period,
+            "generation_limit_per_project": item.generation_limit_per_project,
         }
         for item in CATALOG
     ]

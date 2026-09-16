@@ -63,6 +63,7 @@ class ProductionSettings:
     razorpay_yearly_plan_id: str
     requirements_provider: str
     openai_model: str | None
+    gemini_model: str | None
     rate_limit_interpret_per_hour: int
     rate_limit_generation_per_hour: int
     rate_limit_checkout_per_hour: int
@@ -79,6 +80,7 @@ class ProductionSettings:
             "razorpay_key_id_prefix": self.razorpay_key_id[:8],
             "requirements_provider": self.requirements_provider,
             "openai_model": self.openai_model,
+            "gemini_model": self.gemini_model,
             "rate_limit_interpret_per_hour": self.rate_limit_interpret_per_hour,
             "rate_limit_generation_per_hour": self.rate_limit_generation_per_hour,
             "rate_limit_checkout_per_hour": self.rate_limit_checkout_per_hour,
@@ -150,12 +152,19 @@ def load_production_settings(
         "AI_VASTU_REQUIREMENTS_PROVIDER",
         "fixture",
     ).strip().lower()
-    if provider != "openai":
+    if provider not in {"openai", "gemini"}:
         raise ProductionConfigurationError(
-            "Commercial launch requires AI_VASTU_REQUIREMENTS_PROVIDER=openai."
+            "Commercial launch requires a supported live requirements provider."
         )
-    _required(env, "OPENAI_API_KEY")
-    openai_model = _required(env, "AI_VASTU_OPENAI_MODEL")
+
+    openai_model: str | None = None
+    gemini_model: str | None = None
+    if provider == "openai":
+        _required(env, "OPENAI_API_KEY")
+        openai_model = _required(env, "AI_VASTU_OPENAI_MODEL")
+    else:
+        _required(env, "GEMINI_API_KEY")
+        gemini_model = _required(env, "AI_VASTU_GEMINI_MODEL")
 
     return ProductionSettings(
         database_url=database_url,
@@ -180,6 +189,7 @@ def load_production_settings(
         ),
         requirements_provider=provider,
         openai_model=openai_model,
+        gemini_model=gemini_model,
         rate_limit_interpret_per_hour=_positive_int(
             env,
             "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR",

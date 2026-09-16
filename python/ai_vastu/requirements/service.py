@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from .models import ConfirmedRequirements, RequirementDraft
 from .providers import (
     FixtureRequirementsProvider,
+    GeminiGenerateContentRequirementsProvider,
     InterpretationInput,
     OpenAIResponsesRequirementsProvider,
     ReferenceAsset,
@@ -24,6 +25,8 @@ def create_provider() -> RequirementsProvider:
         return FixtureRequirementsProvider()
     if provider_name == "openai":
         return OpenAIResponsesRequirementsProvider.from_environment()
+    if provider_name == "gemini":
+        return GeminiGenerateContentRequirementsProvider.from_environment()
     raise RuntimeError(f"Unsupported requirements provider: {provider_name}")
 
 
