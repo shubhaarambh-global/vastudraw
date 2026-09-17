@@ -8,7 +8,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-PHASE26C_VERSION = "26C.1"
+from ai_vastu.plan_schema import PlanDocument
+
+PHASE26C_VERSION = "26C.2"
 BasisPoints = Annotated[int, Field(ge=0, le=10_000)]
 
 
@@ -45,6 +47,14 @@ class CandidateExplanation(BaseModel):
     selection_reason: str = Field(min_length=1, max_length=1_000)
 
 
+class CandidateExclusion(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    strategy_id: str = Field(min_length=1, max_length=80)
+    reason_code: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=1_000)
+
+
 class CandidateResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -59,6 +69,9 @@ class CandidateResult(BaseModel):
     architecture_weight_basis_points: BasisPoints
     vastu_weight_basis_points: BasisPoints
     plan_document_hash: str | None = None
+    plan_document: PlanDocument | None = None
+    soft_vastu_suggestions: tuple[str, ...] = ()
+    unevaluated_metrics: tuple[str, ...] = ()
     explanation: CandidateExplanation
 
     @model_validator(mode="after")
@@ -67,16 +80,26 @@ class CandidateResult(BaseModel):
             raise ValueError("Architecture and Vastu weights must sum to 10,000 basis points.")
         if not self.valid_architecture:
             raise ValueError("Invalid architectural candidates cannot enter the ranked result set.")
+        if self.plan_document is not None:
+            document_hash = (
+                self.plan_document.content_hash or self.plan_document.compute_content_hash()
+            )
+            if self.plan_document_hash is None:
+                raise ValueError("plan_document_hash is required when plan_document is present.")
+            if document_hash != self.plan_document_hash:
+                raise ValueError("plan_document_hash does not match plan_document.")
         return self
 
 
 class CandidateRunResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["26C.1"] = "26C.1"
+    schema_version: Literal["26C.2"] = "26C.2"
     project_id: UUID
     planning_mode: CandidatePlanningMode
     candidates: tuple[CandidateResult, ...]
+    exclusions: tuple[CandidateExclusion, ...] = ()
+    attempted_candidate_count: int = Field(default=0, ge=0)
     rejected_candidate_count: int = Field(default=0, ge=0)
     structural_design_included: Literal[False] = False
     content_hash: str | None = None
@@ -88,6 +111,9 @@ class CandidateRunResult(BaseModel):
         ranks = [item.rank for item in self.candidates]
         if ranks != list(range(1, len(ranks) + 1)):
             raise ValueError("Candidate ranks must be contiguous starting at 1.")
+        ids = [item.candidate_id for item in self.candidates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Candidate IDs must be unique.")
         if self.content_hash is not None and self.content_hash != self.compute_content_hash():
             raise ValueError("content_hash does not match candidate run content.")
         return self

@@ -30,9 +30,19 @@ class PlannerNoticeSeverity(StrEnum):
     WARNING = "WARNING"
 
 
+class PlannerSearchVariant(StrEnum):
+    LOWER_LEFT = "LOWER_LEFT"
+    LOWER_RIGHT = "LOWER_RIGHT"
+    UPPER_LEFT = "UPPER_LEFT"
+    UPPER_RIGHT = "UPPER_RIGHT"
+    REVERSE_LOWER_LEFT = "REVERSE_LOWER_LEFT"
+    REVERSE_UPPER_RIGHT = "REVERSE_UPPER_RIGHT"
+
+
 class PlannerConfig(FrozenModel):
     solver_step_mm: PositiveMM
     clearance_reserve_mm: NonNegativeMM = 0
+    search_variant: PlannerSearchVariant = PlannerSearchVariant.LOWER_LEFT
     max_time_ms: PositiveInt
     max_conflicts: PositiveInt
     random_seed: SeedInt = 0

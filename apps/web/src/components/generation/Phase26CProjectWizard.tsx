@@ -499,7 +499,7 @@ export function Phase26CProjectWizard() {
             </div>
 
             <button type="button" className="phase26c-generate-button" disabled>
-              Generate alternatives — enabled in 26C.2
+              Generate alternatives — UI binding in 26C.3
             </button>
           </div>
         ) : null}

@@ -33,6 +33,7 @@ from .models import (
     PlannerNotice,
     PlannerNoticeSeverity,
     PlannerResult,
+    PlannerSearchVariant,
     PlannerStatus,
     RoomPlacement,
     SolverRunMetadata,
@@ -275,6 +276,11 @@ def solve_rectangular_problem(
     room_vars: dict[Any, _RoomVars] = {}
     hard_by_room = _room_constraint_index(problem)
     ordered_rooms = tuple(sorted(problem.room_instances, key=lambda item: str(item.id)))
+    if config.search_variant in {
+        PlannerSearchVariant.REVERSE_LOWER_LEFT,
+        PlannerSearchVariant.REVERSE_UPPER_RIGHT,
+    }:
+        ordered_rooms = tuple(reversed(ordered_rooms))
 
     for room in ordered_rooms:
         constraints = hard_by_room.get(room.id, [])
@@ -510,11 +516,40 @@ def solve_rectangular_problem(
     if penalty_terms:
         model.minimize(sum(term.expression * term.weight for term in penalty_terms))
 
-    decision_vars: list[Any] = []
-    for room in ordered_rooms:
-        rv = room_vars[room.id]
-        decision_vars.extend([rv.x, rv.y, rv.width, rv.depth])
-    model.add_decision_strategy(decision_vars, cp_model.CHOOSE_FIRST, cp_model.SELECT_MIN_VALUE)
+    x_vars = [room_vars[room.id].x for room in ordered_rooms]
+    y_vars = [room_vars[room.id].y for room in ordered_rooms]
+    size_vars = [
+        value
+        for room in ordered_rooms
+        for value in (room_vars[room.id].width, room_vars[room.id].depth)
+    ]
+
+    right_bias = config.search_variant in {
+        PlannerSearchVariant.LOWER_RIGHT,
+        PlannerSearchVariant.UPPER_RIGHT,
+        PlannerSearchVariant.REVERSE_UPPER_RIGHT,
+    }
+    upper_bias = config.search_variant in {
+        PlannerSearchVariant.UPPER_LEFT,
+        PlannerSearchVariant.UPPER_RIGHT,
+        PlannerSearchVariant.REVERSE_UPPER_RIGHT,
+    }
+
+    model.add_decision_strategy(
+        x_vars,
+        cp_model.CHOOSE_FIRST,
+        cp_model.SELECT_MAX_VALUE if right_bias else cp_model.SELECT_MIN_VALUE,
+    )
+    model.add_decision_strategy(
+        y_vars,
+        cp_model.CHOOSE_FIRST,
+        cp_model.SELECT_MAX_VALUE if upper_bias else cp_model.SELECT_MIN_VALUE,
+    )
+    model.add_decision_strategy(
+        size_vars,
+        cp_model.CHOOSE_FIRST,
+        cp_model.SELECT_MIN_VALUE,
+    )
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = config.max_time_ms / 1000.0
