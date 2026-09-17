@@ -74,8 +74,7 @@ def _result(
     evidence: dict[str, object] | None = None,
 ) -> ValidationResult:
     evidence_items = tuple(
-        EvidenceItem(key=key, value=str(value))
-        for key, value in sorted((evidence or {}).items())
+        EvidenceItem(key=key, value=str(value)) for key, value in sorted((evidence or {}).items())
     )
     return ValidationResult(
         check_id=check_id,
@@ -469,9 +468,8 @@ def _validate_walls_and_dimension_closure(
                     entity_refs=(wall.id,),
                 )
             )
-        if (
-            floor.boundary is not None
-            and not topology_validator.covers_axis_segment(floor.boundary, wall.axis)
+        if floor.boundary is not None and not topology_validator.covers_axis_segment(
+            floor.boundary, wall.axis
         ):
             errors.append(
                 _result(

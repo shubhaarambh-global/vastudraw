@@ -32,10 +32,9 @@ def test_phase8_does_not_pull_export_dependencies() -> None:
         assert "import reportlab" not in source
         assert "from reportlab" not in source
 
+
 def test_phase8_does_not_hide_wall_defaults() -> None:
-    source = (ROOT / "python/ai_vastu/architectural_geometry/models.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "python/ai_vastu/architectural_geometry/models.py").read_text(encoding="utf-8")
     assert "external_wall_thickness_mm: PositiveMM" in source
     assert "internal_wall_thickness_mm: PositiveMM" in source
     assert "external_wall_thickness_mm: PositiveMM =" not in source

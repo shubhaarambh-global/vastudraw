@@ -56,9 +56,7 @@ def compile_production_release(
         released_at=released_at,
         release_hash="0" * 64,
     )
-    release = provisional.model_copy(
-        update={"release_hash": provisional.compute_release_hash()}
-    )
+    release = provisional.model_copy(update={"release_hash": provisional.compute_release_hash()})
     if not release.verify_hash():
         raise VastuSpecIntegrityError("Compiled release hash did not verify.")
     return release

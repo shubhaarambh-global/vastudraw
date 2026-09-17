@@ -24,9 +24,7 @@ def _payload(revision_id: UUID) -> dict[str, object]:
 
 def test_project_revision_api_is_append_only_and_loadable() -> None:
     repository = SqliteProjectRepository(":memory:")
-    client = TestClient(
-        create_app(repository, DevelopmentAccessTokenVerifier(TOKEN, USER_ID))
-    )
+    client = TestClient(create_app(repository, DevelopmentAccessTokenVerifier(TOKEN, USER_ID)))
 
     created = client.post(
         "/projects",

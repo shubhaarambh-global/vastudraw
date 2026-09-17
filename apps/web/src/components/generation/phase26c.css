@@ -1,0 +1,462 @@
+.phase26c-content {
+  max-width: none;
+  padding: 0;
+  background: #fbfaf7;
+}
+
+.phase26c-entry,
+.phase26c-wizard-shell {
+  min-height: calc(100vh - 72px);
+  background: #fbfaf7;
+}
+
+.phase26c-entry {
+  padding: 72px clamp(32px, 7vw, 110px);
+}
+
+.phase26c-entry-heading {
+  max-width: 720px;
+}
+
+.phase26c-entry-heading h1,
+.phase26c-wizard-head h1 {
+  margin: 7px 0 8px;
+  font-size: clamp(30px, 3.1vw, 48px);
+  letter-spacing: -0.045em;
+}
+
+.phase26c-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 900px;
+  margin-top: 48px;
+}
+
+.phase26c-entry-grid > button {
+  min-height: 230px;
+  padding: 32px;
+  border: 1px solid #e7e2ef;
+  border-radius: 22px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.phase26c-entry-grid > button:hover {
+  transform: translateY(-2px);
+  border-color: #bba8ea;
+  box-shadow: 0 18px 42px rgba(56, 42, 92, 0.08);
+}
+
+.phase26c-entry-grid strong {
+  display: block;
+  margin-top: 24px;
+  font-size: 21px;
+}
+
+.phase26c-entry-grid small {
+  display: block;
+  max-width: 360px;
+  margin-top: 8px;
+  color: #6f687b;
+  line-height: 1.6;
+}
+
+.phase26c-entry-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 14px;
+  background: #f0ebfb;
+  color: #6f4ac8;
+  font-size: 24px;
+}
+
+.phase26c-v2-note {
+  margin-top: 28px;
+  color: #7a7483;
+  font-size: 13px;
+}
+
+.phase26c-wizard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 42px clamp(32px, 5vw, 72px) 24px;
+  border-bottom: 1px solid #ebe7ef;
+}
+
+.phase26c-progress {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 clamp(32px, 5vw, 72px);
+  border-bottom: 1px solid #ebe7ef;
+}
+
+.phase26c-progress-step {
+  padding: 0 0 14px;
+  border: 0;
+  background: transparent;
+  color: #8b8495;
+  text-align: left;
+}
+
+.phase26c-progress-step span {
+  display: block;
+  height: 4px;
+  margin-bottom: 9px;
+  border-radius: 99px;
+  background: #e6e0ed;
+}
+
+.phase26c-progress-step[data-state="active"] span,
+.phase26c-progress-step[data-state="complete"] span {
+  background: #7650ca;
+}
+
+.phase26c-progress-step[data-state="active"] {
+  color: #2f2544;
+}
+
+.phase26c-progress-step[data-state="complete"]:not(:disabled) {
+  cursor: pointer;
+}
+
+.phase26c-wizard-stage {
+  min-height: 590px;
+  padding: 36px clamp(32px, 9vw, 150px) 96px;
+}
+
+.phase26c-step-card {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.phase26c-step-card h2 {
+  margin: 5px 0 8px;
+  font-size: 26px;
+  letter-spacing: -0.025em;
+}
+
+.phase26c-unit-toggle,
+.phase26c-direction-row,
+.phase26c-choice-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.phase26c-unit-toggle {
+  justify-content: flex-end;
+  margin: 32px 0 16px;
+}
+
+.phase26c-unit-toggle button,
+.phase26c-direction-row button,
+.phase26c-choice-row button {
+  padding: 9px 14px;
+  border: 1px solid #e1dbe9;
+  border-radius: 10px;
+  background: #fff;
+  color: #51475f;
+  cursor: pointer;
+}
+
+.phase26c-unit-toggle button[data-active="true"],
+.phase26c-direction-row button[data-active="true"],
+.phase26c-choice-row button[data-active="true"] {
+  border-color: #baa7e6;
+  background: #eee8fb;
+  color: #5f3ab8;
+}
+
+.phase26c-dimension-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 22px;
+  align-items: end;
+}
+
+.phase26c-dimension-grid label span {
+  display: block;
+  margin-bottom: 9px;
+  color: #6a6078;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.phase26c-dimension-grid input {
+  width: 100%;
+  padding: 12px 4px;
+  border: 0;
+  border-bottom: 1px solid #d7cfe2;
+  outline: none;
+  background: transparent;
+  font-size: 30px;
+}
+
+.phase26c-plot-diagram {
+  display: grid;
+  min-height: 170px;
+  place-items: center;
+  border: 1px solid #e3ddeb;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.phase26c-plot-rect {
+  width: 78px;
+  height: 105px;
+  border: 2px dashed #6b5d83;
+}
+
+.phase26c-plot-diagram small {
+  margin-top: -24px;
+  color: #6f667a;
+}
+
+.phase26c-path-note,
+.phase26c-locked-option {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid #e7e1ee;
+  border-radius: 14px;
+  background: #fff;
+  color: #655b73;
+}
+
+.phase26c-fieldset {
+  margin: 30px 0;
+  padding: 0;
+  border: 0;
+}
+
+.phase26c-fieldset legend {
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.phase26c-locked-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.phase26c-locked-option div {
+  display: grid;
+  gap: 4px;
+}
+
+.phase26c-locked-option span:not(.saas-status-badge) {
+  color: #81798b;
+  font-size: 13px;
+}
+
+.phase26c-locked-option[data-disabled="true"] {
+  opacity: 0.62;
+}
+
+.phase26c-choice-row {
+  justify-content: flex-end;
+  margin: 22px 0;
+}
+
+.phase26c-choice-row strong {
+  margin-right: auto;
+}
+
+.phase26c-counter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.phase26c-counter {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5dfec;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.phase26c-counter button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e4dfea;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.phase26c-add-room {
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed #cfc5db;
+  border-radius: 13px;
+  background: transparent;
+  color: #6546a9;
+}
+
+.phase26c-intent {
+  width: 100%;
+  min-height: 150px;
+  margin: 24px 0 10px;
+  padding: 18px;
+  border: 1px solid #dcd3e8;
+  border-radius: 14px;
+  background: #f3effb;
+  resize: vertical;
+}
+
+.phase26c-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.phase26c-mode-grid button {
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid #e4deeb;
+  border-radius: 13px;
+  background: #fff;
+  text-align: left;
+}
+
+.phase26c-mode-grid button[data-active="true"] {
+  border-color: #9e82dc;
+  background: #f0eafb;
+}
+
+.phase26c-mode-grid span {
+  display: block;
+  margin-top: 7px;
+  color: #81778e;
+  font-size: 12px;
+}
+
+.phase26c-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin-top: 28px;
+  border: 1px solid #e5dfeb;
+  border-radius: 14px;
+  background: #e5dfeb;
+}
+
+.phase26c-review-grid div {
+  padding: 16px 18px;
+  background: #fff;
+}
+
+.phase26c-review-grid dt {
+  color: #847b8d;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.phase26c-review-grid dd {
+  margin: 6px 0 0;
+  font-weight: 700;
+}
+
+.phase26c-candidate-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0;
+}
+
+.phase26c-candidate-preview strong {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.phase26c-candidate-preview span {
+  padding: 7px 10px;
+  border-radius: 99px;
+  background: #eee8f8;
+  color: #65517f;
+  font-size: 12px;
+}
+
+.phase26c-generate-button,
+.phase26c-next {
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 10px;
+  background: #7650ca;
+  color: #fff;
+  font-weight: 700;
+}
+
+.phase26c-generate-button:disabled {
+  opacity: 0.52;
+}
+
+.phase26c-wizard-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 18px clamp(32px, 5vw, 72px);
+  border-top: 1px solid #e8e2ee;
+  background: rgba(251, 250, 247, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.phase26c-back,
+.phase26c-return-button {
+  border: 0;
+  background: transparent;
+  color: #625873;
+}
+
+.phase26c-return-button {
+  margin: 18px 24px 0;
+}
+
+.phase26c-embedded-existing > .phase26c-return-button {
+  position: fixed;
+  z-index: 20;
+  top: 74px;
+  left: 246px;
+}
+
+@media (max-width: 900px) {
+  .phase26c-entry-grid,
+  .phase26c-counter-grid,
+  .phase26c-mode-grid,
+  .phase26c-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .phase26c-dimension-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .phase26c-plot-diagram {
+    grid-column: 1 / -1;
+  }
+
+  .phase26c-progress-step small {
+    display: none;
+  }
+}

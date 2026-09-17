@@ -13,9 +13,7 @@ def create_billing_repository() -> BillingRepository:
     if app_env in {"production", "staging"}:
         database_url = os.getenv("AI_VASTU_DATABASE_URL", "")
         if not database_url:
-            raise RuntimeError(
-                "AI_VASTU_DATABASE_URL is required for production billing."
-            )
+            raise RuntimeError("AI_VASTU_DATABASE_URL is required for production billing.")
         return PostgresBillingRepository(database_url)
 
     path = Path(

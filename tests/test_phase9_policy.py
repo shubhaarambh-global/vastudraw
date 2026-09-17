@@ -38,6 +38,7 @@ def test_phase9_uses_existing_geometry_stack_without_export_dependencies() -> No
         assert "import reportlab" not in source
         assert "from reportlab" not in source
 
+
 def test_phase9_validator_does_not_import_ortools() -> None:
     validation_root = ROOT / "python/ai_vastu/validation"
     for path in validation_root.rglob("*.py"):

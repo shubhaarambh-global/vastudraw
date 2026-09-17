@@ -27,9 +27,7 @@ def _load_sources(path: Path) -> tuple[SourceRecord, ...]:
     if not isinstance(payload, list):
         raise VastuSpecLoadError("sources.json must contain a JSON array.")
     try:
-        records = tuple(
-            SourceRecord.model_validate_json(json.dumps(item)) for item in payload
-        )
+        records = tuple(SourceRecord.model_validate_json(json.dumps(item)) for item in payload)
     except ValidationError as exc:
         raise VastuSpecLoadError("sources.json contains an invalid source record.") from exc
     ordered = tuple(sorted(records, key=lambda item: item.source_id))
@@ -45,9 +43,7 @@ def _load_rule_records(directory: Path) -> tuple[RuleAuthoringRecord, ...]:
     records: list[RuleAuthoringRecord] = []
     for path in sorted(directory.glob("*.json")):
         try:
-            records.append(
-                RuleAuthoringRecord.model_validate_json(json.dumps(_read_json(path)))
-            )
+            records.append(RuleAuthoringRecord.model_validate_json(json.dumps(_read_json(path))))
         except ValidationError as exc:
             raise VastuSpecLoadError(f"Invalid rule authoring record: {path.name}") from exc
     ordered = tuple(sorted(records, key=lambda item: item.rule.rule_id))

@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 
 from ai_vastu.plan_schema.base import FrozenModel
 from ai_vastu.plan_schema.models import EntityId, RoomType
-from ai_vastu.plan_schema.units import MM, PositiveMM
+from ai_vastu.plan_schema.units import MM, NonNegativeMM, PositiveMM
 
 SOLVER_MODEL_VERSION = "1.0.0"
 PositiveInt = Annotated[int, Field(gt=0)]
@@ -32,6 +32,7 @@ class PlannerNoticeSeverity(StrEnum):
 
 class PlannerConfig(FrozenModel):
     solver_step_mm: PositiveMM
+    clearance_reserve_mm: NonNegativeMM = 0
     max_time_ms: PositiveInt
     max_conflicts: PositiveInt
     random_seed: SeedInt = 0

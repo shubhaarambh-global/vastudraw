@@ -10,7 +10,6 @@ expected = plan_document_json_schema()
 actual = json.loads(TARGET.read_text(encoding="utf-8"))
 if actual != expected:
     raise SystemExit(
-        "Generated PlanDocument JSON Schema is stale. "
-        "Run: python scripts/export-plan-schema.py"
+        "Generated PlanDocument JSON Schema is stale. Run: python scripts/export-plan-schema.py"
     )
 print("PlanDocument JSON Schema matches authoritative Pydantic models.")

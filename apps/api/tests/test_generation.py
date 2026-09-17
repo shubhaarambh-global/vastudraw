@@ -19,9 +19,7 @@ AUTH = {"Authorization": f"Bearer {TOKEN}", "content-type": "application/json"}
 
 def _client() -> TestClient:
     return TestClient(
-        create_app(
-            access_token_verifier=DevelopmentAccessTokenVerifier(TOKEN, USER_ID)
-        )
+        create_app(access_token_verifier=DevelopmentAccessTokenVerifier(TOKEN, USER_ID))
     )
 
 

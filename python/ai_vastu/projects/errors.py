@@ -25,6 +25,6 @@ class RevisionConflictError(ProjectStoreError):
 class PersistenceCorruptionError(ProjectStoreError):
     """Raised when persisted canonical content fails integrity checks."""
 
+
 class ProjectStoreConfigurationError(ProjectStoreError):
     """Raised when production persistence configuration is unsafe."""
-

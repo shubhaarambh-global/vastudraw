@@ -40,13 +40,13 @@ assert "CurrentUserDependency" in api_source
 assert "_require_project_owner" in api_source
 assert 'allow_headers=["Authorization", "Content-Type"]' in api_source
 
-web_source = (
-    ROOT / "apps/web/src/components/dashboard/DashboardPage.tsx"
-).read_text(encoding="utf-8")
+web_source = (ROOT / "apps/web/src/components/dashboard/DashboardPage.tsx").read_text(
+    encoding="utf-8"
+)
 assert "DashboardPage" in web_source
-workspace_source = (
-    ROOT / "apps/web/src/components/dashboard/useWorkspaceProjects.ts"
-).read_text(encoding="utf-8")
+workspace_source = (ROOT / "apps/web/src/components/dashboard/useWorkspaceProjects.ts").read_text(
+    encoding="utf-8"
+)
 assert "useWorkspaceProjects" in web_source
 assert "listProjects" in workspace_source
 assert "/editor?project=" in web_source

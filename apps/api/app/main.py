@@ -35,6 +35,19 @@ from ai_vastu.generation_intake import (
     IncomingGenerationAttachment,
     create_generation_intake_store_from_environment,
 )
+from ai_vastu.plan_intake import (
+    PlanAnalysisNotFoundError,
+    PlanAnalysisResult,
+    PlanAnalysisStore,
+    PlanGeometryConfirmationInput,
+    PlanGeometryConfirmationRecord,
+    PlanIntakeConfigurationError,
+    PlanIntakeProviderError,
+    PlanRecognitionInput,
+    PlanReferenceBlob,
+    PlanReferenceKind,
+    create_plan_intake_service,
+)
 from ai_vastu.plan_schema import PLAN_SCHEMA_VERSION, PlanDocument
 from ai_vastu.production.middleware import ProductionHardeningMiddleware
 from ai_vastu.projects import (
@@ -277,6 +290,154 @@ def create_app(
             ) from exc
 
     @app.post(
+        "/projects/{project_id}/generation-intakes/{intake_id}/plan-analysis",
+        response_model=PlanAnalysisResult,
+        tags=["generation"],
+    )
+    def analyze_generation_intake_plan(
+        project_id: UUID,
+        intake_id: UUID,
+        service: ProjectServiceDependency,
+        intake_store: GenerationIntakeStoreDependency,
+        user: CurrentUserDependency,
+    ) -> PlanAnalysisResult:
+        _require_project_owner(service, project_id, user)
+        try:
+            intake = intake_store.get(project_id, intake_id)
+            references: list[PlanReferenceBlob] = []
+            for item in intake.attachments:
+                stored, data = intake_store.read_attachment(
+                    project_id,
+                    intake_id,
+                    item.attachment_id,
+                )
+                references.append(
+                    PlanReferenceBlob(
+                        filename=stored.original_filename,
+                        content_type=stored.media_type,
+                        kind=PlanReferenceKind(stored.kind.value),
+                        data=data,
+                    )
+                )
+            if not references:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Upload a plan reference before requesting plan analysis.",
+                )
+
+            result = create_plan_intake_service().analyze(
+                PlanRecognitionInput(
+                    project_id=project_id,
+                    intake_id=intake_id,
+                    prompt=intake.prompt,
+                    references=tuple(references),
+                )
+            )
+            return PlanAnalysisStore(intake_store.root).save_analysis(result)
+        except GenerationIntakeNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+        except PlanIntakeConfigurationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
+        except PlanIntakeProviderError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+
+    @app.get(
+        "/projects/{project_id}/generation-intakes/{intake_id}/plan-analysis",
+        response_model=PlanAnalysisResult,
+        tags=["generation"],
+    )
+    def get_generation_intake_plan_analysis(
+        project_id: UUID,
+        intake_id: UUID,
+        service: ProjectServiceDependency,
+        intake_store: GenerationIntakeStoreDependency,
+        user: CurrentUserDependency,
+    ) -> PlanAnalysisResult:
+        _require_project_owner(service, project_id, user)
+        try:
+            intake_store.get(project_id, intake_id)
+            return PlanAnalysisStore(intake_store.root).get_analysis(
+                project_id,
+                intake_id,
+            )
+        except GenerationIntakeNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+        except PlanAnalysisNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+
+    @app.post(
+        "/projects/{project_id}/generation-intakes/{intake_id}/plan-confirmation",
+        response_model=PlanGeometryConfirmationRecord,
+        tags=["generation"],
+    )
+    def confirm_generation_intake_plan_geometry(
+        project_id: UUID,
+        intake_id: UUID,
+        payload: PlanGeometryConfirmationInput,
+        service: ProjectServiceDependency,
+        intake_store: GenerationIntakeStoreDependency,
+        user: CurrentUserDependency,
+    ) -> PlanGeometryConfirmationRecord:
+        _require_project_owner(service, project_id, user)
+        try:
+            intake_store.get(project_id, intake_id)
+            return PlanAnalysisStore(intake_store.root).save_confirmation(
+                project_id,
+                intake_id,
+                payload,
+            )
+        except GenerationIntakeNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+
+    @app.get(
+        "/projects/{project_id}/generation-intakes/{intake_id}/plan-confirmation",
+        response_model=PlanGeometryConfirmationRecord,
+        tags=["generation"],
+    )
+    def get_generation_intake_plan_confirmation(
+        project_id: UUID,
+        intake_id: UUID,
+        service: ProjectServiceDependency,
+        intake_store: GenerationIntakeStoreDependency,
+        user: CurrentUserDependency,
+    ) -> PlanGeometryConfirmationRecord:
+        _require_project_owner(service, project_id, user)
+        try:
+            intake_store.get(project_id, intake_id)
+            return PlanAnalysisStore(intake_store.root).get_confirmation(
+                project_id,
+                intake_id,
+            )
+        except (GenerationIntakeNotFoundError, PlanAnalysisNotFoundError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+
+    @app.post(
         "/generation/architectural",
         response_model=ArchitecturalGenerationResult,
         tags=["generation"],
@@ -286,9 +447,7 @@ def create_app(
         _user: CurrentUserDependency,
     ) -> ArchitecturalGenerationResult:
         try:
-            payload = ArchitecturalGenerationRequest.model_validate_json(
-                await request.body()
-            )
+            payload = ArchitecturalGenerationRequest.model_validate_json(await request.body())
             return generate_architectural_plan(payload)
         except (GenerationInputError, ValueError) as exc:
             raise HTTPException(

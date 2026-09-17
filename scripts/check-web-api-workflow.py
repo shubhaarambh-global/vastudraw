@@ -6,9 +6,7 @@ client = (ROOT / "apps/web/src/api/client.ts").read_text(encoding="utf-8")
 panel = (ROOT / "apps/web/src/components/editor/ProjectWorkflowPanel.tsx").read_text(
     encoding="utf-8"
 )
-page = (ROOT / "apps/web/src/components/editor/DemoEditorPage.tsx").read_text(
-    encoding="utf-8"
-)
+page = (ROOT / "apps/web/src/components/editor/DemoEditorPage.tsx").read_text(encoding="utf-8")
 readiness = (ROOT / "python/ai_vastu/release/readiness.py").read_text(encoding="utf-8")
 api = (ROOT / "apps/api/app/main.py").read_text(encoding="utf-8")
 

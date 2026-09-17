@@ -260,11 +260,7 @@ async def razorpay_webhook(
             entity = payload["payload"]["subscription"]["entity"]
             notes = _notes(entity)
             current_end = entity.get("current_end")
-            period_end = (
-                datetime.fromtimestamp(int(current_end), tz=UTC)
-                if current_end
-                else None
-            )
+            period_end = datetime.fromtimestamp(int(current_end), tz=UTC) if current_end else None
             changed = service.apply_subscription_event(
                 event_key=event_key,
                 event_type=event_type,

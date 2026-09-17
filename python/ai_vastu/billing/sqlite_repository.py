@@ -141,9 +141,7 @@ class SqliteBillingRepository:
         )
         self._connection.commit()
 
-    def update_project_grant_source(
-        self, user_id: str, project_id: str, source: str
-    ) -> None:
+    def update_project_grant_source(self, user_id: str, project_id: str, source: str) -> None:
         cursor = self._connection.execute(
             """
             UPDATE billing_project_grants SET source = ?
@@ -194,9 +192,7 @@ class SqliteBillingRepository:
         )
         self._connection.commit()
 
-    def record_event_once(
-        self, provider: str, event_key: str, event_type: str
-    ) -> bool:
+    def record_event_once(self, provider: str, event_key: str, event_type: str) -> bool:
         cursor = self._connection.execute(
             """
             INSERT OR IGNORE INTO billing_events(provider, event_key, event_type)

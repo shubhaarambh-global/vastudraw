@@ -43,9 +43,7 @@ def test_single_project_credit_is_bound_once_and_regeneration_is_free(
         service.register_project(USER, PROJECT_A)
         service.record_successful_generation(USER, PROJECT_A)
 
-        assert service.apply_one_time_purchase(
-            "evt-single", USER, "project_single"
-        )
+        assert service.apply_one_time_purchase("evt-single", USER, "project_single")
         assert service.snapshot(USER).project_credits == 1
 
         assert service.register_project(USER, PROJECT_B) == "project_credit"
@@ -63,12 +61,8 @@ def test_single_project_credit_is_bound_once_and_regeneration_is_free(
 def test_ten_project_pack_grants_ten_credits_idempotently(tmp_path: Path) -> None:
     service, repository = make_service(tmp_path)
     try:
-        assert service.apply_one_time_purchase(
-            "evt-pack", USER, "project_pack_10"
-        )
-        assert not service.apply_one_time_purchase(
-            "evt-pack", USER, "project_pack_10"
-        )
+        assert service.apply_one_time_purchase("evt-pack", USER, "project_pack_10")
+        assert not service.apply_one_time_purchase("evt-pack", USER, "project_pack_10")
         assert service.snapshot(USER).project_credits == 10
     finally:
         repository.close()

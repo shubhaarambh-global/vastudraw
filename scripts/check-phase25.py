@@ -9,36 +9,25 @@ from ai_vastu.vastu.models import RuleBundle
 
 ROOT = Path(__file__).resolve().parents[1]
 
-bundle_path = (
-    ROOT
-    / "docs"
-    / "vastu"
-    / "spec-v1.0"
-    / "production"
-    / "rule-bundle.json"
-)
+bundle_path = ROOT / "docs" / "vastu" / "spec-v1.0" / "production" / "rule-bundle.json"
 bundle = RuleBundle.model_validate_json(bundle_path.read_text(encoding="utf-8"))
 
 assert bundle.production
 assert bundle.content_hash == EXPECTED_VASTU_BUNDLE_HASH
-assert ProductionHardeningMiddleware._scope_for_path(
-    "/requirements/interpret"
-) == "requirements_interpret"
-assert ProductionHardeningMiddleware._scope_for_path(
-    "/confirmed-generation/projects/11111111-1111-1111-1111-111111111111"
-) == "confirmed_generation"
-assert ProductionHardeningMiddleware._scope_for_path(
-    "/billing/checkout"
-) == "billing_checkout"
+assert (
+    ProductionHardeningMiddleware._scope_for_path("/requirements/interpret")
+    == "requirements_interpret"
+)
+assert (
+    ProductionHardeningMiddleware._scope_for_path(
+        "/confirmed-generation/projects/11111111-1111-1111-1111-111111111111"
+    )
+    == "confirmed_generation"
+)
+assert ProductionHardeningMiddleware._scope_for_path("/billing/checkout") == "billing_checkout"
 assert len(hash_rate_limit_key("Bearer secret")) == 64
 
-migration = (
-    ROOT
-    / "infra"
-    / "supabase"
-    / "migrations"
-    / "202609150025_phase25_rate_limits.sql"
-)
+migration = ROOT / "infra" / "supabase" / "migrations" / "202609150025_phase25_rate_limits.sql"
 assert migration.is_file()
 
 workflow = ROOT / ".github" / "workflows" / "production-gates.yml"

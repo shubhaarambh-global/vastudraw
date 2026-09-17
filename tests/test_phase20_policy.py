@@ -29,16 +29,13 @@ def test_phase20b_rules_are_human_approved_and_frozen() -> None:
         assert record.review.source_validation_passed is True
         assert record.review.geometry_semantics_reviewed is True
         assert any(
-            item.role is ReviewerRole.VASTU_EXPERT
-            and item.decision is ReviewDecision.APPROVE
+            item.role is ReviewerRole.VASTU_EXPERT and item.decision is ReviewDecision.APPROVE
             for item in record.review.attestations
         )
 
 
 def test_phase20b_approval_requires_explicit_human_confirmation_token() -> None:
-    source = (ROOT / "scripts/record-vastu-expert-approval.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "scripts/record-vastu-expert-approval.py").read_text(encoding="utf-8")
     assert 'CONFIRMATION_TOKEN = "I_APPROVE_PHASE20B_V1"' in source
     assert "ReviewerRole.VASTU_EXPERT" in source
     assert "datetime.now().astimezone()" in source

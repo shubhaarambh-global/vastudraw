@@ -146,7 +146,5 @@ class ConfirmedRequirements(BaseModel):
             if item.room_type.strip().lower() in {"bedroom", "master_bedroom"}
         )
         if room_bedrooms > self.bedroom_count:
-            raise ValueError(
-                "Explicit bedroom room requirements exceed bedroom_count."
-            )
+            raise ValueError("Explicit bedroom room requirements exceed bedroom_count.")
         return self

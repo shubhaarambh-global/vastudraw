@@ -232,12 +232,8 @@ def evaluate_production_mvp_readiness(repository_root: Path) -> ProductionReadin
         )
     )
 
-    blocker_codes = tuple(
-        gate.code for gate in gates if gate.status is ReleaseGateStatus.BLOCKER
-    )
-    disposition = (
-        ReleaseDisposition.READY if not blocker_codes else ReleaseDisposition.BLOCKED
-    )
+    blocker_codes = tuple(gate.code for gate in gates if gate.status is ReleaseGateStatus.BLOCKER)
+    disposition = ReleaseDisposition.READY if not blocker_codes else ReleaseDisposition.BLOCKED
     report = ProductionReadinessReport(
         disposition=disposition,
         gates=tuple(gates),

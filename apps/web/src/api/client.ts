@@ -21,7 +21,7 @@ export interface RevisionRecord {
 
 export interface GenerationAttachmentRecord {
   readonly attachment_id: string;
-  readonly kind: "IMAGE" | "PDF";
+  readonly kind: "IMAGE" | "PDF" | "DXF" | "DWG";
   readonly original_filename: string;
   readonly media_type: string;
   readonly size_bytes: number;
@@ -37,6 +37,127 @@ export interface GenerationIntakeRecord {
   readonly attachments: readonly GenerationAttachmentRecord[];
   readonly authoritative_geometry: false;
   readonly content_hash: string;
+}
+
+export interface PlanRoomObservation {
+  readonly room_type: string;
+  readonly label: string | null;
+  readonly centroid_x_basis_points: number | null;
+  readonly centroid_y_basis_points: number | null;
+  readonly approximate_area_mm2: number | null;
+  readonly confidence: number;
+  readonly source: string;
+  readonly requires_confirmation: boolean;
+  readonly evidence: readonly string[];
+}
+
+export interface PlanRecognitionDraft {
+  readonly schema_version: "26B.5.1";
+  readonly project_id: string;
+  readonly intake_id: string;
+  readonly provider: string;
+  readonly model: string | null;
+  readonly reference_names: readonly string[];
+  readonly envelope: {
+    readonly geometry_type: "RECTANGLE" | "POLYGON" | "UNKNOWN";
+    readonly width_mm: number | null;
+    readonly depth_mm: number | null;
+    readonly built_up_area_mm2: number | null;
+    readonly confidence: number;
+    readonly source: string;
+    readonly requires_confirmation: boolean;
+    readonly evidence: readonly string[];
+  };
+  readonly orientation: {
+    readonly north_rotation_deg: number | null;
+    readonly road_side: string | null;
+    readonly entrance_facing: string | null;
+    readonly confidence: number;
+    readonly source: string;
+    readonly requires_confirmation: boolean;
+    readonly evidence: readonly string[];
+  };
+  readonly rooms: readonly PlanRoomObservation[];
+  readonly observations: readonly string[];
+  readonly questions: readonly string[];
+  readonly warnings: readonly string[];
+  readonly content_hash: string | null;
+}
+
+export interface PlanVastuAudit {
+  readonly schema_version: "26B.5.1";
+  readonly project_id: string;
+  readonly intake_id: string;
+  readonly status:
+    | "SCORED"
+    | "NEEDS_ORIENTATION"
+    | "NEEDS_ROOM_POSITIONS"
+    | "NO_EVALUABLE_RULES";
+  readonly overall_basis_points: number | null;
+  readonly evaluation_coverage_basis_points: number | null;
+  readonly evaluated_weight: number;
+  readonly unevaluated_weight: number;
+  readonly provisional: true;
+  readonly rules: readonly {
+    readonly rule_id: string;
+    readonly title: string;
+    readonly status:
+      | "PREFERRED"
+      | "SECONDARY"
+      | "NEUTRAL"
+      | "AVOIDED"
+      | "NOT_APPLICABLE"
+      | "NOT_EVALUATED";
+    readonly score_basis_points: number | null;
+    readonly effective_weight: number;
+    readonly evidence: readonly string[];
+    readonly suggestion: string;
+  }[];
+  readonly suggestions: readonly string[];
+  readonly notes: readonly string[];
+  readonly content_hash: string | null;
+}
+
+export interface PlanAnalysisResult {
+  readonly schema_version: "26B.5.1";
+  readonly project_id: string;
+  readonly intake_id: string;
+  readonly recognition: PlanRecognitionDraft;
+  readonly vastu_audit: PlanVastuAudit;
+  readonly alternate_plan_envelope: {
+    readonly geometry_type: "RECTANGLE" | "POLYGON" | "UNKNOWN";
+    readonly width_mm: number | null;
+    readonly depth_mm: number | null;
+    readonly exact_area_mm2: number | null;
+    readonly ready_for_exact_alternatives: boolean;
+    readonly requires_user_confirmation: boolean;
+    readonly reason: string;
+  };
+  readonly content_hash: string | null;
+}
+
+export interface PlanGeometryConfirmationInput {
+  readonly width_mm: number;
+  readonly depth_mm: number;
+  readonly north_rotation_deg: number;
+  readonly road_side?: string | null;
+  readonly entrance_facing?: string | null;
+  readonly preserve_outer_envelope: true;
+}
+
+export interface PlanGeometryConfirmationRecord {
+  readonly schema_version: "26B.5.1";
+  readonly project_id: string;
+  readonly intake_id: string;
+  readonly width_mm: number;
+  readonly depth_mm: number;
+  readonly exact_area_mm2: number;
+  readonly north_rotation_deg: number;
+  readonly road_side: string | null;
+  readonly entrance_facing: string | null;
+  readonly preserve_outer_envelope: true;
+  readonly confirmed_by_user: true;
+  readonly content_hash: string | null;
 }
 
 export interface GenerationResultSummary {
@@ -197,6 +318,40 @@ export class ProjectApiClient {
   ): Promise<readonly GenerationIntakeRecord[]> {
     return this.request<readonly GenerationIntakeRecord[]>(
       `/projects/${encodeURIComponent(projectId)}/generation-intakes`,
+    );
+  }
+
+  async analyzeGenerationIntakePlan(
+    projectId: string,
+    intakeId: string,
+  ): Promise<PlanAnalysisResult> {
+    return this.request<PlanAnalysisResult>(
+      `/projects/${encodeURIComponent(projectId)}/generation-intakes/${encodeURIComponent(intakeId)}/plan-analysis`,
+      { method: "POST" },
+    );
+  }
+
+  async getGenerationIntakePlanAnalysis(
+    projectId: string,
+    intakeId: string,
+  ): Promise<PlanAnalysisResult> {
+    return this.request<PlanAnalysisResult>(
+      `/projects/${encodeURIComponent(projectId)}/generation-intakes/${encodeURIComponent(intakeId)}/plan-analysis`,
+    );
+  }
+
+  async confirmGenerationIntakePlanGeometry(
+    projectId: string,
+    intakeId: string,
+    input: PlanGeometryConfirmationInput,
+  ): Promise<PlanGeometryConfirmationRecord> {
+    return this.request<PlanGeometryConfirmationRecord>(
+      `/projects/${encodeURIComponent(projectId)}/generation-intakes/${encodeURIComponent(intakeId)}/plan-confirmation`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
     );
   }
 

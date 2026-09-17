@@ -21,8 +21,8 @@ def test_web_client_calls_existing_api_contracts_instead_of_reimplementing_backe
 
 
 def test_phase17_generation_input_remains_explicit() -> None:
-    source = (
-        ROOT / "apps/web/src/components/editor/ProjectWorkflowPanel.tsx"
-    ).read_text(encoding="utf-8")
+    source = (ROOT / "apps/web/src/components/editor/ProjectWorkflowPanel.tsx").read_text(
+        encoding="utf-8"
+    )
     assert "Explicit ArchitecturalGenerationRequest JSON" in source
     assert "does not invent missing geometry or solver inputs" in source

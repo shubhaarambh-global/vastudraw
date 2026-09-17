@@ -17,9 +17,24 @@ MAX_ATTACHMENTS = 8
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_TOTAL_BYTES = 50 * 1024 * 1024
 _ALLOWED_MEDIA_TYPES = {
-    "image/jpeg": (GenerationReferenceKind.IMAGE, ".jpg"),
-    "image/png": (GenerationReferenceKind.IMAGE, ".png"),
-    "application/pdf": (GenerationReferenceKind.PDF, ".pdf"),
+    "image/jpeg": (GenerationReferenceKind.IMAGE, ".jpg", "image/jpeg"),
+    "image/png": (GenerationReferenceKind.IMAGE, ".png", "image/png"),
+    "application/pdf": (GenerationReferenceKind.PDF, ".pdf", "application/pdf"),
+    "application/dxf": (GenerationReferenceKind.DXF, ".dxf", "application/dxf"),
+    "application/x-dxf": (GenerationReferenceKind.DXF, ".dxf", "application/dxf"),
+    "image/vnd.dxf": (GenerationReferenceKind.DXF, ".dxf", "application/dxf"),
+    "application/dwg": (GenerationReferenceKind.DWG, ".dwg", "application/dwg"),
+    "application/acad": (GenerationReferenceKind.DWG, ".dwg", "application/dwg"),
+    "application/x-acad": (GenerationReferenceKind.DWG, ".dwg", "application/dwg"),
+    "image/vnd.dwg": (GenerationReferenceKind.DWG, ".dwg", "application/dwg"),
+}
+_EXTENSION_TYPES = {
+    ".jpg": (GenerationReferenceKind.IMAGE, ".jpg", "image/jpeg"),
+    ".jpeg": (GenerationReferenceKind.IMAGE, ".jpg", "image/jpeg"),
+    ".png": (GenerationReferenceKind.IMAGE, ".png", "image/png"),
+    ".pdf": (GenerationReferenceKind.PDF, ".pdf", "application/pdf"),
+    ".dxf": (GenerationReferenceKind.DXF, ".dxf", "application/dxf"),
+    ".dwg": (GenerationReferenceKind.DWG, ".dwg", "application/dwg"),
 }
 
 
@@ -42,13 +57,53 @@ class IncomingGenerationAttachment:
     content: bytes
 
 
-def _verify_signature(media_type: str, content: bytes) -> None:
-    if media_type == "image/jpeg" and not content.startswith(b"\xff\xd8\xff"):
-        raise GenerationIntakeError("JPEG attachment signature does not match media type.")
-    if media_type == "image/png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise GenerationIntakeError("PNG attachment signature does not match media type.")
-    if media_type == "application/pdf" and not content.startswith(b"%PDF-"):
-        raise GenerationIntakeError("PDF attachment signature does not match media type.")
+def _classify_attachment(
+    filename: str,
+    media_type: str,
+) -> tuple[GenerationReferenceKind, str, str]:
+    suffix = Path(filename).suffix.lower()
+    by_extension = _EXTENSION_TYPES.get(suffix)
+    normalized_media = media_type.lower().strip()
+
+    if by_extension is not None:
+        expected_kind, storage_suffix, canonical_media = by_extension
+        by_media = _ALLOWED_MEDIA_TYPES.get(normalized_media)
+        if by_media is not None and by_media[0] is not expected_kind:
+            raise GenerationIntakeError(f"{filename}: file extension and media type disagree.")
+        return expected_kind, storage_suffix, canonical_media
+
+    by_media = _ALLOWED_MEDIA_TYPES.get(normalized_media)
+    if by_media is not None:
+        return by_media
+
+    raise GenerationIntakeError(
+        "Only JPEG, PNG, PDF, DXF, and DWG generation references are supported."
+    )
+
+
+def _verify_signature(kind: GenerationReferenceKind, content: bytes) -> None:
+    if kind is GenerationReferenceKind.IMAGE:
+        if content.startswith(b"\xff\xd8\xff") or content.startswith(b"\x89PNG\r\n\x1a\n"):
+            return
+        raise GenerationIntakeError("Image attachment signature is not JPEG or PNG.")
+
+    if kind is GenerationReferenceKind.PDF:
+        if not content.startswith(b"%PDF-"):
+            raise GenerationIntakeError("PDF attachment signature does not match file type.")
+        return
+
+    if kind is GenerationReferenceKind.DXF:
+        prefix = content[:2048].lstrip()
+        if prefix.startswith(b"AutoCAD Binary DXF") or b"SECTION" in prefix.upper():
+            return
+        raise GenerationIntakeError("DXF attachment signature does not look like DXF.")
+
+    if kind is GenerationReferenceKind.DWG:
+        if not content.startswith(b"AC10"):
+            raise GenerationIntakeError("DWG attachment signature does not look like DWG.")
+        return
+
+    raise GenerationIntakeError("Unsupported attachment kind.")
 
 
 class GenerationIntakeStore:
@@ -88,17 +143,17 @@ class GenerationIntakeStore:
 
         try:
             for incoming in attachments:
-                media = incoming.media_type.lower().strip()
-                if media not in _ALLOWED_MEDIA_TYPES:
-                    raise GenerationIntakeError(
-                        "Only JPEG, PNG, and PDF generation references are supported."
-                    )
                 if len(incoming.content) == 0:
                     raise GenerationIntakeError("Attachments must not be empty.")
                 if len(incoming.content) > MAX_FILE_BYTES:
                     raise GenerationIntakeError("Each attachment must be 20 MiB or smaller.")
-                _verify_signature(media, incoming.content)
-                kind, suffix = _ALLOWED_MEDIA_TYPES[media]
+
+                kind, suffix, canonical_media = _classify_attachment(
+                    incoming.original_filename,
+                    incoming.media_type,
+                )
+                _verify_signature(kind, incoming.content)
+
                 attachment_id = uuid4()
                 storage_name = f"{attachment_id}{suffix}"
                 (intake_dir / storage_name).write_bytes(incoming.content)
@@ -107,7 +162,7 @@ class GenerationIntakeStore:
                         attachment_id=attachment_id,
                         kind=kind,
                         original_filename=incoming.original_filename.strip() or "reference",
-                        media_type=media,
+                        media_type=canonical_media,
                         size_bytes=len(incoming.content),
                         sha256=hashlib.sha256(incoming.content).hexdigest(),
                         storage_name=storage_name,
@@ -161,6 +216,33 @@ class GenerationIntakeStore:
                 f"Generation intake {intake_id} does not exist for project {project_id}."
             )
         return GenerationIntakeRecord.model_validate_json(manifest.read_text("utf-8"))
+
+    def read_attachment(
+        self,
+        project_id: UUID,
+        intake_id: UUID,
+        attachment_id: UUID,
+    ) -> tuple[GenerationAttachmentRecord, bytes]:
+        record = self.get(project_id, intake_id)
+        attachment = next(
+            (item for item in record.attachments if item.attachment_id == attachment_id),
+            None,
+        )
+        if attachment is None:
+            raise GenerationIntakeNotFoundError(
+                f"Attachment {attachment_id} does not exist for intake {intake_id}."
+            )
+
+        path = self._root / str(project_id) / str(intake_id) / attachment.storage_name
+        if not path.is_file():
+            raise GenerationIntakeNotFoundError(f"Attachment payload {attachment_id} is missing.")
+
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != attachment.sha256:
+            raise GenerationIntakeError(
+                f"Attachment {attachment_id} failed its stored SHA-256 integrity check."
+            )
+        return attachment, data
 
 
 def create_generation_intake_store_from_environment(

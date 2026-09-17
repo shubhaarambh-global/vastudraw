@@ -16,10 +16,14 @@ from .store import RequirementsStore
 
 
 def create_provider() -> RequirementsProvider:
-    provider_name = os.getenv(
-        "AI_VASTU_REQUIREMENTS_PROVIDER",
-        "fixture",
-    ).strip().lower()
+    provider_name = (
+        os.getenv(
+            "AI_VASTU_REQUIREMENTS_PROVIDER",
+            "fixture",
+        )
+        .strip()
+        .lower()
+    )
 
     if provider_name == "fixture":
         return FixtureRequirementsProvider()

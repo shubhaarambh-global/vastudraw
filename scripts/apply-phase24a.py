@@ -15,8 +15,7 @@ def patch_api_main() -> None:
         lines = text.splitlines()
         insert_at = 0
         while insert_at < len(lines) and (
-            lines[insert_at].startswith("from __future__")
-            or not lines[insert_at].strip()
+            lines[insert_at].startswith("from __future__") or not lines[insert_at].strip()
         ):
             insert_at += 1
         lines.insert(insert_at, import_line)

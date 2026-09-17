@@ -41,17 +41,15 @@ with tempfile.TemporaryDirectory() as directory:
 assert (ROOT / "apps/api/app/billing_routes.py").exists()
 assert (ROOT / "apps/web/src/app/pricing/page.tsx").exists()
 assert (ROOT / "apps/web/src/app/billing/page.tsx").exists()
-assert (
-    ROOT / "infra/postgres/migrations/202609150003_phase23_billing.sql"
-).exists()
+assert (ROOT / "infra/postgres/migrations/202609150003_phase23_billing.sql").exists()
 
 main_source = (ROOT / "apps/api/app/main.py").read_text(encoding="utf-8")
 assert "billing_router" in main_source
 assert "include_router(billing_router)" in main_source
 routes_source = (ROOT / "apps/api/app/billing_routes.py").read_text(encoding="utf-8")
-assert '/projects/{project_id}/register' in routes_source
-assert '/projects/{project_id}/generation-authorization' in routes_source
-assert '/projects/{project_id}/generation-succeeded' in routes_source
+assert "/projects/{project_id}/register" in routes_source
+assert "/projects/{project_id}/generation-authorization" in routes_source
+assert "/projects/{project_id}/generation-succeeded" in routes_source
 
 print(
     "Phase 23 billing wired: catalog=true, free_generation_once=true, "

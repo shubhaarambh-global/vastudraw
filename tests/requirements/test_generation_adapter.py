@@ -51,9 +51,7 @@ def test_compiler_targets_existing_generation_request_exactly() -> None:
 def test_parking_count_adds_explicit_deterministic_room_requirement() -> None:
     compiled = compile_confirmed_requirements(make_confirmed())
     parking = [
-        item
-        for item in compiled.request.room_requirements
-        if item.room_type.value == "parking"
+        item for item in compiled.request.room_requirements if item.room_type.value == "parking"
     ]
     assert len(parking) == 1
     assert parking[0].quantity == 1

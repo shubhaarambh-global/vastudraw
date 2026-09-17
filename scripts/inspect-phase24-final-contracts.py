@@ -62,10 +62,7 @@ def inspect_module(module_name: str) -> dict[str, Any]:
 
 
 payload: dict[str, Any] = {
-    "modules": {
-        module_name: inspect_module(module_name)
-        for module_name in MODULES
-    }
+    "modules": {module_name: inspect_module(module_name) for module_name in MODULES}
 }
 
 # Also export the concrete FastAPI route surface. This is useful for choosing

@@ -29,9 +29,7 @@ def test_project_ownership_is_persisted_separately_from_plan_document() -> None:
     assert "owner_user_id UUID NOT NULL" in migration
     assert "ENABLE ROW LEVEL SECURITY" in migration
 
-    plan_source = (ROOT / "python/ai_vastu/plan_schema/models.py").read_text(
-        encoding="utf-8"
-    )
+    plan_source = (ROOT / "python/ai_vastu/plan_schema/models.py").read_text(encoding="utf-8")
     assert "owner_user_id" not in plan_source
 
 
@@ -44,20 +42,12 @@ def test_dashboard_is_real_root_route_and_editor_remains_available() -> None:
 
 
 def test_editor_grid_does_not_feed_fractional_viewport_bounds_to_canonical_transform() -> None:
-    source = (
-        ROOT / "apps/web/src/components/editor/PlanEditor.tsx"
-    ).read_text(encoding="utf-8")
+    source = (ROOT / "apps/web/src/components/editor/PlanEditor.tsx").read_text(encoding="utf-8")
 
     assert "y_mm: bounds.minYmm" not in source
     assert "y_mm: bounds.maxYmm" not in source
     assert "x_mm: bounds.minXmm" not in source
     assert "x_mm: bounds.maxXmm" not in source
 
-    assert (
-        "points={[screen.xPx, 0, screen.xPx, props.size.heightPx]}"
-        in source
-    )
-    assert (
-        "points={[0, screen.yPx, props.size.widthPx, screen.yPx]}"
-        in source
-    )
+    assert "points={[screen.xPx, 0, screen.xPx, props.size.heightPx]}" in source
+    assert "points={[0, screen.yPx, props.size.widthPx, screen.yPx]}" in source

@@ -36,8 +36,7 @@ approval_times = [
     item.reviewed_at
     for record in spec.rule_records
     for item in record.review.attestations
-    if item.role is ReviewerRole.VASTU_EXPERT
-    and item.decision is ReviewDecision.APPROVE
+    if item.role is ReviewerRole.VASTU_EXPERT and item.decision is ReviewDecision.APPROVE
 ]
 if not approval_times:
     raise SystemExit("No VASTU_EXPERT approval timestamp exists.")

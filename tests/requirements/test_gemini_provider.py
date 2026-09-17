@@ -85,15 +85,7 @@ def test_gemini_provider_uses_structured_json_and_restores_identity() -> None:
         assert body["contents"][0]["parts"][1]["inlineData"]["mimeType"] == "image/png"
         return httpx.Response(
             200,
-            json={
-                "candidates": [
-                    {
-                        "content": {
-                            "parts": [{"text": json.dumps(_draft_payload())}]
-                        }
-                    }
-                ]
-            },
+            json={"candidates": [{"content": {"parts": [{"text": json.dumps(_draft_payload())}]}}]},
         )
 
     provider = GeminiGenerateContentRequirementsProvider(

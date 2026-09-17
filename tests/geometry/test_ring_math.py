@@ -18,11 +18,13 @@ def test_hole_area_is_subtracted_exactly() -> None:
             IntPoint(x_mm=10, y_mm=10),
             IntPoint(x_mm=0, y_mm=10),
         ),
-        holes=((
-            IntPoint(x_mm=2, y_mm=2),
-            IntPoint(x_mm=2, y_mm=8),
-            IntPoint(x_mm=8, y_mm=8),
-            IntPoint(x_mm=8, y_mm=2),
-        ),),
+        holes=(
+            (
+                IntPoint(x_mm=2, y_mm=2),
+                IntPoint(x_mm=2, y_mm=8),
+                IntPoint(x_mm=8, y_mm=8),
+                IntPoint(x_mm=8, y_mm=2),
+            ),
+        ),
     )
     assert area2_polygon(polygon) == 128

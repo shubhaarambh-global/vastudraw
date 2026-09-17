@@ -6,13 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 report = evaluate_production_mvp_readiness(ROOT)
 if report.disposition is not ReleaseDisposition.READY:
-    raise SystemExit(
-        "Phase 20B expected the production-MVP release gate to be READY."
-    )
+    raise SystemExit("Phase 20B expected the production-MVP release gate to be READY.")
 if report.blocker_codes != ():
-    raise SystemExit(
-        "Unexpected production blocker set: " + ",".join(report.blocker_codes)
-    )
+    raise SystemExit("Unexpected production blocker set: " + ",".join(report.blocker_codes))
 if report.report_hash is None:
     raise SystemExit("Readiness report hash was not produced.")
 

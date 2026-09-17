@@ -52,9 +52,7 @@ class PostgresBillingRepository:
             free_generation_available=bool(row_map["free_generation_available"]),
             project_credits=int(row_map["project_credits"]),
             active_subscription_sku=row_map["active_subscription_sku"],
-            subscription_status=SubscriptionStatus(
-                str(row_map["subscription_status"])
-            ),
+            subscription_status=SubscriptionStatus(str(row_map["subscription_status"])),
             subscription_period_end=row_map["subscription_period_end"],
         )
 
@@ -134,9 +132,7 @@ class PostgresBillingRepository:
             )
             connection.commit()
 
-    def update_project_grant_source(
-        self, user_id: str, project_id: str, source: str
-    ) -> None:
+    def update_project_grant_source(self, user_id: str, project_id: str, source: str) -> None:
         with self._pool.connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -190,9 +186,7 @@ class PostgresBillingRepository:
             )
             connection.commit()
 
-    def record_event_once(
-        self, provider: str, event_key: str, event_type: str
-    ) -> bool:
+    def record_event_once(self, provider: str, event_key: str, event_type: str) -> bool:
         with self._pool.connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """

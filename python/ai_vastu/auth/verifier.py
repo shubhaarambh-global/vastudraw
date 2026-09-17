@@ -93,9 +93,7 @@ def create_access_token_verifier_from_environment(
     supabase_url = env.get("AI_VASTU_SUPABASE_URL", "").strip()
 
     if auth_mode not in {"", "development", "supabase"}:
-        raise AuthConfigurationError(
-            "AI_VASTU_AUTH_MODE must be 'development' or 'supabase'."
-        )
+        raise AuthConfigurationError("AI_VASTU_AUTH_MODE must be 'development' or 'supabase'.")
 
     if app_env in _PRODUCTION_ENVIRONMENTS:
         if auth_mode == "development":
@@ -103,9 +101,7 @@ def create_access_token_verifier_from_environment(
                 "Development authentication is forbidden in production/staging."
             )
         if not supabase_url:
-            raise AuthConfigurationError(
-                "AI_VASTU_SUPABASE_URL is required in production/staging."
-            )
+            raise AuthConfigurationError("AI_VASTU_SUPABASE_URL is required in production/staging.")
         return SupabaseAccessTokenVerifier(supabase_url)
 
     if auth_mode == "supabase" or supabase_url:

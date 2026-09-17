@@ -25,18 +25,24 @@ def rectangle(x1: int, y1: int, x2: int, y2: int) -> IntPolygon:
 
 def test_true_north_sector_classifier_at_zero_rotation() -> None:
     plot = rectangle(0, 0, 10000, 10000)
-    assert _sector_for_point(
-        x_mm=7500,
-        y_mm=7500,
-        plot=plot,
-        north_rotation_udeg=0,
-    ) == "NE"
-    assert _sector_for_point(
-        x_mm=7500,
-        y_mm=2500,
-        plot=plot,
-        north_rotation_udeg=0,
-    ) == "SE"
+    assert (
+        _sector_for_point(
+            x_mm=7500,
+            y_mm=7500,
+            plot=plot,
+            north_rotation_udeg=0,
+        )
+        == "NE"
+    )
+    assert (
+        _sector_for_point(
+            x_mm=7500,
+            y_mm=2500,
+            plot=plot,
+            north_rotation_udeg=0,
+        )
+        == "SE"
+    )
 
 
 def test_cardinal_road_edges_at_zero_rotation() -> None:

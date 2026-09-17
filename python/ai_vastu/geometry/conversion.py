@@ -82,9 +82,7 @@ def paths_to_polygons(paths: Iterable[Iterable[Sequence[Any]]]) -> tuple[IntPoly
         if depth[idx] % 2 != 0:
             continue
         holes = [
-            rings[h]
-            for h in range(len(rings))
-            if parent[h] == idx and depth[h] == depth[idx] + 1
+            rings[h] for h in range(len(rings)) if parent[h] == idx and depth[h] == depth[idx] + 1
         ]
         polygons.append(canonicalize_polygon(IntPolygon(outer=ring, holes=tuple(holes))))
 

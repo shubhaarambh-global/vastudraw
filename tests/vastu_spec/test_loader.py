@@ -28,6 +28,7 @@ def test_repository_v1_spec_is_valid_for_current_lifecycle() -> None:
     else:
         assert spec.production_ready is False
 
+
 def test_authoring_hash_is_deterministic() -> None:
     first = load_vastu_spec_directory(ROOT / "docs/vastu/spec-v1.0")
     second = load_vastu_spec_directory(ROOT / "docs/vastu/spec-v1.0")

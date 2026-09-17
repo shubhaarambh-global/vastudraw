@@ -144,9 +144,7 @@ class PostgresProjectRepository:
                 """,
                 (owner_user_id,),
             ).fetchall()
-        return tuple(
-            self._project_from_row(cast(dict[str, Any], row)) for row in rows
-        )
+        return tuple(self._project_from_row(cast(dict[str, Any], row)) for row in rows)
 
     def is_project_owner(self, project_id: UUID, owner_user_id: UUID) -> bool:
         with self._pool.connection() as connection:
@@ -179,16 +177,13 @@ class PostgresProjectRepository:
                     (command.project_id,),
                 ).fetchone()
                 if project_row is None:
-                    raise ProjectNotFoundError(
-                        f"Project {command.project_id} does not exist."
-                    )
+                    raise ProjectNotFoundError(f"Project {command.project_id} does not exist.")
                 project_payload = cast(dict[str, Any], project_row)
                 current_id = project_payload["current_revision_id"]
                 current_number = int(project_payload["current_revision_number"])
                 if current_id != command.expected_parent_revision_id:
                     raise RevisionConflictError(
-                        "expected_parent_revision_id does not match the current project "
-                        "revision."
+                        "expected_parent_revision_id does not match the current project revision."
                     )
 
                 record = self._build_revision_record(
@@ -223,12 +218,7 @@ class PostgresProjectRepository:
                         record.plan_document_hash,
                         record.source_candidate_id,
                         record.note,
-                        Jsonb(
-                            [
-                                item.model_dump(mode="json")
-                                for item in record.generated_outputs
-                            ]
-                        ),
+                        Jsonb([item.model_dump(mode="json") for item in record.generated_outputs]),
                         record.payload_hash,
                     ),
                 )
@@ -248,8 +238,7 @@ class PostgresProjectRepository:
                 return record
         except errors.UniqueViolation as exc:
             raise DuplicateRevisionError(
-                "Revision "
-                f"{document.revision_id} already exists for project {command.project_id}."
+                f"Revision {document.revision_id} already exists for project {command.project_id}."
             ) from exc
 
     def get_revision(self, project_id: UUID, revision_id: UUID) -> RevisionRecord:
@@ -278,9 +267,7 @@ class PostgresProjectRepository:
                 """,
                 (project_id,),
             ).fetchall()
-        return tuple(
-            self._revision_from_row(cast(dict[str, Any], row)) for row in rows
-        )
+        return tuple(self._revision_from_row(cast(dict[str, Any], row)) for row in rows)
 
     @staticmethod
     def _build_revision_record(

@@ -13,12 +13,12 @@ def patch_generation_adapter() -> None:
     guard = (
         "    if confirmed.floor_count != 1:\n"
         "        raise UnsupportedConfirmedRequirement(\n"
-        "            \"Commercial MVP currently supports exactly one generated floor.\"\n"
+        '            "Commercial MVP currently supports exactly one generated floor."\n'
         "        )\n"
         "    for room in confirmed.rooms:\n"
         "        if room.floor_preference not in {None, 0}:\n"
         "            raise UnsupportedConfirmedRequirement(\n"
-        "                \"Commercial MVP cannot silently drop an upper-floor preference.\"\n"
+        '                "Commercial MVP cannot silently drop an upper-floor preference."\n'
         "            )\n\n"
     )
     if guard not in text:

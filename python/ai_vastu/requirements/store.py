@@ -19,9 +19,7 @@ class RequirementsStore:
 
         if app_env in {"production", "staging"}:
             if not configured:
-                raise RuntimeError(
-                    "AI_VASTU_REQUIREMENTS_PATH is required in production/staging."
-                )
+                raise RuntimeError("AI_VASTU_REQUIREMENTS_PATH is required in production/staging.")
             root = Path(configured)
             if not root.is_absolute():
                 raise RuntimeError(
@@ -63,6 +61,4 @@ class RequirementsStore:
         path = self._confirmed_path(draft_id)
         if not path.exists():
             raise KeyError(str(draft_id))
-        return ConfirmedRequirements.model_validate_json(
-            path.read_text(encoding="utf-8")
-        )
+        return ConfirmedRequirements.model_validate_json(path.read_text(encoding="utf-8"))

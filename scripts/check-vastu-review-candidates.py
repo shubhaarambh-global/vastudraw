@@ -49,8 +49,7 @@ for record in spec.rule_records:
     expert_approvals = tuple(
         item
         for item in record.review.attestations
-        if item.role is ReviewerRole.VASTU_EXPERT
-        and item.decision is ReviewDecision.APPROVE
+        if item.role is ReviewerRole.VASTU_EXPERT and item.decision is ReviewDecision.APPROVE
     )
     assert expert_approvals
     expert_reviewer_ids.update(item.reviewer_id for item in expert_approvals)

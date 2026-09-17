@@ -5,9 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-EXPECTED_VASTU_BUNDLE_HASH = (
-    "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
-)
+EXPECTED_VASTU_BUNDLE_HASH = "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
 
 
 class ProductionConfigurationError(RuntimeError):
@@ -99,16 +97,12 @@ def load_production_settings(
 
     auth_mode = env.get("AI_VASTU_AUTH_MODE", "").strip().lower()
     if auth_mode != "production":
-        raise ProductionConfigurationError(
-            "AI_VASTU_AUTH_MODE must be production."
-        )
+        raise ProductionConfigurationError("AI_VASTU_AUTH_MODE must be production.")
 
     database_url = _required(env, "DATABASE_URL")
     parsed_database = urlparse(database_url)
     if parsed_database.scheme not in {"postgres", "postgresql"}:
-        raise ProductionConfigurationError(
-            "DATABASE_URL must use PostgreSQL in production."
-        )
+        raise ProductionConfigurationError("DATABASE_URL must use PostgreSQL in production.")
 
     supabase_url = _https_url(
         _required(env, "AI_VASTU_SUPABASE_URL"),
@@ -130,13 +124,9 @@ def load_production_settings(
             "AI_VASTU_TRUSTED_HOSTS must contain explicit hostnames."
         )
     if any("://" in host or "/" in host for host in trusted_hosts):
-        raise ProductionConfigurationError(
-            "AI_VASTU_TRUSTED_HOSTS entries must be hostnames only."
-        )
+        raise ProductionConfigurationError("AI_VASTU_TRUSTED_HOSTS entries must be hostnames only.")
 
-    requirements_path = Path(
-        _required(env, "AI_VASTU_REQUIREMENTS_PATH")
-    ).expanduser()
+    requirements_path = Path(_required(env, "AI_VASTU_REQUIREMENTS_PATH")).expanduser()
     if not requirements_path.is_absolute():
         raise ProductionConfigurationError(
             "AI_VASTU_REQUIREMENTS_PATH must be absolute in production."
@@ -148,10 +138,14 @@ def load_production_settings(
             "Razorpay test credentials cannot pass the production launch gate."
         )
 
-    provider = env.get(
-        "AI_VASTU_REQUIREMENTS_PROVIDER",
-        "fixture",
-    ).strip().lower()
+    provider = (
+        env.get(
+            "AI_VASTU_REQUIREMENTS_PROVIDER",
+            "fixture",
+        )
+        .strip()
+        .lower()
+    )
     if provider not in {"openai", "gemini"}:
         raise ProductionConfigurationError(
             "Commercial launch requires a supported live requirements provider."

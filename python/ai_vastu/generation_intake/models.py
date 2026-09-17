@@ -20,6 +20,8 @@ NonNegativeInt = Annotated[int, Field(ge=0)]
 class GenerationReferenceKind(StrEnum):
     IMAGE = "IMAGE"
     PDF = "PDF"
+    DXF = "DXF"
+    DWG = "DWG"
 
 
 class GenerationAttachmentRecord(FrozenModel):

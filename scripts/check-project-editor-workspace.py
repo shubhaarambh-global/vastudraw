@@ -2,12 +2,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-editor = (ROOT / "apps/web/src/components/editor/ProjectEditorPage.tsx").read_text(
-    encoding="utf-8"
-)
-workspace = (ROOT / "apps/web/src/editor/project-workspace.ts").read_text(
-    encoding="utf-8"
-)
+editor = (ROOT / "apps/web/src/components/editor/ProjectEditorPage.tsx").read_text(encoding="utf-8")
+workspace = (ROOT / "apps/web/src/editor/project-workspace.ts").read_text(encoding="utf-8")
 route = (ROOT / "apps/web/src/app/editor/page.tsx").read_text(encoding="utf-8")
 client = (ROOT / "apps/web/src/api/client.ts").read_text(encoding="utf-8")
 

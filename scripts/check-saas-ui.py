@@ -33,7 +33,7 @@ if "82%" in dashboard_source or "Vastu Score" in dashboard_source:
 if "workspace.projects" not in dashboard_source or "workspace.projects" not in projects_source:
     raise SystemExit("Dashboard/projects UI is not bound to live project records.")
 
-if ".saas-sidebar" not in css_source or ".saas-nav-item[data-active=\"true\"]" not in css_source:
+if ".saas-sidebar" not in css_source or '.saas-nav-item[data-active="true"]' not in css_source:
     raise SystemExit("Phase 21 sidebar/active-state styling is incomplete.")
 
 print(

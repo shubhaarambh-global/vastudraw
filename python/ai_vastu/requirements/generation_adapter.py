@@ -127,9 +127,7 @@ def compile_confirmed_requirements(
 
     missing_bedrooms = confirmed.bedroom_count - explicit_bedrooms
     if missing_bedrooms < 0:
-        raise UnsupportedConfirmedRequirement(
-            "Explicit bedroom requirements exceed bedroom_count."
-        )
+        raise UnsupportedConfirmedRequirement("Explicit bedroom requirements exceed bedroom_count.")
     if missing_bedrooms:
         room_requirements.append(
             _room_requirement(
@@ -149,9 +147,7 @@ def compile_confirmed_requirements(
     )
     missing_parking = confirmed.parking_count - explicit_parking
     if missing_parking < 0:
-        raise UnsupportedConfirmedRequirement(
-            "Explicit parking requirements exceed parking_count."
-        )
+        raise UnsupportedConfirmedRequirement("Explicit parking requirements exceed parking_count.")
     if missing_parking:
         room_requirements.append(
             _room_requirement(
@@ -201,6 +197,7 @@ def compile_confirmed_requirements(
         },
         "planner_config": {
             "solver_step_mm": 1,
+            "clearance_reserve_mm": 230,
             "max_time_ms": 5000,
             "max_conflicts": 100000,
             "num_search_workers": 1,
@@ -211,14 +208,19 @@ def compile_confirmed_requirements(
             "door_clearance_margin_mm": 50,
         },
         "openings": [],
+        "circulation_config": {
+            "auto_generate": True,
+            "internal_door_width_mm": 800,
+            "external_door_width_mm": 900,
+            "edge_margin_mm": 100,
+            "door_height_mm": 2100,
+        },
         "stairs": [],
         "swing_contexts": [],
         "assumptions": assumptions,
     }
 
-    request = ArchitecturalGenerationRequest.model_validate_json(
-        json.dumps(payload)
-    )
+    request = ArchitecturalGenerationRequest.model_validate_json(json.dumps(payload))
     notices = (
         "True-North/road/facing are confirmed context but are not inputs in the "
         "inspected Phase 16 generation request.",

@@ -11,15 +11,13 @@ def patch_api_main() -> None:
     text = path.read_text(encoding="utf-8")
 
     import_line = (
-        "from app.confirmed_generation_routes import "
-        "router as confirmed_generation_router"
+        "from app.confirmed_generation_routes import router as confirmed_generation_router"
     )
     if import_line not in text:
         lines = text.splitlines()
         insert_at = 0
         while insert_at < len(lines) and (
-            lines[insert_at].startswith("from __future__")
-            or not lines[insert_at].strip()
+            lines[insert_at].startswith("from __future__") or not lines[insert_at].strip()
         ):
             insert_at += 1
         lines.insert(insert_at, import_line)
@@ -37,12 +35,8 @@ def patch_package_json() -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
     scripts = data.setdefault("scripts", {})
 
-    scripts["confirmed-generation:check"] = (
-        "python scripts/check-confirmed-generation-binding.py"
-    )
-    scripts["phase24:contracts"] = (
-        "python scripts/inspect-phase24-final-contracts.py"
-    )
+    scripts["confirmed-generation:check"] = "python scripts/check-confirmed-generation-binding.py"
+    scripts["phase24:contracts"] = "python scripts/inspect-phase24-final-contracts.py"
 
     validate = scripts.get("validate")
     if not isinstance(validate, str):

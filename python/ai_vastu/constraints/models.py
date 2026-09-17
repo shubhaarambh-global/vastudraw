@@ -191,9 +191,7 @@ class FloorPreferenceObjective(FrozenModel):
 
 class AdjacencyPreferenceObjective(FrozenModel):
     id: EntityId
-    kind: Literal[SoftConstraintKind.ADJACENCY_PREFERENCE] = (
-        SoftConstraintKind.ADJACENCY_PREFERENCE
-    )
+    kind: Literal[SoftConstraintKind.ADJACENCY_PREFERENCE] = SoftConstraintKind.ADJACENCY_PREFERENCE
     origin: Literal[ConstraintOrigin.USER_REQUIREMENT] = ConstraintOrigin.USER_REQUIREMENT
     room_instance_id: EntityId
     target_room_type: RoomType
@@ -204,9 +202,7 @@ class AdjacencyPreferenceObjective(FrozenModel):
 
 class AdjacencyAvoidanceObjective(FrozenModel):
     id: EntityId
-    kind: Literal[SoftConstraintKind.ADJACENCY_AVOIDANCE] = (
-        SoftConstraintKind.ADJACENCY_AVOIDANCE
-    )
+    kind: Literal[SoftConstraintKind.ADJACENCY_AVOIDANCE] = SoftConstraintKind.ADJACENCY_AVOIDANCE
     origin: Literal[ConstraintOrigin.USER_REQUIREMENT] = ConstraintOrigin.USER_REQUIREMENT
     room_instance_id: EntityId
     target_room_type: RoomType

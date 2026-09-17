@@ -237,9 +237,8 @@ def _adjacency_pair_penalty(
 
     if len(penalties) == 1:
         return penalties[0]
-    total_upper = (
-        (buildable_width_cells + buildable_depth_cells) * config.solver_step_mm
-        + (objective.min_shared_length_mm or 0)
+    total_upper = (buildable_width_cells + buildable_depth_cells) * config.solver_step_mm + (
+        objective.min_shared_length_mm or 0
     )
     total = model.new_int_var(0, total_upper, f"{name}_pair_penalty")
     model.add(total == sum(penalties))
@@ -259,9 +258,7 @@ def solve_rectangular_problem(
     """
 
     if len(problem.available_floor_indices) != 1:
-        raise UnsupportedSolverProblemError(
-            "Phase 7 planner supports exactly one available floor."
-        )
+        raise UnsupportedSolverProblemError("Phase 7 planner supports exactly one available floor.")
     if any(room.locked for room in problem.room_instances):
         raise UnsupportedSolverProblemError(
             "Locked rooms require existing authoritative geometry and are not supported in Phase 7."
@@ -324,8 +321,9 @@ def solve_rectangular_problem(
                     f"Unsupported hard constraint in Phase 7: {constraint.kind}."
                 )
 
-        min_w_cells = (min_width_mm + step - 1) // step
-        min_d_cells = (min_depth_mm + step - 1) // step
+        reserve_mm = config.clearance_reserve_mm
+        min_w_cells = (min_width_mm + reserve_mm + step - 1) // step
+        min_d_cells = (min_depth_mm + reserve_mm + step - 1) // step
         max_w_cells = min(width_cells, max_width_mm // step)
         max_d_cells = min(depth_cells, max_depth_mm // step)
         if min_w_cells > max_w_cells or min_d_cells > max_d_cells:
@@ -333,7 +331,10 @@ def solve_rectangular_problem(
                 problem,
                 config,
                 PlannerStatus.INFEASIBLE,
-                notice="Room dimension bounds contain no value on the configured solver lattice.",
+                notice=(
+                    "Room dimension bounds contain no value on the configured solver "
+                    "lattice after applying the explicit clearance reserve."
+                ),
             )
 
         prefix = f"room_{room.id.hex}"
@@ -354,8 +355,39 @@ def solve_rectangular_problem(
             f"{prefix}_area",
         )
         model.add_multiplication_equality(area_cells2, [width, depth])
+
+        # Phase 9 validates room minima on clear dimensions after wall
+        # thickness is deducted from the wall-centreline envelope. The
+        # explicit reserve is therefore subtracted before enforcing minimum
+        # dimensions/area. Using the maximum wall thickness is conservative:
+        # actual clear geometry can only be equal or larger.
+        clear_width_mm = model.new_int_var(
+            1,
+            bounds.width_mm,
+            f"{prefix}_clear_w_mm",
+        )
+        clear_depth_mm = model.new_int_var(
+            1,
+            bounds.depth_mm,
+            f"{prefix}_clear_d_mm",
+        )
+        model.add(clear_width_mm == width * step - reserve_mm)
+        model.add(clear_depth_mm == depth * step - reserve_mm)
+
+        clear_area_mm2 = model.new_int_var(
+            1,
+            bounds.width_mm * bounds.depth_mm,
+            f"{prefix}_clear_area_mm2",
+        )
+        model.add_multiplication_equality(
+            clear_area_mm2,
+            [clear_width_mm, clear_depth_mm],
+        )
+        model.add(clear_area_mm2 >= min_area_mm2)
+
+        # Preserve the existing maximum-area contract on the solver envelope.
+        # The commercial generation profile does not currently set maxima.
         step2 = step * step
-        model.add(area_cells2 * step2 >= min_area_mm2)
         model.add(area_cells2 * step2 <= max_area_mm2)
 
         if aspect is not None:
@@ -428,9 +460,7 @@ def solve_rectangular_problem(
             if len(pair_penalties) == 1:
                 best = pair_penalties[0]
             else:
-                upper = (bounds.width_mm + bounds.depth_mm) + (
-                    objective.min_shared_length_mm or 0
-                )
+                upper = (bounds.width_mm + bounds.depth_mm) + (objective.min_shared_length_mm or 0)
                 best = model.new_int_var(0, upper, f"adj_best_{objective.id.hex}")
                 model.add_min_equality(best, pair_penalties)
             penalty_terms.append(
@@ -441,8 +471,7 @@ def solve_rectangular_problem(
                 notices,
                 code="SINGLE_FLOOR_PREFERENCE_TRIVIALLY_SATISFIED",
                 message=(
-                    "Floor preference is trivially satisfied by the Phase 7 "
-                    "single-floor domain."
+                    "Floor preference is trivially satisfied by the Phase 7 single-floor domain."
                 ),
                 constraint_id=objective.id,
                 room_instance_id=objective.room_instance_id,

@@ -1,5 +1,5 @@
-import { GenerationWorkspacePage } from "../../components/generation/GenerationWorkspacePage.tsx";
+import { Phase26CGenerationPage } from "../../components/generation/Phase26CGenerationPage.tsx";
 
 export default function GenerationPage() {
-  return <GenerationWorkspacePage />;
+  return <Phase26CGenerationPage />;
 }

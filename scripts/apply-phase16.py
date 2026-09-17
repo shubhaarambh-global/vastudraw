@@ -37,27 +37,27 @@ def patch_main() -> None:
     text = text.replace('"phase": "15"', '"phase": "16"')
     text = text.replace('"phase": "11"', '"phase": "16"')
 
-    route_marker = "    @app.post(\n        \"/projects\",\n"
+    route_marker = '    @app.post(\n        "/projects",\n'
     if '"/generation/architectural"' not in text:
         route = (
-            '    @app.post(\n'
+            "    @app.post(\n"
             '        "/generation/architectural",\n'
-            '        response_model=ArchitecturalGenerationResult,\n'
+            "        response_model=ArchitecturalGenerationResult,\n"
             '        tags=["generation"],\n'
-            '    )\n'
-            '    async def generate_architectural(\n'
-            '        request: Request,\n'
-            '    ) -> ArchitecturalGenerationResult:\n'
-            '        try:\n'
-            '            payload = ArchitecturalGenerationRequest.model_validate_json(\n'
-            '                await request.body()\n'
-            '            )\n'
-            '            return generate_architectural_plan(payload)\n'
-            '        except (GenerationInputError, ValueError) as exc:\n'
-            '            raise HTTPException(\n'
-            '                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n'
-            '                detail=str(exc),\n'
-            '            ) from exc\n\n'
+            "    )\n"
+            "    async def generate_architectural(\n"
+            "        request: Request,\n"
+            "    ) -> ArchitecturalGenerationResult:\n"
+            "        try:\n"
+            "            payload = ArchitecturalGenerationRequest.model_validate_json(\n"
+            "                await request.body()\n"
+            "            )\n"
+            "            return generate_architectural_plan(payload)\n"
+            "        except (GenerationInputError, ValueError) as exc:\n"
+            "            raise HTTPException(\n"
+            "                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n"
+            "                detail=str(exc),\n"
+            "            ) from exc\n\n"
         )
         if route_marker not in text:
             raise SystemExit("Could not locate API route insertion point.")
@@ -79,28 +79,28 @@ def patch_readiness() -> None:
         )
 
     old = (
-        '            _gate(\n'
+        "            _gate(\n"
         '                "GENERATION_API_NOT_IMPLEMENTED",\n'
-        '                ReleaseGateStatus.BLOCKER,\n'
-        '                (\n'
+        "                ReleaseGateStatus.BLOCKER,\n"
+        "                (\n"
         '                    "The API does not yet expose the deterministic planning '
         'pipeline as a "\n'
         '                    "product workflow."\n'
-        '                ),\n'
-        '            ),\n'
+        "                ),\n"
+        "            ),\n"
     )
     new = (
-        '            _gate(\n'
+        "            _gate(\n"
         '                "GENERATION_API_IMPLEMENTED",\n'
-        '                ReleaseGateStatus.PASS,\n'
-        '                (\n'
+        "                ReleaseGateStatus.PASS,\n"
+        "                (\n"
         '                    "The deterministic architectural planning pipeline is "\n'
         '                    "exposed as an API workflow."\n'
-        '                ),\n'
+        "                ),\n"
         '                f"pipeline_version={GENERATION_PIPELINE_VERSION}",\n'
         '                "endpoint=POST /generation/architectural",\n'
         '                "vastu_rules_applied=false",\n'
-        '            ),\n'
+        "            ),\n"
     )
     if old in text:
         text = text.replace(old, new, 1)
@@ -159,11 +159,11 @@ def patch_readme() -> None:
     if "## Phase 16 — Deterministic architectural generation API" in text:
         return
     text += (
-        '\n\n## Phase 16 — Deterministic architectural generation API\n\n'
-        'Phase 16 exposes constraint compilation, CP-SAT planning, canonical architectural\n'
-        'geometry and independent validation through `POST /generation/architectural`.\n'
-        'It removes the generation-API production blocker without inventing Vastu doctrine;\n'
-        'Vastu Specification v1 remains DRAFT and therefore production promotion remains blocked.\n'
+        "\n\n## Phase 16 — Deterministic architectural generation API\n\n"
+        "Phase 16 exposes constraint compilation, CP-SAT planning, canonical architectural\n"
+        "geometry and independent validation through `POST /generation/architectural`.\n"
+        "It removes the generation-API production blocker without inventing Vastu doctrine;\n"
+        "Vastu Specification v1 remains DRAFT and therefore production promotion remains blocked.\n"
     )
     path.write_text(text, encoding="utf-8")
 

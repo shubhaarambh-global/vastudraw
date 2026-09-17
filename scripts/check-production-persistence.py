@@ -2,13 +2,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-repository = (ROOT / "python/ai_vastu/projects/postgres_repository.py").read_text(
+repository = (ROOT / "python/ai_vastu/projects/postgres_repository.py").read_text(encoding="utf-8")
+factory = (ROOT / "python/ai_vastu/projects/factory.py").read_text(encoding="utf-8")
+migration = (ROOT / "infra/postgres/migrations/202609150001_phase18_project_store.sql").read_text(
     encoding="utf-8"
 )
-factory = (ROOT / "python/ai_vastu/projects/factory.py").read_text(encoding="utf-8")
-migration = (
-    ROOT / "infra/postgres/migrations/202609150001_phase18_project_store.sql"
-).read_text(encoding="utf-8")
 readiness = (ROOT / "python/ai_vastu/release/readiness.py").read_text(encoding="utf-8")
 api = (ROOT / "apps/api/app/main.py").read_text(encoding="utf-8")
 

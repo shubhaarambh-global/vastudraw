@@ -37,6 +37,7 @@ def test_phase7_does_not_prevent_later_reviewed_vastu_release() -> None:
     assert spec.manifest.production_rule_count > 0
     assert spec.production_ready is True
 
+
 def test_phase7_adds_solver_but_not_cad_export_dependencies() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
     assert "ortools==9.15.6755" in pyproject

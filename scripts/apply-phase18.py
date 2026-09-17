@@ -23,7 +23,7 @@ def patch_errors() -> None:
     text = path.read_text(encoding="utf-8")
     block = (
         "\n\nclass ProjectStoreConfigurationError(ProjectStoreError):\n"
-        "    \"\"\"Raised when production persistence configuration is unsafe.\"\"\"\n"
+        '    """Raised when production persistence configuration is unsafe."""\n'
     )
     if "class ProjectStoreConfigurationError" not in text:
         text = text.rstrip() + block + "\n"
@@ -42,11 +42,15 @@ def patch_repository_protocol() -> None:
 def patch_projects_init() -> None:
     path = ROOT / "python/ai_vastu/projects/__init__.py"
     text = path.read_text(encoding="utf-8")
-    text = text.replace(
-        "    ProjectNotFoundError,\n",
-        "    ProjectNotFoundError,\n    ProjectStoreConfigurationError,\n",
-        1,
-    ) if "ProjectStoreConfigurationError" not in text else text
+    text = (
+        text.replace(
+            "    ProjectNotFoundError,\n",
+            "    ProjectNotFoundError,\n    ProjectStoreConfigurationError,\n",
+            1,
+        )
+        if "ProjectStoreConfigurationError" not in text
+        else text
+    )
     if "from .factory import create_project_repository_from_environment" not in text:
         text = text.replace(
             "from .models import (\n",
@@ -139,28 +143,28 @@ def patch_readiness() -> None:
     path = ROOT / "python/ai_vastu/release/readiness.py"
     text = path.read_text(encoding="utf-8")
     old = (
-        '            _gate(\n'
+        "            _gate(\n"
         '                "PRODUCTION_PERSISTENCE_NOT_IMPLEMENTED",\n'
-        '                ReleaseGateStatus.BLOCKER,\n'
-        '                (\n'
+        "                ReleaseGateStatus.BLOCKER,\n"
+        "                (\n"
         '                    "The current SQLite repository is a reference adapter, "\n'
         '                    "not the planned production store."\n'
-        '                ),\n'
-        '            ),\n'
+        "                ),\n"
+        "            ),\n"
     )
     new = (
-        '            _gate(\n'
+        "            _gate(\n"
         '                "PRODUCTION_PERSISTENCE_IMPLEMENTED",\n'
-        '                ReleaseGateStatus.PASS,\n'
-        '                (\n'
+        "                ReleaseGateStatus.PASS,\n"
+        "                (\n"
         '                    "PostgreSQL/Supabase production persistence is implemented behind "\n'
         '                    "the ProjectRepository boundary."\n'
-        '                ),\n'
+        "                ),\n"
         '                "backend=postgresql",\n'
         '                "driver=psycopg3",\n'
         '                "sqlite_reference_only=true",\n'
         '                "production_without_database_url=fail_closed",\n'
-        '            ),\n'
+        "            ),\n"
     )
     if old in text:
         text = text.replace(old, new, 1)
@@ -248,19 +252,19 @@ def patch_phase18_policy() -> None:
         "ROOT = Path(__file__).resolve().parents[1]\n\n\n"
         "def test_phase18_removes_only_persistence_release_blocker() -> None:\n"
         "    source = (\n"
-        "        ROOT / \"python/ai_vastu/release/readiness.py\"\n"
-        "    ).read_text(encoding=\"utf-8\")\n"
-        "    assert \"PRODUCTION_PERSISTENCE_IMPLEMENTED\" in source\n"
-        "    assert \"PRODUCTION_PERSISTENCE_NOT_IMPLEMENTED\" not in source\n"
-        "    assert \"AUTHORIZATION_NOT_IMPLEMENTED\" in source\n"
-        "    assert \"VASTU_SPEC_NOT_FROZEN\" in source\n\n\n"
+        '        ROOT / "python/ai_vastu/release/readiness.py"\n'
+        '    ).read_text(encoding="utf-8")\n'
+        '    assert "PRODUCTION_PERSISTENCE_IMPLEMENTED" in source\n'
+        '    assert "PRODUCTION_PERSISTENCE_NOT_IMPLEMENTED" not in source\n'
+        '    assert "AUTHORIZATION_NOT_IMPLEMENTED" in source\n'
+        '    assert "VASTU_SPEC_NOT_FROZEN" in source\n\n\n'
         "def test_production_repository_uses_postgres_transaction_boundary() -> None:\n"
         "    source = (\n"
-        "        ROOT / \"python/ai_vastu/projects/postgres_repository.py\"\n"
-        "    ).read_text(encoding=\"utf-8\")\n"
-        "    assert \"FOR UPDATE\" in source\n"
-        "    assert \"connection.transaction()\" in source\n"
-        "    assert \"prepare_threshold\" in source\n"
+        '        ROOT / "python/ai_vastu/projects/postgres_repository.py"\n'
+        '    ).read_text(encoding="utf-8")\n'
+        '    assert "FOR UPDATE" in source\n'
+        '    assert "connection.transaction()" in source\n'
+        '    assert "prepare_threshold" in source\n'
     )
     path.write_text(content, encoding="utf-8")
 

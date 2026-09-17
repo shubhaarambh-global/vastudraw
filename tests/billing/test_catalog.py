@@ -8,6 +8,7 @@ def test_phase23_catalog_prices_are_exact_in_paise() -> None:
     assert get_product("pro_monthly").amount_paise == 999_900
     assert get_product("pro_yearly").amount_paise == 6_999_900
 
+
 def test_public_catalog_contains_five_products() -> None:
     assert len(public_catalog()) == 5
 

@@ -50,18 +50,15 @@ def _direction(text: str, phrase: str) -> Direction | None:
         for name in names:
             escaped_name = re.escape(name)
 
-            direction_before_phrase = (
-                rf"\b{escaped_name}\b[\s-]*{phrase}\b"
-            )
+            direction_before_phrase = rf"\b{escaped_name}\b[\s-]*{phrase}\b"
             phrase_before_direction = (
                 rf"\b{phrase}\b"
                 rf"(?:\s+(?:on|to|at|towards?))?"
                 rf"[\s:=-]*\b{escaped_name}\b"
             )
 
-            if (
-                re.search(direction_before_phrase, lowered)
-                or re.search(phrase_before_direction, lowered)
+            if re.search(direction_before_phrase, lowered) or re.search(
+                phrase_before_direction, lowered
             ):
                 return direction
 

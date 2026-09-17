@@ -30,14 +30,7 @@ except ProductionConfigurationError as exc:
 bundle_path = Path(
     os.getenv(
         "AI_VASTU_VASTU_RULE_BUNDLE_PATH",
-        str(
-            ROOT
-            / "docs"
-            / "vastu"
-            / "spec-v1.0"
-            / "production"
-            / "rule-bundle.json"
-        ),
+        str(ROOT / "docs" / "vastu" / "spec-v1.0" / "production" / "rule-bundle.json"),
     )
 )
 if not bundle_path.is_file():

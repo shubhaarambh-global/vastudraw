@@ -24,9 +24,8 @@ class BillingService:
             source = "subscription"
         elif self._repository.consume_project_credit(user_id):
             source = "project_credit"
-        elif (
-            snapshot.free_generation_available
-            and not self._repository.has_pending_free_project(user_id)
+        elif snapshot.free_generation_available and not self._repository.has_pending_free_project(
+            user_id
         ):
             source = "free_trial_pending"
         else:
@@ -35,9 +34,7 @@ class BillingService:
         self._repository.add_project_grant(user_id, project_id, source)
         return source
 
-    def authorize_generation(
-        self, user_id: str, project_id: str
-    ) -> GenerationAuthorization:
+    def authorize_generation(self, user_id: str, project_id: str) -> GenerationAuthorization:
         snapshot = self._repository.get_snapshot(user_id)
         if snapshot.has_active_subscription:
             return GenerationAuthorization(
@@ -51,9 +48,7 @@ class BillingService:
             )
 
         if grant.source == "project_credit":
-            return GenerationAuthorization(
-                allowed=True, reason="paid_project", consumption=None
-            )
+            return GenerationAuthorization(allowed=True, reason="paid_project", consumption=None)
         if grant.source == "free_trial_pending" and snapshot.free_generation_available:
             return GenerationAuthorization(
                 allowed=True,
@@ -82,19 +77,13 @@ class BillingService:
 
         if not self._repository.consume_free_generation(user_id):
             raise PermissionError("Free generation was already consumed.")
-        self._repository.update_project_grant_source(
-            user_id, project_id, "free_trial_used"
-        )
+        self._repository.update_project_grant_source(user_id, project_id, "free_trial_used")
 
-    def apply_one_time_purchase(
-        self, event_key: str, user_id: str, sku: str
-    ) -> bool:
+    def apply_one_time_purchase(self, event_key: str, user_id: str, sku: str) -> bool:
         product = get_product(sku)
         if product.kind not in {ProductKind.PROJECT, ProductKind.PROJECT_PACK}:
             raise ValueError("SKU is not a one-time project product.")
-        if not self._repository.record_event_once(
-            "razorpay", event_key, "payment_link.paid"
-        ):
+        if not self._repository.record_event_once("razorpay", event_key, "payment_link.paid"):
             return False
         self._repository.grant_project_credits(user_id, product.project_credits)
         return True

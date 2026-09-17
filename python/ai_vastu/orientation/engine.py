@@ -137,9 +137,7 @@ def edge_direction_analysis(
     tangent_drawing = drawing_bearing_udeg(edge.start, edge.end)
     # CCW boundary: interior is left of the edge, so outward is the right normal.
     outward_delta = (
-        90 * MICRODEGREES_PER_DEGREE
-        if signed_area > 0
-        else -90 * MICRODEGREES_PER_DEGREE
+        90 * MICRODEGREES_PER_DEGREE if signed_area > 0 else -90 * MICRODEGREES_PER_DEGREE
     )
     outward_drawing = (tangent_drawing + outward_delta) % FULL_TURN_UDEG
     tangent_true = true_bearing_udeg(tangent_drawing, orientation)

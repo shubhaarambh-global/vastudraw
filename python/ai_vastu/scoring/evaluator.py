@@ -220,9 +220,7 @@ def score_candidate(request: ScoringRequest, candidate: ScoringCandidate) -> Can
                 )
             )
         elif isinstance(objective, FloorPreferenceObjective):
-            value = (
-                _BASIS_POINTS if source.floor_index in objective.preferred_floor_indices else 0
-            )
+            value = _BASIS_POINTS if source.floor_index in objective.preferred_floor_indices else 0
             scores.append(
                 ObjectiveScore(
                     constraint_id=objective.id,

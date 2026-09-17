@@ -41,10 +41,7 @@ def _expert_approval_times(spec: LoadedVastuSpecification) -> list[datetime]:
     result: list[datetime] = []
     for record in spec.rule_records:
         for item in record.review.attestations:
-            if (
-                item.role is ReviewerRole.VASTU_EXPERT
-                and item.decision is ReviewDecision.APPROVE
-            ):
+            if item.role is ReviewerRole.VASTU_EXPERT and item.decision is ReviewDecision.APPROVE:
                 result.append(item.reviewed_at)
     return result
 
@@ -64,8 +61,7 @@ def main() -> None:
         if not record.review.geometry_semantics_reviewed:
             raise SystemExit(f"Rule {record.rule.rule_id} lacks geometry-semantics review.")
         if not any(
-            item.role is ReviewerRole.VASTU_EXPERT
-            and item.decision is ReviewDecision.APPROVE
+            item.role is ReviewerRole.VASTU_EXPERT and item.decision is ReviewDecision.APPROVE
             for item in record.review.attestations
         ):
             raise SystemExit(f"Rule {record.rule.rule_id} lacks VASTU_EXPERT approval.")
@@ -125,8 +121,7 @@ def main() -> None:
             item.reviewer_id
             for record in frozen_spec.rule_records
             for item in record.review.attestations
-            if item.role is ReviewerRole.VASTU_EXPERT
-            and item.decision is ReviewDecision.APPROVE
+            if item.role is ReviewerRole.VASTU_EXPERT and item.decision is ReviewDecision.APPROVE
         }
     )
     (SPEC_ROOT / "README.md").write_text(

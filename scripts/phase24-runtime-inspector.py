@@ -142,12 +142,7 @@ except Exception:
     pass
 
 
-payload: dict[str, Any] = {
-    "modules": {
-        name: inspect_module(name)
-        for name in sorted(module_names)
-    }
-}
+payload: dict[str, Any] = {"modules": {name: inspect_module(name) for name in sorted(module_names)}}
 
 # Record FastAPI endpoint call signatures, not only paths.
 try:

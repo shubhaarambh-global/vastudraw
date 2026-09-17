@@ -6,6 +6,10 @@ from uuid import UUID
 import jwt
 from fastapi import APIRouter, Header, HTTPException
 
+from ai_vastu.architectural_intelligence import (
+    ArchitecturalIntelligenceConfigurationError,
+    ArchitecturalIntelligenceProviderError,
+)
 from ai_vastu.billing import BillingService, create_billing_repository
 from ai_vastu.projects.factory import create_project_repository_from_environment
 from ai_vastu.projects.service import ProjectRevisionService
@@ -19,6 +23,10 @@ from ai_vastu.requirements.generation_adapter import (
     UnsupportedConfirmedRequirement,
 )
 from ai_vastu.requirements.store import RequirementsStore
+from ai_vastu.vastu_reasoning import (
+    VastuReasoningConfigurationError,
+    VastuReasoningProviderError,
+)
 
 router = APIRouter(prefix="/confirmed-generation", tags=["confirmed-generation"])
 
@@ -101,6 +109,14 @@ def generate_from_confirmed_requirements(
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ArchitecturalIntelligenceConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ArchitecturalIntelligenceProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except VastuReasoningConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except VastuReasoningProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except (
         UnsupportedConfirmedRequirement,
         Phase24FinalizationError,
@@ -116,6 +132,18 @@ def generate_from_confirmed_requirements(
         return {
             "status": generation_result.disposition.value,
             "billing_reason": run.billing_reason,
+            "architectural_intent": (
+                None
+                if run.architectural_intent is None
+                else run.architectural_intent.model_dump(mode="json")
+            ),
+            "vastu_reasoning_profile": (
+                None
+                if run.vastu_reasoning_profile is None
+                else run.vastu_reasoning_profile.model_dump(mode="json")
+            ),
+            "vastu_assessment": None,
+            "planning_blend": None,
             "free_generation_consumed": False,
             "revision_persisted": False,
             "generation_result": generation_result.model_dump(mode="json"),
@@ -128,6 +156,22 @@ def generate_from_confirmed_requirements(
     return {
         "status": generation_result.disposition.value,
         "billing_reason": run.billing_reason,
+        "architectural_intent": (
+            None
+            if run.architectural_intent is None
+            else run.architectural_intent.model_dump(mode="json")
+        ),
+        "vastu_reasoning_profile": (
+            None
+            if run.vastu_reasoning_profile is None
+            else run.vastu_reasoning_profile.model_dump(mode="json")
+        ),
+        "vastu_assessment": (
+            None if run.vastu_assessment is None else run.vastu_assessment.model_dump(mode="json")
+        ),
+        "planning_blend": (
+            None if run.planning_blend is None else run.planning_blend.model_dump(mode="json")
+        ),
         "free_generation_consumed": run.free_generation_consumed,
         "revision_persisted": True,
         "revision_id": str(revision.revision_id),

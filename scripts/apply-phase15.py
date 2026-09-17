@@ -52,16 +52,16 @@ def patch_api() -> None:
 
     route = (
         "\n    @app.get(\n"
-        "        \"/system/release-readiness\",\n"
+        '        "/system/release-readiness",\n'
         "        response_model=ProductionReadinessReport,\n"
-        "        tags=[\"system\"],\n"
+        '        tags=["system"],\n'
         "    )\n"
         "    def release_readiness() -> ProductionReadinessReport:\n"
         "        repository_root = Path(__file__).resolve().parents[3]\n"
         "        return evaluate_production_mvp_readiness(repository_root)\n"
     )
     if '"/system/release-readiness"' not in text:
-        marker = "\n    @app.post(\n        \"/projects\","
+        marker = '\n    @app.post(\n        "/projects",'
         index = text.find(marker)
         if index == -1:
             raise SystemExit("Could not locate API project routes insertion point.")
@@ -81,7 +81,7 @@ def patch_docs() -> None:
     append_once(
         ROOT / "README.md",
         "## Phase 15 — Production MVP release gate",
-        '''## Phase 15 — Production MVP release gate
+        """## Phase 15 — Production MVP release gate
 
 Phase 15 adds a deterministic, fail-closed public-MVP release-readiness report. The
 engineering CI gate verifies that the readiness mechanism is stable; the separate
@@ -91,16 +91,16 @@ The current repository is intentionally **BLOCKED** for public production releas
 The principal blockers are the still-DRAFT/empty Vastu Specification v1, missing
 project authorization, absence of the planned production persistence adapter, and
 missing end-to-end generation/API/editor wiring. This is a truthful release gate,
-not a claim that those capabilities already exist.''',
+not a claim that those capabilities already exist.""",
     )
     append_once(
         ROOT / "THIRD_PARTY.md",
         "## Phase 15 dependency note",
-        '''## Phase 15 dependency note
+        """## Phase 15 dependency note
 
 Phase 15 introduces no new third-party runtime dependency. It composes existing
 repository metadata and subsystem contracts into a deterministic release-readiness
-gate.''',
+gate.""",
     )
 
 

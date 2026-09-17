@@ -39,6 +39,7 @@ def test_repository_spec_requires_review_before_production_freeze() -> None:
     assert spec.manifest.production_rule_count > 0
     assert spec.production_ready is True
 
+
 def test_phase5_rule_files_require_a_reviewed_release() -> None:
     spec = load_vastu_spec_directory(ROOT / "docs/vastu/spec-v1.0")
     rules = sorted((ROOT / "docs/vastu/spec-v1.0/rules").glob("*.json"))
@@ -51,6 +52,7 @@ def test_phase5_rule_files_require_a_reviewed_release() -> None:
     assert len(rules) == spec.manifest.production_rule_count
     assert len(rules) > 0
     assert spec.production_ready is True
+
 
 def test_phase5_does_not_pull_solver_or_cad_dependencies() -> None:
     python_root = ROOT / "python/ai_vastu"

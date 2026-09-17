@@ -98,10 +98,7 @@ def score_and_select_alternatives(request: ScoringRequest) -> ScoringRunResult:
             for prior in selected_candidates
         ]
         minimum_changed = min(changed_counts) if changed_counts else None
-        if (
-            minimum_changed is not None
-            and minimum_changed < request.config.minimum_changed_rooms
-        ):
+        if minimum_changed is not None and minimum_changed < request.config.minimum_changed_rooms:
             excluded.append(
                 ExcludedAlternative(
                     candidate_id=item.candidate_id,

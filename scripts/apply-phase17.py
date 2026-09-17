@@ -26,17 +26,17 @@ def patch_api() -> None:
         "    allowed_origins = tuple(\n"
         "        origin.strip()\n"
         "        for origin in os.environ.get(\n"
-        "            \"AI_VASTU_WEB_ORIGINS\",\n"
-        "            \"http://localhost:3000,http://127.0.0.1:3000\",\n"
-        "        ).split(\",\")\n"
+        '            "AI_VASTU_WEB_ORIGINS",\n'
+        '            "http://localhost:3000,http://127.0.0.1:3000",\n'
+        '        ).split(",")\n'
         "        if origin.strip()\n"
         "    )\n"
         "    app.add_middleware(\n"
         "        CORSMiddleware,\n"
         "        allow_origins=list(allowed_origins),\n"
         "        allow_credentials=False,\n"
-        "        allow_methods=[\"GET\", \"POST\"],\n"
-        "        allow_headers=[\"Content-Type\"],\n"
+        '        allow_methods=["GET", "POST"],\n'
+        '        allow_headers=["Content-Type"],\n'
         "    )\n"
     )
     if "AI_VASTU_WEB_ORIGINS" not in text:
@@ -112,25 +112,25 @@ def patch_readiness() -> None:
     path = ROOT / "python/ai_vastu/release/readiness.py"
     text = path.read_text(encoding="utf-8")
     old = (
-        '            _gate(\n'
+        "            _gate(\n"
         '                "WEB_API_WORKFLOW_NOT_IMPLEMENTED",\n'
-        '                ReleaseGateStatus.BLOCKER,\n'
+        "                ReleaseGateStatus.BLOCKER,\n"
         '                "The web editor is not yet bound to project generation/save/load '
         'API flows.",\n'
-        '            ),\n'
+        "            ),\n"
     )
     new = (
-        '            _gate(\n'
+        "            _gate(\n"
         '                "WEB_API_WORKFLOW_IMPLEMENTED",\n'
-        '                ReleaseGateStatus.PASS,\n'
-        '                (\n'
+        "                ReleaseGateStatus.PASS,\n"
+        "                (\n"
         '                    "The web editor is bound to project create/load/save and "\n'
         '                    "architectural generation API flows."\n'
-        '                ),\n'
+        "                ),\n"
         '                "project_api=create/load/save",\n'
         '                "generation_api=POST /generation/architectural",\n'
         '                "authoritative_units=mm",\n'
-        '            ),\n'
+        "            ),\n"
     )
     if old in text:
         text = text.replace(old, new, 1)
@@ -190,7 +190,6 @@ def patch_env() -> None:
     if "NEXT_PUBLIC_AI_VASTU_API_BASE_URL" not in text:
         text = text.rstrip() + "\n" + additions
     path.write_text(text, encoding="utf-8")
-
 
 
 def patch_web_styles() -> None:

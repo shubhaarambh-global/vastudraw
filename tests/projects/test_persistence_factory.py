@@ -37,9 +37,7 @@ def test_development_defaults_to_sqlite_reference_adapter() -> None:
 
 def test_production_fails_closed_without_postgres_url() -> None:
     with pytest.raises(ProjectStoreConfigurationError):
-        persistence_factory.create_project_repository_from_environment(
-            {"APP_ENV": "production"}
-        )
+        persistence_factory.create_project_repository_from_environment({"APP_ENV": "production"})
 
 
 def test_database_url_selects_postgres_adapter(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -51,9 +51,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
     if args.confirmation != CONFIRMATION_TOKEN:
-        raise SystemExit(
-            "Approval not recorded: explicit confirmation token did not match."
-        )
+        raise SystemExit("Approval not recorded: explicit confirmation token did not match.")
 
     spec = load_vastu_spec_directory(SPEC_ROOT)
     if spec.manifest.lifecycle not in {SpecLifecycle.IN_REVIEW, SpecLifecycle.FROZEN}:
@@ -97,16 +95,9 @@ def main() -> None:
                 f"{record.review.status.value}."
             )
         if not record.review.source_validation_passed:
-            raise SystemExit(
-                f"Rule {record.rule.rule_id} has not passed source validation."
-            )
-        if any(
-            item.decision is ReviewDecision.REJECT
-            for item in record.review.attestations
-        ):
-            raise SystemExit(
-                f"Rule {record.rule.rule_id} contains a rejection attestation."
-            )
+            raise SystemExit(f"Rule {record.rule.rule_id} has not passed source validation.")
+        if any(item.decision is ReviewDecision.REJECT for item in record.review.attestations):
+            raise SystemExit(f"Rule {record.rule.rule_id} contains a rejection attestation.")
 
         attestation = ReviewerAttestation(
             reviewer_id=args.reviewer_id,

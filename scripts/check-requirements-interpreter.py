@@ -21,8 +21,7 @@ with tempfile.TemporaryDirectory() as directory:
         user_id=USER,
         project_id=PROJECT,
         prompt=(
-            "30 x 50 ft plot, road on east, true north 0 deg, "
-            "3 BHK, kitchen, puja, 2-car parking"
+            "30 x 50 ft plot, road on east, true north 0 deg, 3 BHK, kitchen, puja, 2-car parking"
         ),
         references=(),
     )

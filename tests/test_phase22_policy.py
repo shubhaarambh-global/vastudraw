@@ -4,9 +4,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_phase22_generation_intake_accepts_prompt_image_and_pdf() -> None:
-    source = (
-        ROOT / "apps/web/src/components/generation/GenerationWorkspacePage.tsx"
-    ).read_text(encoding="utf-8")
+    source = (ROOT / "apps/web/src/components/generation/GenerationWorkspacePage.tsx").read_text(
+        encoding="utf-8"
+    )
     assert "Generation prompt" in source
     assert "image/jpeg" in source
     assert "image/png" in source
@@ -15,9 +15,7 @@ def test_phase22_generation_intake_accepts_prompt_image_and_pdf() -> None:
 
 
 def test_phase22_reference_inputs_are_explicitly_nonauthoritative() -> None:
-    source = (ROOT / "python/ai_vastu/generation_intake/models.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "python/ai_vastu/generation_intake/models.py").read_text(encoding="utf-8")
     assert "authoritative_geometry: bool = False" in source
     assert "cannot be authoritative geometry" in source
 

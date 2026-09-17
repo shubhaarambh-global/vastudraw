@@ -16,9 +16,7 @@ def test_phase23_keeps_frozen_vastu_files_out_of_scope() -> None:
 
 
 def test_phase23_has_server_authoritative_billing_gate() -> None:
-    service = (
-        ROOT / "python/ai_vastu/billing/service.py"
-    ).read_text(encoding="utf-8")
+    service = (ROOT / "python/ai_vastu/billing/service.py").read_text(encoding="utf-8")
     assert "authorize_generation" in service
     assert "record_successful_generation" in service
     assert "free_trial_pending" in service

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-PROFILE_VERSION = "24B.1"
+PROFILE_VERSION = "24B.3"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,8 +64,27 @@ ROOM_ALIASES: dict[str, str] = {
     "servant room": "servant_room",
     "servant toilet": "servant_toilet",
     "family lounge": "family_lounge",
+    # Common natural-language labels emitted by requirement providers.
+    "living room": "living",
+    "living area": "living",
+    "drawing room": "drawing",
+    "dining room": "dining",
+    "dining area": "dining",
+    "puja room": "puja",
     "pooja": "puja",
+    "pooja room": "puja",
+    "prayer room": "puja",
     "mandir": "puja",
+    "common toilet/bath": "common_toilet",
+    "common toilet bath": "common_toilet",
+    "common bathroom": "common_toilet",
+    "car parking": "parking",
+    "car park": "parking",
+    "parking space": "parking",
+    "utility room": "utility",
+    "store room": "store",
+    "study room": "study",
+    "laundry room": "laundry",
 }
 
 

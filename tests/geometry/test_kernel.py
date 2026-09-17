@@ -68,12 +68,14 @@ def test_union_preserves_an_explicit_hole() -> None:
             IntPoint(x_mm=100, y_mm=100),
             IntPoint(x_mm=0, y_mm=100),
         ),
-        holes=((
-            IntPoint(x_mm=25, y_mm=25),
-            IntPoint(x_mm=25, y_mm=75),
-            IntPoint(x_mm=75, y_mm=75),
-            IntPoint(x_mm=75, y_mm=25),
-        ),),
+        holes=(
+            (
+                IntPoint(x_mm=25, y_mm=25),
+                IntPoint(x_mm=25, y_mm=75),
+                IntPoint(x_mm=75, y_mm=75),
+                IntPoint(x_mm=75, y_mm=25),
+            ),
+        ),
     )
     result = kernel.union((donut,))
     assert len(result.polygons) == 1

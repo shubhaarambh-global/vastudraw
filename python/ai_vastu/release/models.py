@@ -50,9 +50,7 @@ class ProductionReadinessReport(FrozenModel):
         if self.blocker_count != len(self.blocker_codes):
             raise ValueError("blocker_count must equal blocker_codes length.")
         expected_disposition = (
-            ReleaseDisposition.READY
-            if self.blocker_count == 0
-            else ReleaseDisposition.BLOCKED
+            ReleaseDisposition.READY if self.blocker_count == 0 else ReleaseDisposition.BLOCKED
         )
         if self.disposition is not expected_disposition:
             raise ValueError("disposition does not match blocker state.")

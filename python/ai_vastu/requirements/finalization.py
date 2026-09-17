@@ -42,9 +42,7 @@ from ai_vastu.vastu.models import (
 from .generation_adapter import CompiledGeneration
 from .models import ConfirmedRequirements
 
-EXPECTED_VASTU_V1_BUNDLE_HASH = (
-    "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
-)
+EXPECTED_VASTU_V1_BUNDLE_HASH = "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
 _DIRECTION_BEARINGS: dict[str, float] = {
     "N": 0.0,
     "NE": 45.0,
@@ -88,22 +86,13 @@ def production_rule_bundle_path() -> Path:
                 "AI_VASTU_VASTU_RULE_BUNDLE_PATH must be absolute when configured."
             )
         return path
-    return (
-        _repository_root()
-        / "docs"
-        / "vastu"
-        / "spec-v1.0"
-        / "production"
-        / "rule-bundle.json"
-    )
+    return _repository_root() / "docs" / "vastu" / "spec-v1.0" / "production" / "rule-bundle.json"
 
 
 def load_production_vastu_bundle() -> RuleBundle:
     path = production_rule_bundle_path()
     if not path.is_file():
-        raise Phase24FinalizationError(
-            f"Frozen production Vastu bundle not found: {path}"
-        )
+        raise Phase24FinalizationError(f"Frozen production Vastu bundle not found: {path}")
     bundle = RuleBundle.model_validate_json(path.read_text(encoding="utf-8"))
     if not bundle.production:
         raise Phase24FinalizationError("Vastu RuleBundle is not marked production.")
@@ -164,14 +153,12 @@ def _sector_for_point(
 def _target_room_types_for_rule(rule: VastuRule) -> set[str]:
     candidates = {rule.subject.entity_type.strip().lower().replace(" ", "_")}
     candidates.update(
-        attribute.value.strip().lower().replace(" ", "_")
-        for attribute in rule.subject.attributes
+        attribute.value.strip().lower().replace(" ", "_") for attribute in rule.subject.attributes
     )
     matches = candidates & _ROOM_TYPES
     if not matches:
         raise Phase24FinalizationError(
-            "Reviewed CENTROID_IN_ZONE rule has no deterministic RoomType selector: "
-            f"{rule.rule_id}"
+            f"Reviewed CENTROID_IN_ZONE rule has no deterministic RoomType selector: {rule.rule_id}"
         )
     return matches
 
@@ -309,21 +296,16 @@ def _road_edge_index(direction: str, north_rotation_udeg: int) -> int:
 
     north_rotation_deg = north_rotation_udeg / 1_000_000.0
     true_edge_bearings = tuple(
-        (local_bearing - north_rotation_deg) % 360.0
-        for local_bearing in _LOCAL_EDGE_BEARINGS
+        (local_bearing - north_rotation_deg) % 360.0 for local_bearing in _LOCAL_EDGE_BEARINGS
     )
-    differences = tuple(
-        _circular_difference(bearing, target) for bearing in true_edge_bearings
-    )
+    differences = tuple(_circular_difference(bearing, target) for bearing in true_edge_bearings)
     best = min(differences)
     if best > 22.5 + 1e-9:
         raise Phase24FinalizationError(
             "Confirmed road side does not correspond to a rectangular plot edge "
             "under the confirmed true-North rotation."
         )
-    candidates = [
-        index for index, value in enumerate(differences) if abs(value - best) < 1e-9
-    ]
+    candidates = [index for index, value in enumerate(differences) if abs(value - best) < 1e-9]
     if len(candidates) != 1:
         raise Phase24FinalizationError(
             "Confirmed road side is ambiguous between multiple plot edges."
@@ -417,9 +399,7 @@ def _score_generation(
         )
     )
     if not scoring_result.selected:
-        raise Phase24FinalizationError(
-            "Accepted generation was excluded by deterministic scoring."
-        )
+        raise Phase24FinalizationError("Accepted generation was excluded by deterministic scoring.")
     return scoring_result.selected[0].candidate.scoring_summary
 
 

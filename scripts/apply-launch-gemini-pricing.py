@@ -16,11 +16,11 @@ def write(relative: str, text: str) -> None:
 # 1. Providers __init__.
 path = "python/ai_vastu/requirements/providers/__init__.py"
 text = read(path)
-import_block = '''from .gemini_generate_content import (
+import_block = """from .gemini_generate_content import (
     GeminiGenerateContentRequirementsProvider,
     GeminiRequirementsConfigurationError,
 )
-'''
+"""
 if "GeminiGenerateContentRequirementsProvider" not in text:
     marker = "from .fixture import FixtureRequirementsProvider\n"
     if marker not in text:
@@ -41,22 +41,21 @@ text = read(path)
 if "GeminiGenerateContentRequirementsProvider" not in text:
     text = text.replace(
         "    FixtureRequirementsProvider,\n",
-        "    FixtureRequirementsProvider,\n"
-        "    GeminiGenerateContentRequirementsProvider,\n",
+        "    FixtureRequirementsProvider,\n    GeminiGenerateContentRequirementsProvider,\n",
         1,
     )
 if 'if provider_name == "gemini":' not in text:
-    marker = '''    if provider_name == "openai":
+    marker = """    if provider_name == "openai":
         return OpenAIResponsesRequirementsProvider.from_environment()
-'''
+"""
     if marker not in text:
         raise SystemExit("Could not patch requirements provider factory")
     text = text.replace(
         marker,
         marker
-        + '''    if provider_name == "gemini":
+        + """    if provider_name == "gemini":
         return GeminiGenerateContentRequirementsProvider.from_environment()
-''',
+""",
         1,
     )
 write(path, text)
@@ -92,9 +91,9 @@ text = text.replace("amount_paise=339_900", "amount_paise=489_900")
 text = text.replace("amount_paise=249_900", "amount_paise=999_900")
 text = text.replace("amount_paise=2_499_900", "amount_paise=6_999_900")
 
-single = '''        amount_paise=49_900,
+single = """        amount_paise=49_900,
         project_credits=1,
-'''
+"""
 if "generation_limit_per_project=3" not in text:
     if single not in text:
         raise SystemExit("Could not attach single-project generation metadata")
@@ -103,9 +102,9 @@ if "generation_limit_per_project=3" not in text:
         single + "        generation_limit_per_project=3,\n",
         1,
     )
-pack = '''        amount_paise=489_900,
+pack = """        amount_paise=489_900,
         project_credits=10,
-'''
+"""
 if "generation_limit_per_project=5" not in text:
     if pack not in text:
         raise SystemExit("Could not attach pack generation metadata")
@@ -143,7 +142,7 @@ if '"gemini_model": self.gemini_model' not in text:
         '            "gemini_model": self.gemini_model,\n',
         1,
     )
-old_provider = '''    provider = env.get(
+old_provider = """    provider = env.get(
         "AI_VASTU_REQUIREMENTS_PROVIDER",
         "fixture",
     ).strip().lower()
@@ -153,8 +152,8 @@ old_provider = '''    provider = env.get(
         )
     _required(env, "OPENAI_API_KEY")
     openai_model = _required(env, "AI_VASTU_OPENAI_MODEL")
-'''
-new_provider = '''    provider = env.get(
+"""
+new_provider = """    provider = env.get(
         "AI_VASTU_REQUIREMENTS_PROVIDER",
         "fixture",
     ).strip().lower()
@@ -171,7 +170,7 @@ new_provider = '''    provider = env.get(
     else:
         _required(env, "GEMINI_API_KEY")
         gemini_model = _required(env, "AI_VASTU_GEMINI_MODEL")
-'''
+"""
 if old_provider in text:
     text = text.replace(old_provider, new_provider, 1)
 elif 'provider not in {"openai", "gemini"}' not in text:
@@ -194,13 +193,13 @@ for relative in (".env.example", ".env.production.example"):
         continue
     text = env_path.read_text(encoding="utf-8")
     if "AI_VASTU_GEMINI_MODEL" not in text:
-        text += '''
+        text += """
 
 # Gemini requirements interpreter
 # Set AI_VASTU_REQUIREMENTS_PROVIDER=gemini to enable.
 GEMINI_API_KEY=
 AI_VASTU_GEMINI_MODEL=gemini-2.5-flash
-'''
+"""
         env_path.write_text(text, encoding="utf-8")
 
 print("Gemini 2.5 Flash + launch pricing metadata integrated.")

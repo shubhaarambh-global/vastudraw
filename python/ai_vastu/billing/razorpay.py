@@ -99,15 +99,9 @@ class RazorpayClient:
             )
 
         if product.kind == ProductKind.SUBSCRIPTION:
-            plan_id = (
-                self._monthly_plan_id
-                if sku == "pro_monthly"
-                else self._yearly_plan_id
-            )
+            plan_id = self._monthly_plan_id if sku == "pro_monthly" else self._yearly_plan_id
             if not plan_id:
-                raise RazorpayConfigurationError(
-                    f"Razorpay plan id is missing for {sku}."
-                )
+                raise RazorpayConfigurationError(f"Razorpay plan id is missing for {sku}.")
             total_count = 120 if sku == "pro_monthly" else 10
             result = self._post(
                 "/subscriptions",
@@ -121,9 +115,7 @@ class RazorpayClient:
             )
             checkout_url = result.get("short_url")
             if not checkout_url:
-                raise RuntimeError(
-                    "Razorpay subscription did not return a checkout URL."
-                )
+                raise RuntimeError("Razorpay subscription did not return a checkout URL.")
             return CheckoutSession(
                 sku=sku,
                 provider="razorpay",

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_export_vendor_dependencies_are_confined_to_export_adapters() -> None:
     allowed = {
         ROOT / "python/ai_vastu/exporting/dxf_exporter.py",
+        ROOT / "python/ai_vastu/exporting/dxf_importer.py",
         ROOT / "python/ai_vastu/exporting/jpeg_exporter.py",
         ROOT / "python/ai_vastu/exporting/pdf_exporter.py",
     }
@@ -20,9 +21,7 @@ def test_export_vendor_dependencies_are_confined_to_export_adapters() -> None:
             or "from reportlab" in text
         )
         if has_vendor_import:
-            assert path in allowed, (
-                f"Export vendor dependency leaked into {path.relative_to(ROOT)}"
-            )
+            assert path in allowed, f"Export vendor dependency leaked into {path.relative_to(ROOT)}"
 
 
 def test_phase13_has_no_dwg_backend_claim() -> None:

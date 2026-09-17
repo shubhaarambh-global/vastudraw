@@ -19,6 +19,7 @@ from ai_vastu.plan_schema import (
     Assumption,
     BuildableArea,
     IntPolygon,
+    NonNegativeMM,
     PositiveMM,
     RoomRequirement,
 )
@@ -30,6 +31,14 @@ from ai_vastu.validation import DoorSwingContext, ValidationConfig, ValidationRu
 GENERATION_PIPELINE_VERSION = "1.0.0"
 NonNegativeInt = Annotated[int, Field(ge=0)]
 _HASH_LENGTH = 64
+
+
+class CirculationGenerationConfig(FrozenModel):
+    auto_generate: bool = False
+    internal_door_width_mm: PositiveMM = 800
+    external_door_width_mm: PositiveMM = 900
+    edge_margin_mm: NonNegativeMM = 100
+    door_height_mm: PositiveMM = 2100
 
 
 class GenerationDisposition(StrEnum):
@@ -54,6 +63,7 @@ class ArchitecturalGenerationRequest(FrozenModel):
     openings: tuple[OpeningBuildRequest, ...] = ()
     stairs: tuple[StairBuildRequest, ...] = ()
     swing_contexts: tuple[DoorSwingContext, ...] = ()
+    circulation_config: CirculationGenerationConfig = CirculationGenerationConfig()
 
     @model_validator(mode="after")
     def validate_generation_request(self) -> ArchitecturalGenerationRequest:
@@ -78,9 +88,7 @@ class ArchitecturalGenerationResult(FrozenModel):
         feasible = self.planner_result.status in (PlannerStatus.OPTIMAL, PlannerStatus.FEASIBLE)
         if feasible:
             if self.geometry_result is None or self.validation_result is None:
-                raise ValueError(
-                    "Feasible generation requires geometry and validation results."
-                )
+                raise ValueError("Feasible generation requires geometry and validation results.")
             expected = (
                 GenerationDisposition.ACCEPTED
                 if self.validation_result.report.valid

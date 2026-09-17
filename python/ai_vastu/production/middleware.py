@@ -130,9 +130,7 @@ class ProductionHardeningMiddleware:
                     ]
                 )
                 if app_env == "production":
-                    hsts = str(
-                        load_production_settings().hsts_seconds
-                    ).encode("ascii")
+                    hsts = str(load_production_settings().hsts_seconds).encode("ascii")
                     headers.append(
                         (
                             b"strict-transport-security",

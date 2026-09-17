@@ -72,14 +72,10 @@ def _sanitize_schema(value: Any) -> Any:
     for key, item in value.items():
         if key == "const" or key not in _ALLOWED_SCHEMA_KEYS:
             continue
-        if (
-            (key == "properties" and isinstance(item, dict))
-            or (key == "$defs" and isinstance(item, dict))
+        if (key == "properties" and isinstance(item, dict)) or (
+            key == "$defs" and isinstance(item, dict)
         ):
-            result[key] = {
-                str(name): _sanitize_schema(schema)
-                for name, schema in item.items()
-            }
+            result[key] = {str(name): _sanitize_schema(schema) for name, schema in item.items()}
         else:
             result[key] = _sanitize_schema(item)
     return result
@@ -166,9 +162,7 @@ class GeminiGenerateContentRequirementsProvider:
             "generationConfig": {
                 "temperature": 0.1,
                 "responseMimeType": "application/json",
-                "responseJsonSchema": _sanitize_schema(
-                    RequirementDraft.model_json_schema()
-                ),
+                "responseJsonSchema": _sanitize_schema(RequirementDraft.model_json_schema()),
             },
         }
 

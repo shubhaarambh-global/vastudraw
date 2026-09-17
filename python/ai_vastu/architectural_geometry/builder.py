@@ -60,12 +60,8 @@ class _AtomicSegment:
 
     def points(self) -> tuple[IntPoint, IntPoint]:
         if self.orientation == "H":
-            return IntPoint(x_mm=self.lo, y_mm=self.fixed), IntPoint(
-                x_mm=self.hi, y_mm=self.fixed
-            )
-        return IntPoint(x_mm=self.fixed, y_mm=self.lo), IntPoint(
-            x_mm=self.fixed, y_mm=self.hi
-        )
+            return IntPoint(x_mm=self.lo, y_mm=self.fixed), IntPoint(x_mm=self.hi, y_mm=self.fixed)
+        return IntPoint(x_mm=self.fixed, y_mm=self.lo), IntPoint(x_mm=self.fixed, y_mm=self.hi)
 
     @property
     def length_mm(self) -> int:
@@ -283,8 +279,7 @@ def build_architectural_geometry(
         )
 
     room_polygons = {
-        placement.room_instance_id: _room_polygon(placement)
-        for placement in placements
+        placement.room_instance_id: _room_polygon(placement) for placement in placements
     }
     rooms = tuple(
         RoomGeometry(
