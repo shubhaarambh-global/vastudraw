@@ -11,8 +11,16 @@ from ai_vastu.architectural_intelligence import (
     ArchitecturalIntelligenceProviderError,
 )
 from ai_vastu.billing import BillingService, create_billing_repository
+from ai_vastu.multi_candidate import MultiCandidateGenerationError
+from ai_vastu.projects.errors import ProjectNotFoundError, RevisionConflictError
 from ai_vastu.projects.factory import create_project_repository_from_environment
 from ai_vastu.projects.service import ProjectRevisionService
+from ai_vastu.requirements.candidate_orchestrator import (
+    CandidateGenerationOrchestrator,
+    CandidateSelectionError,
+    GenerateAlternativesOptions,
+    SelectAlternativeOptions,
+)
 from ai_vastu.requirements.final_orchestrator import (
     EntitlementDenied,
     FinalGenerationOrchestrator,
@@ -78,6 +86,126 @@ def _resolve_user_id(authorization: str | None) -> UUID:
         return UUID(str(claims["sub"]))
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid access token.") from exc
+
+
+@router.post("/projects/{project_id}/alternatives")
+def generate_confirmed_alternatives(
+    project_id: UUID,
+    options: GenerateAlternativesOptions,
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    user_id = _resolve_user_id(authorization)
+    billing_repository = create_billing_repository()
+    project_repository = create_project_repository_from_environment()
+    try:
+        orchestrator = CandidateGenerationOrchestrator(
+            requirements_store=RequirementsStore.from_environment(),
+            billing_service=BillingService(billing_repository),
+            project_service=ProjectRevisionService(project_repository),
+        )
+        preview = orchestrator.preview(
+            authenticated_user_id=user_id,
+            project_id=project_id,
+            draft_id=options.draft_id,
+            max_alternatives=options.max_alternatives,
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Confirmed requirements were not found.",
+        ) from exc
+    except EntitlementDenied as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ArchitecturalIntelligenceConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ArchitecturalIntelligenceProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except VastuReasoningConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except VastuReasoningProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except (
+        MultiCandidateGenerationError,
+        UnsupportedConfirmedRequirement,
+        Phase24FinalizationError,
+        ValueError,
+    ) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        billing_repository.close()
+        project_repository.close()
+
+    return {
+        "candidate_run": preview.outcome.run.model_dump(mode="json"),
+        "billing_reason": preview.billing_reason,
+        "quota_consumed": False,
+        "revision_persisted": False,
+        "architectural_intent": (
+            None
+            if preview.architectural_intent is None
+            else preview.architectural_intent.model_dump(mode="json")
+        ),
+        "vastu_reasoning_profile": (
+            None
+            if preview.vastu_reasoning_profile is None
+            else preview.vastu_reasoning_profile.model_dump(mode="json")
+        ),
+    }
+
+
+@router.post("/projects/{project_id}/alternatives/select")
+def select_confirmed_alternative(
+    project_id: UUID,
+    options: SelectAlternativeOptions,
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    user_id = _resolve_user_id(authorization)
+    billing_repository = create_billing_repository()
+    project_repository = create_project_repository_from_environment()
+    try:
+        orchestrator = CandidateGenerationOrchestrator(
+            requirements_store=RequirementsStore.from_environment(),
+            billing_service=BillingService(billing_repository),
+            project_service=ProjectRevisionService(project_repository),
+        )
+        selection = orchestrator.select(
+            authenticated_user_id=user_id,
+            project_id=project_id,
+            options=options,
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Confirmed requirements were not found.",
+        ) from exc
+    except EntitlementDenied as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ProjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RevisionConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except CandidateSelectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        billing_repository.close()
+        project_repository.close()
+
+    revision = selection.revision
+    return {
+        "revision_persisted": True,
+        "successful_generation_recorded": selection.successful_generation_recorded,
+        "billing_reason": selection.billing_reason,
+        "revision_id": str(revision.revision_id),
+        "revision_number": revision.revision_number,
+        "plan_document_hash": revision.plan_document_hash,
+        "editor_path": f"/editor?project={project_id}",
+    }
 
 
 @router.post("/projects/{project_id}")
