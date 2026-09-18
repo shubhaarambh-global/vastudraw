@@ -67,7 +67,7 @@ client = required[7].read_text(encoding="utf-8")
 for token in (
     "CandidateGenerationOrchestrator",
     "record_successful_generation",
-    "run_multi_candidate_generation",
+    "run_architectural_brain_candidates",
     "append_revision(command)",
 ):
     if token not in orchestrator:
@@ -103,6 +103,24 @@ for token in (
 ):
     if token not in client:
         raise SystemExit(f"Phase 26C.3 client missing: {token}")
+
+
+# Phase 26 architectural-brain routing contract:
+# orchestrator -> architectural brain -> deterministic candidate engine
+candidate_engine_contract = (
+    ROOT / "python" / "ai_vastu" / "architectural_brain" / "candidate_engine.py"
+)
+
+if not candidate_engine_contract.is_file():
+    raise SystemExit("Phase 26 architectural candidate engine is missing.")
+
+candidate_engine_source = candidate_engine_contract.read_text(encoding="utf-8")
+
+if "run_multi_candidate_generation" not in candidate_engine_source:
+    raise SystemExit(
+        "Phase 26 Architectural Brain no longer delegates to run_multi_candidate_generation."
+    )
+
 
 print(
     "Phase 26C.3 ready: wizard=true, requirements_confirmation=true, "

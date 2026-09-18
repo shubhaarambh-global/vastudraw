@@ -11,7 +11,13 @@ def test_phase26c3_preview_and_selection_are_separate() -> None:
 
     assert '"/projects/{project_id}/alternatives"' in route
     assert '"/projects/{project_id}/alternatives/select"' in route
-    assert "run_multi_candidate_generation" in orchestrator
+    assert "run_architectural_brain_candidates" in orchestrator
+
+    candidate_engine = (
+        ROOT / "python" / "ai_vastu" / "architectural_brain" / "candidate_engine.py"
+    ).read_text(encoding="utf-8")
+
+    assert "run_multi_candidate_generation" in candidate_engine
     assert orchestrator.index("append_revision(command)") < orchestrator.index(
         "record_successful_generation("
     )

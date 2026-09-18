@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ai_vastu.architectural_brain import run_architectural_brain_candidates
 from ai_vastu.architectural_intelligence import (
     ArchitecturalDesignIntent,
     ArchitecturalReasoningInput,
@@ -16,7 +17,6 @@ from ai_vastu.architectural_intelligence import (
 from ai_vastu.billing import BillingService, GenerationAuthorization
 from ai_vastu.multi_candidate import (
     MultiCandidateGenerationOutcome,
-    run_multi_candidate_generation,
 )
 from ai_vastu.plan_schema import PlanDocument
 from ai_vastu.projects.errors import DuplicateRevisionError, RevisionNotFoundError
@@ -174,9 +174,10 @@ class CandidateGenerationOrchestrator:
         if architectural_intent is not None:
             compiled = apply_design_intent(compiled, architectural_intent)
 
-        outcome = run_multi_candidate_generation(
+        outcome = run_architectural_brain_candidates(
             confirmed=confirmed,
             compiled=compiled,
+            original_prompt=draft.prompt,
             vastu_profile=vastu_reasoning_profile,
             max_alternatives=max_alternatives,
         )
