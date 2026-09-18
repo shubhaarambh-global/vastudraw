@@ -15,6 +15,7 @@ SOLVER_MODEL_VERSION = "1.0.0"
 PositiveInt = Annotated[int, Field(gt=0)]
 NonNegativeInt = Annotated[int, Field(ge=0)]
 SeedInt = Annotated[int, Field(ge=0, le=2_147_483_647)]
+BasisPointsInt = Annotated[int, Field(ge=0, le=10_000)]
 _HASH_LENGTH = 64
 
 
@@ -39,10 +40,30 @@ class PlannerSearchVariant(StrEnum):
     REVERSE_UPPER_RIGHT = "REVERSE_UPPER_RIGHT"
 
 
+class PlannerBoundarySide(StrEnum):
+    SOUTH = "SOUTH"
+    EAST = "EAST"
+    NORTH = "NORTH"
+    WEST = "WEST"
+
+
+class ResidentialPlanningConfig(FrozenModel):
+    enabled: bool = False
+    target_occupied_area_basis_points: BasisPointsInt = 7_000
+    occupied_area_weight: NonNegativeInt = 40
+    room_area_balance_weight: NonNegativeInt = 10
+    compactness_weight: NonNegativeInt = 40
+    road_boundary_side: PlannerBoundarySide | None = None
+    entrance_boundary_side: PlannerBoundarySide | None = None
+    require_road_connected_parking: bool = False
+    require_entrance_boundary_access: bool = False
+
+
 class PlannerConfig(FrozenModel):
     solver_step_mm: PositiveMM
     clearance_reserve_mm: NonNegativeMM = 0
     search_variant: PlannerSearchVariant = PlannerSearchVariant.LOWER_LEFT
+    residential_planning: ResidentialPlanningConfig = ResidentialPlanningConfig()
     max_time_ms: PositiveInt
     max_conflicts: PositiveInt
     random_seed: SeedInt = 0

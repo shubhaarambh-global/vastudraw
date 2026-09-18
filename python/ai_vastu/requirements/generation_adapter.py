@@ -18,6 +18,7 @@ from ai_vastu.requirements.generation_profile import (
     normalize_room_type,
 )
 from ai_vastu.requirements.models import ConfirmedRequirements
+from ai_vastu.requirements.residential_planning import local_boundary_side
 
 
 class UnsupportedConfirmedRequirement(ValueError):
@@ -158,11 +159,44 @@ def compile_confirmed_requirements(
                 ordinal=ordinal,
             )
         )
+        ordinal += 1
+
+    existing_types = {str(item["room_type"]) for item in room_requirements}
+    circulation_types = {"lobby", "corridor", "foyer"}
+    added_system_lobby = False
+    if confirmed.bedroom_count >= 2 and not (existing_types & circulation_types):
+        room_requirements.append(
+            _room_requirement(
+                project_id=confirmed.project_id,
+                room_type="lobby",
+                quantity=1,
+                floor_preference=0,
+                ordinal=ordinal,
+            )
+        )
+        ordinal += 1
+        added_system_lobby = True
 
     if not room_requirements:
         raise UnsupportedConfirmedRequirement(
             "At least one confirmed room requirement is required."
         )
+
+    try:
+        road_boundary_side = local_boundary_side(
+            confirmed.road_side.value,
+            north_rotation_deg=confirmed.north_rotation_deg,
+        )
+        entrance_boundary_side = local_boundary_side(
+            (
+                confirmed.entrance_facing.value
+                if confirmed.entrance_facing is not None
+                else confirmed.road_side.value
+            ),
+            north_rotation_deg=confirmed.north_rotation_deg,
+        )
+    except ValueError as exc:
+        raise UnsupportedConfirmedRequirement(str(exc)) from exc
 
     assumptions = [
         {
@@ -175,7 +209,22 @@ def compile_confirmed_requirements(
             "source": "DOCUMENTED_DEFAULT",
             "confirmed_by_user": True,
             "affected_entity_ids": [],
-        }
+        },
+        {
+            "id": str(_stable_id(confirmed.project_id, "phase26c4a-residential-planning")),
+            "code": "PHASE26C4A_RESIDENTIAL_PLANNING",
+            "description": (
+                "User accepted the V1 deterministic residential-planning profile: "
+                "automatic room-envelope occupancy target, compactness optimization, "
+                "road-connected parking, entrance-edge anchoring and deterministic "
+                "circulation topology. The automatic occupancy target is a planning "
+                "heuristic only and is not an FSI/FAR/setback or regulatory entitlement. "
+                f"System circulation lobby added={added_system_lobby}."
+            ),
+            "source": "DOCUMENTED_DEFAULT",
+            "confirmed_by_user": True,
+            "affected_entity_ids": [],
+        },
     ]
 
     payload: dict[str, object] = {
@@ -198,6 +247,17 @@ def compile_confirmed_requirements(
         "planner_config": {
             "solver_step_mm": 1,
             "clearance_reserve_mm": 230,
+            "residential_planning": {
+                "enabled": True,
+                "target_occupied_area_basis_points": 7000,
+                "occupied_area_weight": 40,
+                "room_area_balance_weight": 10,
+                "compactness_weight": 40,
+                "road_boundary_side": road_boundary_side.value,
+                "entrance_boundary_side": entrance_boundary_side.value,
+                "require_road_connected_parking": confirmed.parking_count > 0,
+                "require_entrance_boundary_access": True,
+            },
             "max_time_ms": 5000,
             "max_conflicts": 100000,
             "num_search_workers": 1,
@@ -222,8 +282,12 @@ def compile_confirmed_requirements(
 
     request = ArchitecturalGenerationRequest.model_validate_json(json.dumps(payload))
     notices = (
-        "True-North/road/facing are confirmed context but are not inputs in the "
-        "inspected Phase 16 generation request.",
+        "Phase 26C.4A compiles confirmed road/entrance directions into local "
+        "rectangular boundary anchors for residential planning.",
+        "Automatic occupied-area planning is a documented V1 heuristic and does "
+        "not claim regulatory permissible construction area.",
+        "Deterministic residential topology objectives are applied inside CP-SAT "
+        "unless an explicit relationship already governs the same room pair.",
         "Frozen Vastu evaluation must run in the final Phase 24 binding.",
     )
     return CompiledGeneration(

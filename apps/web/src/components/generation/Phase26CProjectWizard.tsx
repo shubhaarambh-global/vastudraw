@@ -821,12 +821,12 @@ export function Phase26CProjectWizard() {
 
             <div className="phase26c-candidate-preview">
               <strong>Candidate exploration</strong>
-              <span>Compact</span>
-              <span>Privacy-first</span>
-              <span>Daylight</span>
-              <span>Circulation</span>
-              <span>Vastu-aware</span>
-              <span>Alternate zoning</span>
+              <span>Space-use search</span>
+              <span>Topology search</span>
+              <span>Boundary search</span>
+              <span>Access search</span>
+              <span>Soft Vastu comparison</span>
+              <span>Alternate zoning search</span>
             </div>
 
             <button

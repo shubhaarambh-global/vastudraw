@@ -177,17 +177,33 @@ def _has_unmeasured_room_priorities(result: ArchitecturalGenerationResult) -> bo
     )
 
 
+def _occupied_area_basis_points(artifact: CandidateArtifact) -> int:
+    points = artifact.generation.problem.buildable_area.polygon.outer
+    xs = [point.x_mm for point in points]
+    ys = [point.y_mm for point in points]
+    buildable_area_mm2 = (max(xs) - min(xs)) * (max(ys) - min(ys))
+    if buildable_area_mm2 <= 0:
+        return 0
+    occupied_area_mm2 = sum(item.area_mm2 for item in artifact.generation.planner_result.placements)
+    return min(
+        _BASIS_POINTS,
+        (occupied_area_mm2 * _BASIS_POINTS + buildable_area_mm2 // 2) // buildable_area_mm2,
+    )
+
+
 def _explanation(
     artifact: CandidateArtifact,
     coverage: int | None,
 ) -> CandidateExplanation:
     blend = artifact.planning_blend
+    occupied_bp = _occupied_area_basis_points(artifact)
     strengths = [
         (
-            "Architecture score "
-            f"{blend.architecture_score_basis_points / 100:.1f}/100 "
-            "from currently measurable deterministic objectives."
-        )
+            "Current measurable-objective score "
+            f"{blend.architecture_score_basis_points / 100:.1f}/100. "
+            "Full architectural quality scoring is not claimed in Phase 26C.4A."
+        ),
+        (f"Room-envelope occupancy {occupied_bp / 100:.1f}% of the current buildable rectangle."),
     ]
     compromises: list[str] = []
 

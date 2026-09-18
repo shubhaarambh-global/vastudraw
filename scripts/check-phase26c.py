@@ -86,7 +86,7 @@ for token in (
         raise SystemExit(f"Phase 26C.3 API missing: {token}")
 
 for token in (
-    "Architecture",
+    "Measured objectives",
     "Vastu",
     "Coverage",
     "Select this plan",

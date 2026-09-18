@@ -16,7 +16,12 @@ from ai_vastu.constraints import (
     compile_constraints,
 )
 from ai_vastu.plan_schema import DoorSwing, OpeningKind, RoomGeometry, Wall, WallCategory
-from ai_vastu.solver import PlannerError, PlannerStatus, solve_rectangular_problem
+from ai_vastu.solver import (
+    PlannerBoundarySide,
+    PlannerError,
+    PlannerStatus,
+    solve_rectangular_problem,
+)
 from ai_vastu.validation import (
     ArchitecturalValidationRequest,
     validate_architectural_geometry,
@@ -69,6 +74,26 @@ def _overlap_length(first: tuple[int, int], second: tuple[int, int]) -> int:
     return max(0, min(first[1], second[1]) - max(first[0], second[0]))
 
 
+def _wall_on_boundary_side(
+    wall: Wall,
+    request: ArchitecturalGenerationRequest,
+    side: PlannerBoundarySide,
+) -> bool:
+    points = request.buildable_area.polygon.outer
+    xs = [point.x_mm for point in points]
+    ys = [point.y_mm for point in points]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+
+    if side is PlannerBoundarySide.SOUTH:
+        return wall.axis.start.y_mm == min_y and wall.axis.end.y_mm == min_y
+    if side is PlannerBoundarySide.EAST:
+        return wall.axis.start.x_mm == max_x and wall.axis.end.x_mm == max_x
+    if side is PlannerBoundarySide.NORTH:
+        return wall.axis.start.y_mm == max_y and wall.axis.end.y_mm == max_y
+    return wall.axis.start.x_mm == min_x and wall.axis.end.x_mm == min_x
+
+
 def _adjacent_room_ids(wall: Wall, rooms: tuple[RoomGeometry, ...]) -> tuple[UUID, ...]:
     wall_edge = _edge_signature(
         wall.axis.start.x_mm,
@@ -104,10 +129,10 @@ def _adjacent_room_ids(wall: Wall, rooms: tuple[RoomGeometry, ...]) -> tuple[UUI
 
 
 _ACCESS_PRIORITY = {
-    "living": 0,
-    "drawing": 1,
-    "foyer": 2,
-    "verandah": 3,
+    "foyer": 0,
+    "verandah": 1,
+    "living": 2,
+    "drawing": 3,
     "family_lounge": 4,
     "dining": 5,
     "kitchen": 6,
@@ -167,9 +192,23 @@ def _synthesize_circulation_openings(
         and _wall_length_mm(candidate.wall)
         >= config.external_door_width_mm + 2 * config.edge_margin_mm
     ]
+
+    planning = request.planner_config.residential_planning
+    if planning.enabled and planning.entrance_boundary_side is not None:
+        external_candidates = [
+            candidate
+            for candidate in external_candidates
+            if _wall_on_boundary_side(
+                candidate.wall,
+                request,
+                planning.entrance_boundary_side,
+            )
+        ]
+
     if not external_candidates:
         raise GenerationInputError(
-            "Auto circulation could not place an exterior access door on any generated wall."
+            "Auto circulation could not place an exterior access door on the "
+            "required entrance boundary."
         )
 
     def external_key(candidate: _CirculationWall) -> tuple[int, tuple[int, int, int, int, str]]:

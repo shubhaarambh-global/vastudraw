@@ -31,7 +31,7 @@ def test_phase26c3_ui_binds_wizard_to_candidate_workspace() -> None:
     assert "generateConfirmedAlternatives" in wizard
     assert "Phase26CCandidateWorkspace" in wizard
     assert "Select this plan" in workspace
-    assert "Architecture" in workspace
+    assert "Measured objectives" in workspace
     assert "Vastu" in workspace
     assert "Coverage" in workspace
     assert "selectConfirmedAlternative" in client

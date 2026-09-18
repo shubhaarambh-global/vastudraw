@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any
+from uuid import UUID, uuid5
 
 from ortools.sat.python import cp_model
 
@@ -24,11 +25,12 @@ from ai_vastu.constraints import (
     PreferredDimensionObjective,
     RoomPrioritiesObjective,
 )
-from ai_vastu.plan_schema import IntPolygon
+from ai_vastu.plan_schema import IntPolygon, RoomType
 
 from .errors import SolverModelError, UnsupportedSolverProblemError
 from .models import (
     ObjectiveContribution,
+    PlannerBoundarySide,
     PlannerConfig,
     PlannerNotice,
     PlannerNoticeSeverity,
@@ -38,6 +40,10 @@ from .models import (
     RoomPlacement,
     SolverRunMetadata,
 )
+from .residential_quality import RoomAreaBasis, allocate_room_area_targets
+
+_SYSTEM_OBJECTIVE_NAMESPACE = UUID("38cf35f1-3f68-52d2-88b5-b455219a54cf")
+_AREA_PENALTY_DIVISOR_MM2 = 1_000
 
 
 @dataclass(frozen=True)
@@ -57,6 +63,7 @@ class _RoomVars:
     x_end: Any
     y_end: Any
     area_cells2: Any
+    clear_area_mm2: Any
     x_interval: Any
     y_interval: Any
 
@@ -67,6 +74,485 @@ class _PenaltyTerm:
     kind: str
     weight: int
     expression: Any
+
+
+@dataclass(frozen=True)
+class _AdjacencyTargetSpec:
+    max_gap_mm: int | None
+    min_shared_length_mm: int | None
+
+
+def _system_objective_id(problem: CompiledConstraintProblem, key: str) -> UUID:
+    problem_hash = problem.content_hash or problem.compute_content_hash()
+    return uuid5(_SYSTEM_OBJECTIVE_NAMESPACE, f"{problem_hash}|{key}")
+
+
+def _pin_room_to_boundary(
+    model: Any,
+    room: _RoomVars,
+    *,
+    side: PlannerBoundarySide,
+    width_cells: int,
+    depth_cells: int,
+) -> None:
+    if side is PlannerBoundarySide.SOUTH:
+        model.add(room.y == 0)
+    elif side is PlannerBoundarySide.EAST:
+        model.add(room.x_end == width_cells)
+    elif side is PlannerBoundarySide.NORTH:
+        model.add(room.y_end == depth_cells)
+    else:
+        model.add(room.x == 0)
+
+
+def _scaled_area_penalty(
+    model: Any,
+    *,
+    raw_penalty_mm2: Any,
+    upper_mm2: int,
+    name: str,
+) -> Any:
+    upper = upper_mm2 // _AREA_PENALTY_DIVISOR_MM2 + 1
+    scaled = model.new_int_var(0, upper, name)
+    model.add_division_equality(
+        scaled,
+        raw_penalty_mm2,
+        _AREA_PENALTY_DIVISOR_MM2,
+    )
+    return scaled
+
+
+_ENTRY_ROOM_PRIORITY = (
+    "foyer",
+    "verandah",
+    "living",
+    "drawing",
+    "family_lounge",
+    "dining",
+)
+
+
+def _entry_room(problem: CompiledConstraintProblem) -> Any | None:
+    for room_type in _ENTRY_ROOM_PRIORITY:
+        matches = tuple(
+            room for room in problem.room_instances if room.room_type.value == room_type
+        )
+        if matches:
+            return min(matches, key=lambda item: str(item.id))
+    return None
+
+
+def _apply_residential_boundary_constraints(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+    width_cells: int,
+    depth_cells: int,
+    notices: list[PlannerNotice],
+) -> None:
+    planning = config.residential_planning
+    if not planning.enabled:
+        return
+
+    parking_rooms = tuple(
+        room for room in problem.room_instances if room.room_type.value in {"parking", "garage"}
+    )
+    if planning.require_road_connected_parking and parking_rooms:
+        if planning.road_boundary_side is None:
+            raise SolverModelError(
+                "Road-connected parking requires a deterministic local road boundary side."
+            )
+        for room in parking_rooms:
+            _pin_room_to_boundary(
+                model,
+                room_vars[room.id],
+                side=planning.road_boundary_side,
+                width_cells=width_cells,
+                depth_cells=depth_cells,
+            )
+        _append_notice(
+            notices,
+            code="ROAD_CONNECTED_PARKING_ENFORCED",
+            message=(
+                "Parking/garage room envelopes are pinned to the confirmed road-side "
+                "boundary before architectural geometry is built."
+            ),
+        )
+
+    if planning.require_entrance_boundary_access:
+        if planning.entrance_boundary_side is None:
+            raise SolverModelError(
+                "Entrance-boundary access requires a deterministic local entrance side."
+            )
+        entry = _entry_room(problem)
+        if entry is None:
+            raise SolverModelError("Residential entrance anchoring requires an entry-capable room.")
+        _pin_room_to_boundary(
+            model,
+            room_vars[entry.id],
+            side=planning.entrance_boundary_side,
+            width_cells=width_cells,
+            depth_cells=depth_cells,
+        )
+        _append_notice(
+            notices,
+            code="ENTRANCE_BOUNDARY_ANCHOR_ENFORCED",
+            message=(
+                f"Entry room {entry.room_type.value} is pinned to the confirmed "
+                "entrance-facing boundary."
+            ),
+            room_instance_id=entry.id,
+        )
+
+
+def _relationship_already_declared(
+    problem: CompiledConstraintProblem,
+    *,
+    source_room_id: Any,
+    target_room_type: RoomType,
+) -> bool:
+    for item in (*problem.hard_constraints, *problem.soft_constraints):
+        if getattr(item, "room_instance_id", None) != source_room_id:
+            continue
+        if getattr(item, "target_room_type", None) is target_room_type:
+            return True
+    return False
+
+
+def _topology_target(
+    room_type: RoomType,
+    present: set[RoomType],
+) -> tuple[RoomType, int, int] | None:
+    private_types = {
+        RoomType.BEDROOM,
+        RoomType.MASTER_BEDROOM,
+        RoomType.PARENTS_BEDROOM,
+        RoomType.GUEST_BEDROOM,
+        RoomType.CHILDREN_BEDROOM,
+        RoomType.COMMON_TOILET,
+        RoomType.BATH,
+        RoomType.POWDER_ROOM,
+    }
+    if room_type in private_types:
+        if RoomType.LOBBY in present:
+            return (RoomType.LOBBY, 100, 1_100)
+        if RoomType.LIVING in present:
+            return (RoomType.LIVING, 90, 1_100)
+
+    if room_type is RoomType.LOBBY:
+        if RoomType.FOYER in present:
+            return (RoomType.FOYER, 100, 1_100)
+        if RoomType.LIVING in present:
+            return (RoomType.LIVING, 100, 1_100)
+        if RoomType.DRAWING in present:
+            return (RoomType.DRAWING, 100, 1_100)
+
+    if room_type is RoomType.KITCHEN:
+        if RoomType.DINING in present:
+            return (RoomType.DINING, 95, 1_100)
+        if RoomType.LIVING in present:
+            return (RoomType.LIVING, 85, 1_100)
+
+    if room_type is RoomType.PUJA:
+        if RoomType.DINING in present:
+            return (RoomType.DINING, 75, 900)
+        if RoomType.LIVING in present:
+            return (RoomType.LIVING, 75, 900)
+
+    if room_type in {RoomType.PARKING, RoomType.GARAGE}:
+        if RoomType.FOYER in present:
+            return (RoomType.FOYER, 80, 1_100)
+        if RoomType.LIVING in present:
+            return (RoomType.LIVING, 80, 1_100)
+
+    if (
+        room_type
+        in {
+            RoomType.UTILITY,
+            RoomType.PANTRY,
+            RoomType.STORE,
+            RoomType.LAUNDRY,
+        }
+        and RoomType.KITCHEN in present
+    ):
+        return (RoomType.KITCHEN, 85, 1_000)
+
+    if room_type is RoomType.SERVANT_TOILET and RoomType.SERVANT_ROOM in present:
+        return (RoomType.SERVANT_ROOM, 95, 900)
+
+    return None
+
+
+def _append_residential_topology_objectives(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+    width_cells: int,
+    depth_cells: int,
+    notices: list[PlannerNotice],
+    penalty_terms: list[_PenaltyTerm],
+) -> None:
+    if not config.residential_planning.enabled:
+        return
+
+    present = {room.room_type for room in problem.room_instances}
+    added = 0
+    for room in sorted(problem.room_instances, key=lambda item: str(item.id)):
+        target = _topology_target(room.room_type, present)
+        if target is None:
+            continue
+        target_room_type, weight, shared_length_mm = target
+        if target_room_type is room.room_type:
+            continue
+        if _relationship_already_declared(
+            problem,
+            source_room_id=room.id,
+            target_room_type=target_room_type,
+        ):
+            continue
+
+        targets = tuple(
+            target_room
+            for target_room in problem.room_instances
+            if target_room.room_type is target_room_type and target_room.id != room.id
+        )
+        if not targets:
+            continue
+
+        spec = _AdjacencyTargetSpec(
+            max_gap_mm=0,
+            min_shared_length_mm=shared_length_mm,
+        )
+        pair_penalties = [
+            _adjacency_pair_penalty(
+                model,
+                room_vars[room.id],
+                room_vars[target_room.id],
+                config=config,
+                buildable_width_cells=width_cells,
+                buildable_depth_cells=depth_cells,
+                objective=spec,
+                name=(f"res_topology_{room.id.hex}_{target_room.id.hex}"),
+            )
+            for target_room in targets
+        ]
+        if len(pair_penalties) == 1:
+            best = pair_penalties[0]
+        else:
+            upper = (width_cells + depth_cells) * config.solver_step_mm + shared_length_mm
+            best = model.new_int_var(
+                0,
+                upper,
+                f"res_topology_best_{room.id.hex}",
+            )
+            model.add_min_equality(best, pair_penalties)
+
+        penalty_terms.append(
+            _PenaltyTerm(
+                _system_objective_id(
+                    problem,
+                    f"topology:{room.id}:{target_room_type.value}",
+                ),
+                "RESIDENTIAL_TOPOLOGY_ADJACENCY",
+                weight,
+                best,
+            )
+        )
+        added += 1
+
+    if added:
+        _append_notice(
+            notices,
+            code="RESIDENTIAL_TOPOLOGY_ACTIVE",
+            message=(
+                f"{added} deterministic residential topology objective(s) were "
+                "added where no explicit relationship already governed the pair."
+            ),
+        )
+
+
+def _append_residential_quality_objectives(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    minimum_envelope_area_mm2: dict[Any, int],
+    *,
+    config: PlannerConfig,
+    bounds: _RectangleBounds,
+    width_cells: int,
+    depth_cells: int,
+    notices: list[PlannerNotice],
+    penalty_terms: list[_PenaltyTerm],
+) -> None:
+    planning = config.residential_planning
+    if not planning.enabled:
+        return
+
+    step2 = config.solver_step_mm * config.solver_step_mm
+    buildable_area_mm2 = bounds.width_mm * bounds.depth_mm
+    desired_area_mm2 = buildable_area_mm2 * planning.target_occupied_area_basis_points // 10_000
+    bases = tuple(
+        RoomAreaBasis(
+            room_instance_id=room.id,
+            room_type=room.room_type,
+            minimum_envelope_area_mm2=minimum_envelope_area_mm2[room.id],
+        )
+        for room in problem.room_instances
+    )
+    targets = allocate_room_area_targets(
+        bases,
+        desired_total_area_mm2=desired_area_mm2,
+    )
+    effective_target_mm2 = sum(item.target_area_mm2 for item in targets)
+
+    total_area_cells2 = model.new_int_var(
+        0,
+        width_cells * depth_cells,
+        "residential_total_area_cells2",
+    )
+    model.add(
+        total_area_cells2 == sum(room_vars[room.id].area_cells2 for room in problem.room_instances)
+    )
+    total_area_mm2 = model.new_int_var(
+        0,
+        buildable_area_mm2,
+        "residential_total_area_mm2",
+    )
+    model.add(total_area_mm2 == total_area_cells2 * step2)
+
+    if planning.occupied_area_weight > 0:
+        deviation = model.new_int_var(
+            0,
+            buildable_area_mm2,
+            "residential_total_area_deviation_mm2",
+        )
+        model.add_abs_equality(deviation, total_area_mm2 - effective_target_mm2)
+        scaled = _scaled_area_penalty(
+            model,
+            raw_penalty_mm2=deviation,
+            upper_mm2=buildable_area_mm2,
+            name="residential_total_area_penalty",
+        )
+        penalty_terms.append(
+            _PenaltyTerm(
+                _system_objective_id(problem, "occupied-area-target"),
+                "RESIDENTIAL_OCCUPIED_AREA_TARGET",
+                planning.occupied_area_weight,
+                scaled,
+            )
+        )
+
+    target_by_room = {item.room_instance_id: item for item in targets}
+    if planning.room_area_balance_weight > 0:
+        for room in problem.room_instances:
+            target = target_by_room[room.id]
+            deviation = model.new_int_var(
+                0,
+                buildable_area_mm2,
+                f"residential_room_area_deviation_{room.id.hex}",
+            )
+            model.add_abs_equality(
+                deviation,
+                room_vars[room.id].area_cells2 * step2 - target.target_area_mm2,
+            )
+            scaled = _scaled_area_penalty(
+                model,
+                raw_penalty_mm2=deviation,
+                upper_mm2=buildable_area_mm2,
+                name=f"residential_room_area_penalty_{room.id.hex}",
+            )
+            penalty_terms.append(
+                _PenaltyTerm(
+                    _system_objective_id(problem, f"room-area:{room.id}"),
+                    "RESIDENTIAL_ROOM_AREA_BALANCE",
+                    planning.room_area_balance_weight,
+                    scaled,
+                )
+            )
+
+    if planning.compactness_weight > 0:
+        min_x = model.new_int_var(0, width_cells, "residential_bbox_min_x")
+        min_y = model.new_int_var(0, depth_cells, "residential_bbox_min_y")
+        max_x = model.new_int_var(0, width_cells, "residential_bbox_max_x")
+        max_y = model.new_int_var(0, depth_cells, "residential_bbox_max_y")
+        model.add_min_equality(
+            min_x,
+            [room_vars[room.id].x for room in problem.room_instances],
+        )
+        model.add_min_equality(
+            min_y,
+            [room_vars[room.id].y for room in problem.room_instances],
+        )
+        model.add_max_equality(
+            max_x,
+            [room_vars[room.id].x_end for room in problem.room_instances],
+        )
+        model.add_max_equality(
+            max_y,
+            [room_vars[room.id].y_end for room in problem.room_instances],
+        )
+        span_x = model.new_int_var(1, width_cells, "residential_bbox_span_x")
+        span_y = model.new_int_var(1, depth_cells, "residential_bbox_span_y")
+        model.add(span_x == max_x - min_x)
+        model.add(span_y == max_y - min_y)
+        bbox_cells2 = model.new_int_var(
+            1,
+            width_cells * depth_cells,
+            "residential_bbox_area_cells2",
+        )
+        model.add_multiplication_equality(bbox_cells2, [span_x, span_y])
+        void_cells2 = model.new_int_var(
+            0,
+            width_cells * depth_cells,
+            "residential_bbox_void_cells2",
+        )
+        model.add(void_cells2 == bbox_cells2 - total_area_cells2)
+        void_mm2 = model.new_int_var(
+            0,
+            buildable_area_mm2,
+            "residential_bbox_void_mm2",
+        )
+        model.add(void_mm2 == void_cells2 * step2)
+        scaled_void = _scaled_area_penalty(
+            model,
+            raw_penalty_mm2=void_mm2,
+            upper_mm2=buildable_area_mm2,
+            name="residential_compactness_penalty",
+        )
+        penalty_terms.append(
+            _PenaltyTerm(
+                _system_objective_id(problem, "compactness-void"),
+                "RESIDENTIAL_COMPACTNESS_VOID",
+                planning.compactness_weight,
+                scaled_void,
+            )
+        )
+
+    actual_target_bp = (
+        effective_target_mm2 * 10_000 + buildable_area_mm2 // 2
+    ) // buildable_area_mm2
+    _append_notice(
+        notices,
+        code="RESIDENTIAL_PLANNING_TARGET_ACTIVE",
+        message=(
+            "Automatic occupied-room planning target is "
+            f"{actual_target_bp / 100:.1f}% of the buildable rectangle after "
+            "room-role expansion caps. This is a planning heuristic, not a "
+            "regulatory/FAR/FSI entitlement."
+        ),
+    )
+    _append_notice(
+        notices,
+        code="RESIDENTIAL_COMPACTNESS_ACTIVE",
+        message=(
+            "The solver penalizes empty area inside the occupied-room bounding box "
+            "to reduce scattered islands and unexplained internal voids."
+        ),
+    )
 
 
 def _rectangle_bounds(polygon: IntPolygon) -> _RectangleBounds:
@@ -159,7 +645,7 @@ def _adjacency_pair_penalty(
     config: PlannerConfig,
     buildable_width_cells: int,
     buildable_depth_cells: int,
-    objective: AdjacencyPreferenceObjective,
+    objective: AdjacencyPreferenceObjective | _AdjacencyTargetSpec,
     name: str,
 ) -> Any:
     gap_x = _new_nonnegative_max(
@@ -274,6 +760,7 @@ def solve_rectangular_problem(
 
     model = cp_model.CpModel()
     room_vars: dict[Any, _RoomVars] = {}
+    minimum_envelope_area_mm2: dict[Any, int] = {}
     hard_by_room = _room_constraint_index(problem)
     ordered_rooms = tuple(sorted(problem.room_instances, key=lambda item: str(item.id)))
     if config.search_variant in {
@@ -410,9 +897,11 @@ def solve_rectangular_problem(
             x_end=x_end,
             y_end=y_end,
             area_cells2=area_cells2,
+            clear_area_mm2=clear_area_mm2,
             x_interval=x_interval,
             y_interval=y_interval,
         )
+        minimum_envelope_area_mm2[room.id] = min_w_cells * min_d_cells * step2
 
     model.add_no_overlap_2d(
         [room_vars[room.id].x_interval for room in ordered_rooms],
@@ -420,6 +909,16 @@ def solve_rectangular_problem(
     )
 
     notices: list[PlannerNotice] = []
+    _apply_residential_boundary_constraints(
+        model,
+        problem,
+        room_vars,
+        config=config,
+        width_cells=width_cells,
+        depth_cells=depth_cells,
+        notices=notices,
+    )
+
     penalty_terms: list[_PenaltyTerm] = []
     for objective in sorted(problem.soft_constraints, key=lambda item: str(item.id)):
         vars_for_room = room_vars[objective.room_instance_id]
@@ -483,15 +982,28 @@ def solve_rectangular_problem(
                 room_instance_id=objective.room_instance_id,
             )
         elif isinstance(objective, PreferredAreaObjective):
-            _append_notice(
-                notices,
-                code="SOFT_OBJECTIVE_NOT_YET_OPTIMIZED",
-                message=(
-                    "Preferred area is preserved in the compiled problem but not "
-                    "optimized in Phase 7."
-                ),
-                constraint_id=objective.id,
-                room_instance_id=objective.room_instance_id,
+            deviation_mm2 = model.new_int_var(
+                0,
+                bounds.width_mm * bounds.depth_mm,
+                f"pref_area_deviation_{objective.id.hex}",
+            )
+            model.add_abs_equality(
+                deviation_mm2,
+                vars_for_room.clear_area_mm2 - objective.preferred_area_mm2,
+            )
+            scaled = _scaled_area_penalty(
+                model,
+                raw_penalty_mm2=deviation_mm2,
+                upper_mm2=bounds.width_mm * bounds.depth_mm,
+                name=f"pref_area_penalty_{objective.id.hex}",
+            )
+            penalty_terms.append(
+                _PenaltyTerm(
+                    objective.id,
+                    objective.kind.value,
+                    objective.weight,
+                    scaled,
+                )
             )
         elif isinstance(objective, RoomPrioritiesObjective):
             _append_notice(
@@ -512,6 +1024,30 @@ def solve_rectangular_problem(
                 constraint_id=objective.id,
                 room_instance_id=objective.room_instance_id,
             )
+
+    _append_residential_topology_objectives(
+        model,
+        problem,
+        room_vars,
+        config=config,
+        width_cells=width_cells,
+        depth_cells=depth_cells,
+        notices=notices,
+        penalty_terms=penalty_terms,
+    )
+
+    _append_residential_quality_objectives(
+        model,
+        problem,
+        room_vars,
+        minimum_envelope_area_mm2,
+        config=config,
+        bounds=bounds,
+        width_cells=width_cells,
+        depth_cells=depth_cells,
+        notices=notices,
+        penalty_terms=penalty_terms,
+    )
 
     if penalty_terms:
         model.minimize(sum(term.expression * term.weight for term in penalty_terms))

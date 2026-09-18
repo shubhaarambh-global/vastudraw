@@ -4,12 +4,14 @@ from .errors import PlannerError, SolverModelError, UnsupportedSolverProblemErro
 from .models import (
     SOLVER_MODEL_VERSION,
     ObjectiveContribution,
+    PlannerBoundarySide,
     PlannerConfig,
     PlannerNotice,
     PlannerNoticeSeverity,
     PlannerResult,
     PlannerSearchVariant,
     PlannerStatus,
+    ResidentialPlanningConfig,
     RoomPlacement,
     SolverRunMetadata,
 )
@@ -18,6 +20,7 @@ from .rectangular_cp_sat import solve_rectangular_problem
 __all__ = [
     "SOLVER_MODEL_VERSION",
     "ObjectiveContribution",
+    "PlannerBoundarySide",
     "PlannerConfig",
     "PlannerError",
     "PlannerNotice",
@@ -25,6 +28,7 @@ __all__ = [
     "PlannerResult",
     "PlannerSearchVariant",
     "PlannerStatus",
+    "ResidentialPlanningConfig",
     "RoomPlacement",
     "SolverModelError",
     "SolverRunMetadata",

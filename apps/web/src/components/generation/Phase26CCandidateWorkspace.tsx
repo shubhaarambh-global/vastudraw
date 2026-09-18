@@ -151,7 +151,7 @@ function CandidateMetrics({
   return (
     <div className="phase26c3-metrics">
       <div>
-        <span>Architecture</span>
+        <span>Measured objectives</span>
         <strong>{scoreText(candidate.architecture_score_basis_points)}</strong>
       </div>
       <div>
@@ -167,7 +167,7 @@ function CandidateMetrics({
         </strong>
       </div>
       <div>
-        <span>Combined</span>
+        <span>Current blend</span>
         <strong>{scoreText(candidate.combined_score_basis_points)}</strong>
       </div>
     </div>
@@ -280,7 +280,7 @@ export function Phase26CCandidateWorkspace({
             }}
           >
             <span>{String.fromCharCode(65 + index)}</span>
-            <strong>{item.strategy.label}</strong>
+            <strong>Plan</strong>
             <small>{scoreText(item.combined_score_basis_points)}</small>
           </button>
         ))}
@@ -291,7 +291,7 @@ export function Phase26CCandidateWorkspace({
           <div className="phase26c3-canvas-head">
             <div>
               <span>Candidate {String(candidate.rank)}</span>
-              <strong>{candidate.strategy.label}</strong>
+              <strong>{`Plan ${String.fromCharCode(64 + candidate.rank)}`}</strong>
             </div>
             <span className="saas-status-badge" data-tone="green">
               Hard-valid
