@@ -20,6 +20,7 @@ from .providers import (
     FixtureVastuReasoningProvider,
     GeminiVastuReasoningProvider,
     OpenAIVastuReasoningProvider,
+    OpenRouterVastuReasoningProvider,
     VastuReasoningInput,
     VastuReasoningProvider,
 )
@@ -47,9 +48,11 @@ def create_vastu_reasoning_provider() -> VastuReasoningProvider:
         return GeminiVastuReasoningProvider.from_environment()
     if name == "openai":
         return OpenAIVastuReasoningProvider.from_environment()
+    if name == "openrouter":
+        return OpenRouterVastuReasoningProvider.from_environment()
     raise VastuReasoningConfigurationError(
         "Unsupported AI_VASTU_VASTU_PROVIDER: "
-        f"{name or '<blank>'}. Use disabled, fixture, gemini, or openai."
+        f"{name or '<blank>'}. Use disabled, fixture, gemini, openai, or openrouter."
     )
 
 

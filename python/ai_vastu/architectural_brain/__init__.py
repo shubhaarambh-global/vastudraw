@@ -25,7 +25,9 @@ from .precedent_store import JsonlPrecedentStore, PrecedentQuery
 from .revisions import (
     apply_revision_intent,
     deterministic_revision_interpretation,
+    interpret_revision,
     interpret_revision_with_gemini,
+    interpret_revision_with_openrouter,
 )
 from .scoring import score_plan_document
 from .service import ArchitecturalBrainRun, ArchitecturalBrainService
@@ -64,7 +66,9 @@ __all__ = [
     "default_residential_topology",
     "default_source_registry",
     "deterministic_revision_interpretation",
+    "interpret_revision",
     "interpret_revision_with_gemini",
+    "interpret_revision_with_openrouter",
     "production_allowed_source_ids",
     "require_no_unexplained_residual",
     "run_architectural_brain_candidates",

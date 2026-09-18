@@ -18,7 +18,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
-    "validate": "pnpm python:lint && pnpm python:typecheck && pnpm python:test && pnpm contracts:generate && pnpm contracts:check && pnpm vastu:check && pnpm vastu:review && pnpm vastu:production && pnpm constraints:check && pnpm planner:check && pnpm geometry:check && pnpm validation:check && pnpm scoring:check && pnpm projects:check && pnpm editor:check && pnpm exports:check && pnpm dwg:check && pnpm generation:check && pnpm web-api:check && pnpm project-editor:check && pnpm generation-intake:check && pnpm requirements:check && pnpm confirmed-generation:check && pnpm phase24:check && pnpm phase25:check && pnpm phase26b5:check && pnpm phase26c:check && pnpm billing:check && pnpm saas-ui:check && pnpm persistence:check && pnpm auth:check && pnpm mvp:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm phase26c4a:check && pnpm phase26:check",
+    "validate": "pnpm python:lint && pnpm python:typecheck && pnpm python:test && pnpm contracts:generate && pnpm contracts:check && pnpm vastu:check && pnpm vastu:review && pnpm vastu:production && pnpm constraints:check && pnpm planner:check && pnpm geometry:check && pnpm validation:check && pnpm scoring:check && pnpm projects:check && pnpm editor:check && pnpm exports:check && pnpm dwg:check && pnpm generation:check && pnpm web-api:check && pnpm project-editor:check && pnpm generation-intake:check && pnpm requirements:check && pnpm confirmed-generation:check && pnpm phase24:check && pnpm phase25:check && pnpm phase26b5:check && pnpm phase26c:check && pnpm billing:check && pnpm saas-ui:check && pnpm persistence:check && pnpm auth:check && pnpm mvp:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm phase26c4a:check && pnpm phase26:check && pnpm phase26:openrouter-check",
     "scoring:check": "python scripts/check-scoring.py",
     "projects:check": "python scripts/check-project-revisions.py",
     "editor:check": "pnpm --filter @ai-vastu/web typecheck && pnpm --filter @ai-vastu/web test",
@@ -55,6 +55,8 @@
     "phase26b5:check": "python scripts/check-phase26b5.py",
     "phase26c:check": "python scripts/check-phase26c.py",
     "phase26c4a:check": "python scripts/check-phase26c4a.py",
-    "phase26:check": "python scripts/check-phase26-final.py"
+    "phase26:check": "python scripts/check-phase26-final.py",
+    "phase26:openrouter-check": "python scripts/check-phase26-openrouter.py",
+    "phase26:openrouter-live": "python scripts/check-openrouter-live.py"
   }
 }

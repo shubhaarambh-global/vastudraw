@@ -10,6 +10,7 @@ from .providers import (
     FixtureArchitecturalIntelligenceProvider,
     GeminiArchitecturalIntelligenceProvider,
     OpenAIResponsesArchitecturalIntelligenceProvider,
+    OpenRouterArchitecturalIntelligenceProvider,
 )
 
 
@@ -36,9 +37,11 @@ def create_architectural_intelligence_provider() -> ArchitecturalIntelligencePro
         return GeminiArchitecturalIntelligenceProvider.from_environment()
     if provider_name == "openai":
         return OpenAIResponsesArchitecturalIntelligenceProvider.from_environment()
+    if provider_name == "openrouter":
+        return OpenRouterArchitecturalIntelligenceProvider.from_environment()
     raise ArchitecturalIntelligenceConfigurationError(
         "Unsupported AI_VASTU_ARCHITECT_PROVIDER: "
-        f"{provider_name or '<blank>'}. Use disabled, fixture, gemini, or openai."
+        f"{provider_name or '<blank>'}. Use disabled, fixture, gemini, openai, or openrouter."
     )
 
 

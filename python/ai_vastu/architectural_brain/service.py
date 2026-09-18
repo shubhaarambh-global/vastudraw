@@ -59,7 +59,14 @@ class ArchitecturalBrainService:
         concepts = create_architectural_brain_provider().propose(
             project_id=project_id,
             original_prompt=original_prompt,
+            width_mm=width_mm,
+            depth_mm=depth_mm,
+            bedroom_count=bedroom_count,
+            toilet_count=toilet_count,
+            parking_count=parking_count,
             room_types=room_types,
+            road_side=road_side,
+            entrance_side=entrance_side,
             precedents=precedents,
             concept_count=concept_count,
         )

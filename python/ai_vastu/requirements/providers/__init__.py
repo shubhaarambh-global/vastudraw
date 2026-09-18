@@ -8,6 +8,10 @@ from .openai_responses import (
     OpenAIRequirementsConfigurationError,
     OpenAIResponsesRequirementsProvider,
 )
+from .openrouter_chat import (
+    OpenRouterRequirementsConfigurationError,
+    OpenRouterRequirementsProvider,
+)
 
 __all__ = [
     "FixtureRequirementsProvider",
@@ -16,6 +20,8 @@ __all__ = [
     "InterpretationInput",
     "OpenAIRequirementsConfigurationError",
     "OpenAIResponsesRequirementsProvider",
+    "OpenRouterRequirementsConfigurationError",
+    "OpenRouterRequirementsProvider",
     "ReferenceAsset",
     "RequirementsProvider",
 ]

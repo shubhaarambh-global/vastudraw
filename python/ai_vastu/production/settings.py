@@ -5,6 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from ai_vastu.openrouter_http import (
+    FALLBACK_REASONING_MODEL,
+    PRIMARY_ARCHITECTURAL_MODEL,
+    VISION_PLAN_MODEL,
+    OpenRouterConfigurationError,
+    OpenRouterModelPolicy,
+)
+
 EXPECTED_VASTU_BUNDLE_HASH = "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
 
 
@@ -62,6 +70,9 @@ class ProductionSettings:
     requirements_provider: str
     openai_model: str | None
     gemini_model: str | None
+    openrouter_primary_model: str | None
+    openrouter_vision_model: str | None
+    openrouter_fallback_model: str | None
     rate_limit_interpret_per_hour: int
     rate_limit_generation_per_hour: int
     rate_limit_checkout_per_hour: int
@@ -79,6 +90,9 @@ class ProductionSettings:
             "requirements_provider": self.requirements_provider,
             "openai_model": self.openai_model,
             "gemini_model": self.gemini_model,
+            "openrouter_primary_model": self.openrouter_primary_model,
+            "openrouter_vision_model": self.openrouter_vision_model,
+            "openrouter_fallback_model": self.openrouter_fallback_model,
             "rate_limit_interpret_per_hour": self.rate_limit_interpret_per_hour,
             "rate_limit_generation_per_hour": self.rate_limit_generation_per_hour,
             "rate_limit_checkout_per_hour": self.rate_limit_checkout_per_hour,
@@ -146,19 +160,46 @@ def load_production_settings(
         .strip()
         .lower()
     )
-    if provider not in {"openai", "gemini"}:
+    if provider not in {"openai", "gemini", "openrouter"}:
         raise ProductionConfigurationError(
             "Commercial launch requires a supported live requirements provider."
         )
 
     openai_model: str | None = None
     gemini_model: str | None = None
+    openrouter_primary_model: str | None = None
+    openrouter_vision_model: str | None = None
+    openrouter_fallback_model: str | None = None
+
     if provider == "openai":
         _required(env, "OPENAI_API_KEY")
         openai_model = _required(env, "AI_VASTU_OPENAI_MODEL")
-    else:
+    elif provider == "gemini":
         _required(env, "GEMINI_API_KEY")
         gemini_model = _required(env, "AI_VASTU_GEMINI_MODEL")
+    else:
+        _required(env, "OPENROUTER_API_KEY")
+        policy = OpenRouterModelPolicy(
+            primary=env.get(
+                "AI_VASTU_OPENROUTER_PRIMARY_MODEL",
+                PRIMARY_ARCHITECTURAL_MODEL,
+            ).strip(),
+            vision=env.get(
+                "AI_VASTU_OPENROUTER_VISION_MODEL",
+                VISION_PLAN_MODEL,
+            ).strip(),
+            fallback=env.get(
+                "AI_VASTU_OPENROUTER_FALLBACK_MODEL",
+                FALLBACK_REASONING_MODEL,
+            ).strip(),
+        )
+        try:
+            policy.validate()
+        except OpenRouterConfigurationError as exc:
+            raise ProductionConfigurationError(str(exc)) from exc
+        openrouter_primary_model = policy.primary
+        openrouter_vision_model = policy.vision
+        openrouter_fallback_model = policy.fallback
 
     return ProductionSettings(
         database_url=database_url,
@@ -184,6 +225,9 @@ def load_production_settings(
         requirements_provider=provider,
         openai_model=openai_model,
         gemini_model=gemini_model,
+        openrouter_primary_model=openrouter_primary_model,
+        openrouter_vision_model=openrouter_vision_model,
+        openrouter_fallback_model=openrouter_fallback_model,
         rate_limit_interpret_per_hour=_positive_int(
             env,
             "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR",

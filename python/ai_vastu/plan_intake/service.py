@@ -5,6 +5,7 @@ import os
 from .audit import build_plan_analysis
 from .errors import PlanIntakeConfigurationError, PlanIntakeProviderError
 from .models import PlanAnalysisResult, PlanRecognitionDraft
+from .openrouter_provider import OpenRouterPlanRecognitionProvider
 from .provider import (
     FixturePlanRecognitionProvider,
     GeminiPlanRecognitionProvider,
@@ -79,9 +80,11 @@ def create_plan_recognition_provider() -> PlanRecognitionProvider:
         return FixturePlanRecognitionProvider()
     if name == "gemini":
         return GeminiPlanRecognitionProvider.from_environment()
+    if name == "openrouter":
+        return OpenRouterPlanRecognitionProvider.from_environment()
     raise PlanIntakeConfigurationError(
         "Unsupported AI_VASTU_PLAN_RECOGNITION_PROVIDER: "
-        f"{name or '<blank>'}. Use fixture or gemini."
+        f"{name or '<blank>'}. Use fixture, gemini, or openrouter."
     )
 
 

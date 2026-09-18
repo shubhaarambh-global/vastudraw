@@ -45,19 +45,24 @@ def run_architectural_brain_candidates(
         for requirement in compiled.request.room_requirements
         if "toilet" in requirement.room_type.value or "bath" in requirement.room_type.value
     )
-    brain = ArchitecturalBrainService.from_environment().propose(
-        project_id=confirmed.project_id,
-        original_prompt=original_prompt,
-        width_mm=confirmed.plot_width_mm,
-        depth_mm=confirmed.plot_depth_mm,
-        bedroom_count=confirmed.bedroom_count,
-        toilet_count=toilet_count,
-        parking_count=confirmed.parking_count,
-        room_types=room_types,
-        road_side=_value(confirmed.road_side),
-        entrance_side=_value(confirmed.entrance_facing),
-        concept_count=6,
-    )
+    try:
+        brain = ArchitecturalBrainService.from_environment().propose(
+            project_id=confirmed.project_id,
+            original_prompt=original_prompt,
+            width_mm=confirmed.plot_width_mm,
+            depth_mm=confirmed.plot_depth_mm,
+            bedroom_count=confirmed.bedroom_count,
+            toilet_count=toilet_count,
+            parking_count=confirmed.parking_count,
+            room_types=room_types,
+            road_side=_value(confirmed.road_side),
+            entrance_side=_value(confirmed.entrance_facing),
+            concept_count=6,
+        )
+    except RuntimeError as exc:
+        raise MultiCandidateGenerationError(
+            f"Architectural Brain provider failed: {exc}"
+        ) from exc
 
     strategies = default_candidate_strategies()
     accepted: list[tuple[CandidateResult, CandidateArtifact]] = []

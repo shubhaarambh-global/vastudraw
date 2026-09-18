@@ -9,6 +9,7 @@ from .providers import (
     GeminiGenerateContentRequirementsProvider,
     InterpretationInput,
     OpenAIResponsesRequirementsProvider,
+    OpenRouterRequirementsProvider,
     ReferenceAsset,
     RequirementsProvider,
 )
@@ -31,6 +32,8 @@ def create_provider() -> RequirementsProvider:
         return OpenAIResponsesRequirementsProvider.from_environment()
     if provider_name == "gemini":
         return GeminiGenerateContentRequirementsProvider.from_environment()
+    if provider_name == "openrouter":
+        return OpenRouterRequirementsProvider.from_environment()
     raise RuntimeError(f"Unsupported requirements provider: {provider_name}")
 
 

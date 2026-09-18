@@ -7,6 +7,12 @@ from uuid import UUID
 
 import httpx
 
+from ai_vastu.openrouter_http import (
+    OpenRouterClient,
+    OpenRouterModelPolicy,
+    OpenRouterRequestError,
+    schema_instruction,
+)
 from ai_vastu.plan_schema import AdjacencyPreference, AdjacencyProhibition, RoomType
 from ai_vastu.requirements.generation_adapter import CompiledGeneration
 
@@ -126,6 +132,103 @@ def interpret_revision_with_gemini(
         }
     )
     return StructuredRevisionIntent.model_validate(payload)
+
+
+def interpret_revision_with_openrouter(
+    *,
+    project_id: UUID,
+    base_revision_id: UUID,
+    request: str,
+) -> StructuredRevisionIntent:
+    client = OpenRouterClient.from_environment()
+    policy = OpenRouterModelPolicy.from_environment()
+    prompt = {
+        "task": (
+            "Convert a residential-plan revision request to structured intent only. "
+            "Never output CAD coordinates. Preserve all unmentioned requirements."
+        ),
+        "project_id": str(project_id),
+        "base_revision_id": str(base_revision_id),
+        "request": request,
+        "operations": [item.value for item in RevisionOperation],
+        "units": "millimetres",
+        "schema": StructuredRevisionIntent.model_json_schema(),
+    }
+    user_text = json.dumps(
+        prompt,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    user_text += "\n\n" + schema_instruction(
+        StructuredRevisionIntent.model_json_schema()
+    )
+
+    def validate(
+        parsed: dict[str, object],
+        _model: str,
+    ) -> StructuredRevisionIntent:
+        payload = dict(parsed)
+        payload.update(
+            {
+                "schema_version": "26D.1",
+                "project_id": str(project_id),
+                "base_revision_id": str(base_revision_id),
+                "original_request": request,
+                "preserve_unmentioned_requirements": True,
+                "authoritative_geometry": False,
+            }
+        )
+        return StructuredRevisionIntent.model_validate(payload)
+
+    try:
+        return client.complete_validated_json(
+            messages=(
+                {
+                    "role": "system",
+                    "content": (
+                        "Interpret residential plan revisions into structured intent only. "
+                        "Do not emit geometry or coordinates. Return JSON only."
+                    ),
+                },
+                {"role": "user", "content": user_text},
+            ),
+            models=policy.reasoning_chain,
+            validator=validate,
+            temperature=0.1,
+        )
+    except OpenRouterRequestError as exc:
+        raise RuntimeError(f"OpenRouter revision interpretation failed: {exc}") from exc
+
+
+def interpret_revision(
+    *,
+    project_id: UUID,
+    base_revision_id: UUID,
+    request: str,
+) -> StructuredRevisionIntent:
+    provider = os.getenv("AI_VASTU_REVISION_PROVIDER", "deterministic").strip().lower()
+    if provider in {"", "deterministic", "fixture"}:
+        return deterministic_revision_interpretation(
+            project_id=project_id,
+            base_revision_id=base_revision_id,
+            request=request,
+        )
+    if provider == "openrouter":
+        return interpret_revision_with_openrouter(
+            project_id=project_id,
+            base_revision_id=base_revision_id,
+            request=request,
+        )
+    if provider == "gemini":
+        return interpret_revision_with_gemini(
+            project_id=project_id,
+            base_revision_id=base_revision_id,
+            request=request,
+        )
+    raise RuntimeError(
+        "AI_VASTU_REVISION_PROVIDER must be deterministic, openrouter, or gemini."
+    )
 
 
 def _room_type(value: str) -> RoomType | None:
