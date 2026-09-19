@@ -32,6 +32,10 @@ from .final_orchestrator import EntitlementDenied
 from .finalization import EXPECTED_VASTU_V1_BUNDLE_HASH
 from .generation_adapter import CompiledGeneration, compile_confirmed_requirements
 from .models import ConfirmedRequirements
+from .precedent_adapter import (
+    precedent_reasoning_context,
+    retrieve_resplan_precedents,
+)
 from .store import RequirementsStore
 
 
@@ -103,11 +107,14 @@ class CandidateGenerationOrchestrator:
             raise PermissionError("Confirmed requirements do not belong to this user.")
         if confirmed.project_id != project_id:
             raise PermissionError("Confirmed requirements belong to another project.")
-        if confirmed.floor_count != 1:
-            raise ValueError("Commercial V1 currently supports exactly one generated floor.")
         for room in confirmed.rooms:
-            if room.floor_preference not in {None, 0}:
-                raise ValueError("Commercial V1 cannot silently drop an upper-floor preference.")
+            if (
+                room.floor_preference is not None
+                and not 0 <= room.floor_preference < confirmed.floor_count
+            ):
+                raise ValueError(
+                    "PROGRAM_DISTRIBUTION_FAILURE: room floor preference is outside the building."
+                )
         return confirmed
 
     def _authorize(
@@ -154,12 +161,19 @@ class CandidateGenerationOrchestrator:
         )
         draft = self._requirements_store.get_draft(draft_id)
 
+        precedent_matches = retrieve_resplan_precedents(
+            confirmed,
+            limit=6,
+        )
+        precedent_context = precedent_reasoning_context(precedent_matches)
+
         architectural_intent: ArchitecturalDesignIntent | None = None
         if architectural_intelligence_enabled():
             architectural_intent = create_architectural_intelligence_service().reason(
                 ArchitecturalReasoningInput(
                     confirmed=confirmed,
                     original_prompt=draft.prompt,
+                    precedent_context=precedent_context,
                 )
             )
 
@@ -170,7 +184,11 @@ class CandidateGenerationOrchestrator:
                 original_prompt=draft.prompt,
             )
 
+        # Keep the shared compiled baseline precedent-neutral.
+        # Individual ResPlan graphs are bound later per candidate concept,
+        # before that candidate reaches CP-SAT.
         compiled = compile_confirmed_requirements(confirmed)
+
         if architectural_intent is not None:
             compiled = apply_design_intent(compiled, architectural_intent)
 
@@ -179,6 +197,7 @@ class CandidateGenerationOrchestrator:
             compiled=compiled,
             original_prompt=draft.prompt,
             vastu_profile=vastu_reasoning_profile,
+            precedent_matches=precedent_matches,
             max_alternatives=max_alternatives,
         )
 

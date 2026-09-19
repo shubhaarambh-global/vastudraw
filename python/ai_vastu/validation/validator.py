@@ -856,8 +856,9 @@ def _validate_circulation(
             graph[str(first)].add(str(second))
             graph[str(second)].add(str(first))
 
-    visited = {_OUTSIDE}
-    queue = deque([_OUTSIDE])
+    anchor_nodes = {str(room_id) for room_id in request.circulation_anchor_room_ids}
+    visited = {_OUTSIDE, *anchor_nodes}
+    queue = deque([_OUTSIDE, *sorted(anchor_nodes)])
     while queue:
         current = queue.popleft()
         for neighbour in sorted(graph[current]):
@@ -866,6 +867,10 @@ def _validate_circulation(
                 queue.append(neighbour)
 
     for room in floor.rooms:
+        if room.room_type.value in {"parking", "garage"}:
+            continue
+        if not request.config.require_exterior_access and str(room.id) in anchor_nodes:
+            continue
         if str(room.id) not in visited:
             errors.append(
                 _result(

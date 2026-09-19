@@ -7,34 +7,49 @@ from ai_vastu.plan_schema import RoomType
 
 _BASIS_POINTS = 10_000
 
-_TIGHT_CAP_ROOM_TYPES = {
+_PARKING_CAP_ROOM_TYPES = {
     RoomType.PARKING,
     RoomType.GARAGE,
 }
-_SERVICE_CAP_ROOM_TYPES = {
+
+_SANITARY_CAP_ROOM_TYPES = {
     RoomType.ATTACHED_TOILET,
     RoomType.COMMON_TOILET,
     RoomType.POWDER_ROOM,
     RoomType.BATH,
     RoomType.SERVANT_TOILET,
-    RoomType.PUJA,
+}
+
+_SMALL_SERVICE_CAP_ROOM_TYPES = {
     RoomType.PANTRY,
     RoomType.STORE,
+}
+
+_UTILITY_CAP_ROOM_TYPES = {
     RoomType.UTILITY,
     RoomType.LAUNDRY,
 }
+
 _CIRCULATION_CAP_ROOM_TYPES = {
     RoomType.LOBBY,
     RoomType.CORRIDOR,
     RoomType.FOYER,
     RoomType.VERANDAH,
 }
+
 _MODERATE_CAP_ROOM_TYPES = {
     RoomType.KITCHEN,
     RoomType.DRESSING,
     RoomType.WARDROBE,
     RoomType.STAIRCASE,
     RoomType.LIFT,
+}
+
+_PUBLIC_CAP_ROOM_TYPES = {
+    RoomType.LIVING,
+    RoomType.DRAWING,
+    RoomType.DINING,
+    RoomType.FAMILY_LOUNGE,
 }
 
 
@@ -54,17 +69,43 @@ class RoomAreaTarget:
 
 
 def expansion_cap_basis_points(room_type: RoomType) -> int:
-    """Maximum automatic room expansion relative to its solver-envelope minimum."""
+    """Return a role-sensitive automatic expansion ceiling.
 
-    if room_type in _TIGHT_CAP_ROOM_TYPES:
-        return 10_500
-    if room_type in _SERVICE_CAP_ROOM_TYPES:
-        return 12_000
-    if room_type in _CIRCULATION_CAP_ROOM_TYPES:
-        return 13_500
-    if room_type in _MODERATE_CAP_ROOM_TYPES:
+    These values govern deterministic target allocation only. They are not
+    regulatory maxima and do not replace explicit room maximum constraints.
+
+    Public rooms and circulation are allowed to absorb useful residual area,
+    while parking and sanitary rooms remain deliberately constrained so the
+    solver cannot create oversized parking/toilets merely to fill the site.
+    """
+
+    if room_type in _PARKING_CAP_ROOM_TYPES:
+        return 14_000
+
+    if room_type in _SANITARY_CAP_ROOM_TYPES:
         return 15_000
-    return 19_000
+
+    if room_type is RoomType.PUJA:
+        return 20_000
+
+    if room_type in _SMALL_SERVICE_CAP_ROOM_TYPES:
+        return 18_000
+
+    if room_type in _UTILITY_CAP_ROOM_TYPES:
+        return 20_000
+
+    if room_type in _CIRCULATION_CAP_ROOM_TYPES:
+        return 30_000
+
+    if room_type in _MODERATE_CAP_ROOM_TYPES:
+        return 22_000
+
+    if room_type in _PUBLIC_CAP_ROOM_TYPES:
+        return 32_000
+
+    # Bedrooms, studies, offices, courtyards and other ordinary occupied
+    # spaces receive a moderate expansion allowance.
+    return 24_000
 
 
 def allocate_room_area_targets(
@@ -74,18 +115,32 @@ def allocate_room_area_targets(
 ) -> tuple[RoomAreaTarget, ...]:
     """Distribute an automatic planning-footprint target deterministically.
 
-    The room minimums remain authoritative hard minima. Automatic expansion is capped by
-    room role so parking/service/circulation spaces cannot absorb arbitrary residual area.
-    This is a planning heuristic only; it is not an FSI, setback or regulatory entitlement.
+    Hard room minima remain authoritative. Automatic growth is distributed
+    according to room role so useful spaces can consume the confirmed
+    buildable envelope without allowing parking, toilets or small service
+    spaces to become arbitrary residual-area sinks.
+
+    This remains a planning heuristic, not an FSI/FAR/setback entitlement.
     """
 
     if not rooms:
         return ()
+
     if desired_total_area_mm2 <= 0:
         raise ValueError("desired_total_area_mm2 must be positive.")
 
-    ordered = tuple(sorted(rooms, key=lambda item: str(item.room_instance_id)))
-    bases = {item.room_instance_id: item.minimum_envelope_area_mm2 for item in ordered}
+    ordered = tuple(
+        sorted(
+            rooms,
+            key=lambda item: str(item.room_instance_id),
+        )
+    )
+
+    bases = {
+        item.room_instance_id: item.minimum_envelope_area_mm2
+        for item in ordered
+    }
+
     caps = {
         item.room_instance_id: (
             item.minimum_envelope_area_mm2
@@ -97,32 +152,55 @@ def allocate_room_area_targets(
 
     minimum_total = sum(bases.values())
     maximum_total = sum(caps.values())
-    effective_total = min(max(desired_total_area_mm2, minimum_total), maximum_total)
+
+    effective_total = min(
+        max(desired_total_area_mm2, minimum_total),
+        maximum_total,
+    )
+
     extra = effective_total - minimum_total
     total_capacity = maximum_total - minimum_total
 
     targets = dict(bases)
+
     if extra > 0 and total_capacity > 0:
         allocations: list[tuple[UUID, int, int]] = []
         assigned = 0
+
         for item in ordered:
             room_id = item.room_instance_id
             capacity = caps[room_id] - bases[room_id]
             numerator = extra * capacity
-            quotient, remainder = divmod(numerator, total_capacity)
+            quotient, remainder = divmod(
+                numerator,
+                total_capacity,
+            )
+
             targets[room_id] += quotient
             assigned += quotient
-            allocations.append((room_id, capacity, remainder))
+            allocations.append(
+                (
+                    room_id,
+                    capacity,
+                    remainder,
+                )
+            )
 
         remainder_units = extra - assigned
+
         for room_id, capacity, _ in sorted(
             allocations,
-            key=lambda item: (-item[2], str(item[0])),
+            key=lambda item: (
+                -item[2],
+                str(item[0]),
+            ),
         ):
             if remainder_units <= 0:
                 break
+
             if capacity <= 0 or targets[room_id] >= caps[room_id]:
                 continue
+
             targets[room_id] += 1
             remainder_units -= 1
 

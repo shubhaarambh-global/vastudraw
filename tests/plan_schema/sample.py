@@ -49,7 +49,7 @@ def rectangle() -> IntPolygon:
 def sample_plan() -> PlanDocument:
     boundary = rectangle()
     return PlanDocument(
-        schema_version="1.0.0",
+        schema_version="1.1.0",
         project_id=PROJECT_ID,
         revision_id=REVISION_ID,
         canonical_units="mm",

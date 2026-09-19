@@ -5,7 +5,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from ai_vastu.generation.errors import GenerationInputError
+from ai_vastu.generation.errors import CirculationGenerationError, GenerationInputError
 from ai_vastu.generation.models import ArchitecturalGenerationResult, GenerationDisposition
 from ai_vastu.requirements.finalization import (
     CanonicalGeneration,
@@ -38,6 +38,68 @@ _BASIS_POINTS = 10_000
 
 class MultiCandidateGenerationError(RuntimeError):
     pass
+
+
+def _generation_failure_detail(
+    generation: ArchitecturalGenerationResult,
+) -> str:
+    """Explain why a deterministic generation was not accepted."""
+
+    planner = generation.planner_result
+
+    parts = [
+        f"disposition={generation.disposition.value}",
+        f"planner_status={planner.status.value}",
+    ]
+
+    if planner.objective_penalty is not None:
+        parts.append(f"objective_penalty={planner.objective_penalty}")
+
+    if planner.notices:
+        notice_text = " | ".join(
+            (f"{item.severity.value}:{item.code}:{item.message}") for item in planner.notices
+        )
+        parts.append(f"planner_notices=[{notice_text}]")
+
+    validation = generation.validation_result
+
+    if validation is not None:
+        report = validation.report
+
+        parts.append(f"validation_valid={report.valid}")
+
+        if report.errors:
+            error_text = " | ".join(
+                (
+                    f"{item.severity.value}:"
+                    f"{item.check_id}:"
+                    f"{item.message_code}:"
+                    "entities=" + (",".join(str(entity) for entity in item.entity_refs) or "none")
+                )
+                for item in report.errors
+            )
+
+            parts.append(f"validation_errors=[{error_text}]")
+
+        if report.warnings:
+            warning_text = " | ".join(
+                (f"{item.severity.value}:{item.check_id}:{item.message_code}")
+                for item in report.warnings
+            )
+
+            parts.append(f"validation_warnings=[{warning_text}]")
+
+    detail = "; ".join(parts)
+
+    # CandidateExclusion.message is intentionally bounded to 1000 chars.
+    # Preserve the leading solver/validation evidence and truncate only
+    # verbose diagnostic tail data.
+    max_length = 980
+
+    if len(detail) <= max_length:
+        return detail
+
+    return detail[: max_length - len(" ...[truncated]")] + " ...[truncated]"
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,6 +381,15 @@ def run_multi_candidate_generation(
         strategy_compiled = _strategy_compiled(compiled, strategy)
         try:
             generation = run_compiled_generation(strategy_compiled)
+        except CirculationGenerationError as exc:
+            exclusions.append(
+                CandidateExclusion(
+                    strategy_id=strategy.strategy_id,
+                    reason_code="CIRCULATION_DISCONNECTED",
+                    message=str(exc),
+                )
+            )
+            continue
         except GenerationInputError as exc:
             exclusions.append(
                 CandidateExclusion(
@@ -334,10 +405,7 @@ def run_multi_candidate_generation(
                 CandidateExclusion(
                     strategy_id=strategy.strategy_id,
                     reason_code=generation.disposition.value,
-                    message=(
-                        "Candidate did not pass the deterministic generation and "
-                        "hard validation pipeline."
-                    ),
+                    message=_generation_failure_detail(generation),
                 )
             )
             continue
@@ -376,8 +444,18 @@ def run_multi_candidate_generation(
         )
 
     if not accepted:
+        exclusion_text = "\n".join(
+            (f"- {item.strategy_id}: {item.reason_code}: {item.message}") for item in exclusions
+        )
+
+        if not exclusion_text:
+            exclusion_text = "- No deterministic exclusion detail was recorded."
+
         raise MultiCandidateGenerationError(
-            "All deterministic Phase 26C candidate strategies were rejected."
+            "All deterministic Phase 26C candidate "
+            "strategies were rejected.\n"
+            "Deterministic diagnostics:\n"
+            f"{exclusion_text}"
         )
 
     accepted.sort(

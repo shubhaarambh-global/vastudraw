@@ -143,7 +143,10 @@ class AdjacencyProhibitionConstraint(FrozenModel):
     kind: Literal[HardConstraintKind.ADJACENCY_PROHIBITION] = (
         HardConstraintKind.ADJACENCY_PROHIBITION
     )
-    origin: Literal[ConstraintOrigin.USER_REQUIREMENT] = ConstraintOrigin.USER_REQUIREMENT
+    origin: Literal[
+        ConstraintOrigin.USER_REQUIREMENT,
+        ConstraintOrigin.ARCHITECTURAL_INVARIANT,
+    ] = ConstraintOrigin.USER_REQUIREMENT
     room_instance_id: EntityId
     target_room_type: RoomType
 
@@ -244,6 +247,7 @@ class ConstraintCompilerInput(FrozenModel):
     available_floor_indices: tuple[NonNegativeInt, ...]
     room_requirements: tuple[RoomRequirement, ...]
     assumptions: tuple[Assumption, ...] = ()
+    instance_namespace: str = ""
 
     @model_validator(mode="after")
     def validate_identity_sets(self) -> ConstraintCompilerInput:

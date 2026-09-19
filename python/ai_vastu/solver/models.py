@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from pydantic import Field, model_validator
 
 from ai_vastu.plan_schema.base import FrozenModel
+from ai_vastu.plan_schema.geometry import IntPoint, IntPolygon
 from ai_vastu.plan_schema.models import EntityId, RoomType
 from ai_vastu.plan_schema.units import MM, NonNegativeMM, PositiveMM
 
@@ -56,7 +57,13 @@ class ResidentialPlanningConfig(FrozenModel):
     road_boundary_side: PlannerBoundarySide | None = None
     entrance_boundary_side: PlannerBoundarySide | None = None
     require_road_connected_parking: bool = False
+    parking_min_frontage_mm: PositiveMM = 3_000
+    parking_min_depth_mm: PositiveMM = 5_500
     require_entrance_boundary_access: bool = False
+    require_horizontal_circulation: bool = False
+    vertical_core_footprint: IntPolygon | None = None
+    wet_stack_anchor: IntPoint | None = None
+    wet_stack_weight: NonNegativeInt = 35
 
 
 class PlannerConfig(FrozenModel):

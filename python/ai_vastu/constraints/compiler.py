@@ -17,6 +17,7 @@ from .models import (
     CompilerNotice,
     ConstraintCompilerInput,
     ConstraintNoticeSeverity,
+    ConstraintOrigin,
     ContainmentConstraint,
     DimensionAxis,
     FloorPreferenceObjective,
@@ -35,13 +36,30 @@ from .models import (
 _ROOM_INSTANCE_NAMESPACE = UUID("1cf9b0e5-669f-54f4-a050-d91877d7cd0a")
 _CONSTRAINT_NAMESPACE = UUID("0b91840f-a154-55db-af12-cbc1a8f41bf1")
 
+_PUJA_SANITARY_PROHIBITIONS = frozenset(
+    {
+        RoomType.ATTACHED_TOILET,
+        RoomType.COMMON_TOILET,
+        RoomType.POWDER_ROOM,
+        RoomType.BATH,
+        RoomType.SERVANT_TOILET,
+    }
+)
+
 
 def _stable_id(*parts: object) -> UUID:
     return uuid5(_CONSTRAINT_NAMESPACE, "|".join(str(part) for part in parts))
 
 
-def _room_instance_id(requirement_id: UUID, ordinal: int) -> UUID:
-    return uuid5(_ROOM_INSTANCE_NAMESPACE, f"{requirement_id}|{ordinal}")
+def _room_instance_id(
+    requirement_id: UUID,
+    ordinal: int,
+    instance_namespace: str,
+) -> UUID:
+    return uuid5(
+        _ROOM_INSTANCE_NAMESPACE,
+        f"{instance_namespace}|{requirement_id}|{ordinal}",
+    )
 
 
 def _target_available(
@@ -261,6 +279,53 @@ def _append_adjacency_preference(
     )
 
 
+def _append_architectural_invariants(
+    hard: list[HardConstraint],
+    instances: list[RoomInstance],
+) -> None:
+    """Add deterministic, product-approved residential safety/quality invariants.
+
+    These constraints are not model-authored judgement and are not Vastu scoring
+    rules. They are explicit architectural invariants enforced before geometry
+    can be accepted.
+    """
+
+    present_types = {room.room_type for room in instances}
+
+    sanitary_types = tuple(
+        sorted(
+            _PUJA_SANITARY_PROHIBITIONS & present_types,
+            key=lambda item: item.value,
+        )
+    )
+
+    if not sanitary_types:
+        return
+
+    puja_rooms = tuple(
+        sorted(
+            (room for room in instances if room.room_type is RoomType.PUJA),
+            key=lambda item: str(item.id),
+        )
+    )
+
+    for puja in puja_rooms:
+        for sanitary_type in sanitary_types:
+            hard.append(
+                AdjacencyProhibitionConstraint(
+                    id=_stable_id(
+                        puja.id,
+                        "architectural-invariant",
+                        "puja-sanitary-separation",
+                        sanitary_type.value,
+                    ),
+                    origin=ConstraintOrigin.ARCHITECTURAL_INVARIANT,
+                    room_instance_id=puja.id,
+                    target_room_type=sanitary_type,
+                )
+            )
+
+
 def _preflight_total_area(input_data: ConstraintCompilerInput) -> None:
     buildable_area2 = area2_polygon(input_data.buildable_area.polygon)
     if buildable_area2 <= 0:
@@ -301,7 +366,11 @@ def compile_constraints(input_data: ConstraintCompilerInput) -> CompiledConstrai
     for requirement in sorted(input_data.room_requirements, key=lambda item: str(item.id)):
         for ordinal in range(1, requirement.quantity + 1):
             instance = RoomInstance(
-                id=_room_instance_id(requirement.id, ordinal),
+                id=_room_instance_id(
+                    requirement.id,
+                    ordinal,
+                    input_data.instance_namespace,
+                ),
                 requirement_id=requirement.id,
                 ordinal=ordinal,
                 room_type=requirement.room_type,
@@ -376,6 +445,11 @@ def compile_constraints(input_data: ConstraintCompilerInput) -> CompiledConstrai
                     user_priority=requirement.user_priority,
                 )
             )
+
+    _append_architectural_invariants(
+        hard,
+        instances,
+    )
 
     problem = CompiledConstraintProblem(
         buildable_area=input_data.buildable_area,

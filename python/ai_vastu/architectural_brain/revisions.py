@@ -160,9 +160,7 @@ def interpret_revision_with_openrouter(
         separators=(",", ":"),
         ensure_ascii=False,
     )
-    user_text += "\n\n" + schema_instruction(
-        StructuredRevisionIntent.model_json_schema()
-    )
+    user_text += "\n\n" + schema_instruction(StructuredRevisionIntent.model_json_schema())
 
     def validate(
         parsed: dict[str, object],
@@ -226,9 +224,7 @@ def interpret_revision(
             base_revision_id=base_revision_id,
             request=request,
         )
-    raise RuntimeError(
-        "AI_VASTU_REVISION_PROVIDER must be deterministic, openrouter, or gemini."
-    )
+    raise RuntimeError("AI_VASTU_REVISION_PROVIDER must be deterministic, openrouter, or gemini.")
 
 
 def _room_type(value: str) -> RoomType | None:

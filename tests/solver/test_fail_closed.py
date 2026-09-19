@@ -48,9 +48,16 @@ def test_rejects_locked_room_without_existing_geometry() -> None:
         solve_rectangular_problem(problem, config=config())
 
 
-def test_hard_adjacency_prohibition_fails_closed_until_modeled() -> None:
-    problem = compiled_problem(requirements=(living_requirement(), dining_requirement()))
-    room_id = problem.room_instances[0].id
+def test_hard_adjacency_prohibition_is_enforced() -> None:
+    problem = compiled_problem(
+        requirements=(
+            living_requirement(),
+            dining_requirement(),
+        )
+    )
+
+    room_id = next(room.id for room in problem.room_instances if room.room_type is RoomType.LIVING)
+
     constraint = AdjacencyProhibitionConstraint(
         id=UUID("72000000-0000-0000-0000-000000000099"),
         kind=HardConstraintKind.ADJACENCY_PROHIBITION,
@@ -58,14 +65,51 @@ def test_hard_adjacency_prohibition_fails_closed_until_modeled() -> None:
         room_instance_id=room_id,
         target_room_type=RoomType.DINING,
     )
+
     problem = problem.model_copy(
-        update={"hard_constraints": (*problem.hard_constraints, constraint)}
+        update={
+            "hard_constraints": (
+                *problem.hard_constraints,
+                constraint,
+            )
+        }
     )
-    with pytest.raises(
-        UnsupportedSolverProblemError,
-        match="Hard adjacency prohibitions",
-    ):
-        solve_rectangular_problem(problem, config=config())
+
+    planner_config = config(step_mm=100)
+
+    result = solve_rectangular_problem(
+        problem,
+        config=planner_config,
+    )
+
+    assert result.status in {
+        PlannerStatus.OPTIMAL,
+        PlannerStatus.FEASIBLE,
+    }
+
+    source = next(item for item in result.placements if item.room_instance_id == room_id)
+
+    target = next(item for item in result.placements if item.room_type is RoomType.DINING)
+
+    gap_x = max(
+        source.x_mm - (target.x_mm + target.width_mm),
+        target.x_mm - (source.x_mm + source.width_mm),
+        0,
+    )
+
+    gap_y = max(
+        source.y_mm - (target.y_mm + target.depth_mm),
+        target.y_mm - (source.y_mm + source.depth_mm),
+        0,
+    )
+
+    assert (
+        max(
+            gap_x,
+            gap_y,
+        )
+        >= planner_config.solver_step_mm
+    )
 
 
 def test_lattice_infeasibility_returns_explicit_infeasible_result() -> None:

@@ -92,9 +92,7 @@ def _precedent_evidence(
             "room_types": item.fingerprint.room_types,
             "road_side": item.fingerprint.road_side,
             "entrance_side": item.fingerprint.entrance_side,
-            "topology": [
-                edge.model_dump(mode="json") for edge in item.fingerprint.topology
-            ],
+            "topology": [edge.model_dump(mode="json") for edge in item.fingerprint.topology],
         }
         for item in precedents[:12]
     ]
@@ -301,8 +299,7 @@ class OpenRouterArchitecturalBrainProvider:
         )
         prompt["output_contract"] = (
             "Return an object with key 'concepts'. Each array item must validate as an "
-            "ArchitecturalConcept. "
-            + schema_instruction(ArchitecturalConcept.model_json_schema())
+            "ArchitecturalConcept. " + schema_instruction(ArchitecturalConcept.model_json_schema())
         )
 
         def validate(
@@ -322,16 +319,12 @@ class OpenRouterArchitecturalBrainProvider:
                     {
                         "schema_version": "26.4B.1",
                         "project_id": str(project_id),
-                        "precedent_ids": [
-                            item.fingerprint.precedent_id for item in precedents[:8]
-                        ],
+                        "precedent_ids": [item.fingerprint.precedent_id for item in precedents[:8]],
                         "authoritative_geometry": False,
                         "content_hash": None,
                     }
                 )
-                concepts.append(
-                    ArchitecturalConcept.model_validate(item).with_content_hash()
-                )
+                concepts.append(ArchitecturalConcept.model_validate(item).with_content_hash())
             if not concepts:
                 raise ValueError("Architectural Brain returned no valid concepts.")
             return tuple(concepts)
@@ -375,6 +368,5 @@ def create_architectural_brain_provider() -> ArchitecturalBrainProvider:
     if name == "openrouter":
         return OpenRouterArchitecturalBrainProvider.from_environment()
     raise RuntimeError(
-        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER must be "
-        "fixture/deterministic/gemini/openrouter."
+        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER must be fixture/deterministic/gemini/openrouter."
     )

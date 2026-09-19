@@ -58,7 +58,7 @@ def test_compile_adds_residential_topology_and_boundary_context() -> None:
     planning = compiled.request.planner_config.residential_planning
 
     assert planning.enabled is True
-    assert planning.target_occupied_area_basis_points == 7_000
+    assert planning.target_occupied_area_basis_points == 9_000
     assert planning.road_boundary_side is PlannerBoundarySide.EAST
     assert planning.entrance_boundary_side is PlannerBoundarySide.EAST
     assert planning.require_road_connected_parking is True

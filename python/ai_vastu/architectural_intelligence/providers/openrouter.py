@@ -32,6 +32,27 @@ wardrobe/furniture needs stated by the client, daylight, ventilation,
 service/plumbing clustering, short legible circulation, parking access, and
 avoiding unusable leftover spaces.
 
+When residential precedent studies are supplied:
+- Treat them as REAL-PLAN TOPOLOGY EVIDENCE, not as authoritative designs.
+- Similarity/retrieval scores indicate brief similarity only; they are NOT
+  architectural-quality scores.
+- Study recurring entry sequences, room connectivity, adjacency patterns,
+  exterior exposure, area proportions, and circulation organization.
+- Prefer relationships supported by multiple relevant precedents over an
+  isolated precedent.
+- Do NOT copy a precedent blindly.
+- Do NOT copy precedent coordinates or exact dimensions.
+- Adapt useful topology to the confirmed client brief, plot proportions,
+  orientation, requested spaces, circulation needs, and other constraints.
+- ResPlan's generic "bathroom" semantic does NOT establish whether a sanitary
+  space is attached, common, bath-only, powder-room, or another subtype.
+- ResPlan does NOT provide a puja semantic. Never reinterpret storage, balcony,
+  or another room as puja merely to match a precedent.
+- Never create a puja-sanitary adjacency from precedent evidence.
+- If precedent evidence conflicts with confirmed requirements, confirmed
+  requirements win.
+- Use planning_notes or warnings when precedent evidence is ambiguous.
+
 CRITICAL AUTHORITY BOUNDARY:
 - Do NOT draw authoritative geometry.
 - Do NOT output coordinates, walls, doors, polygons, or a finished floor plan.
@@ -80,11 +101,30 @@ class OpenRouterArchitecturalIntelligenceProvider:
             separators=(",", ":"),
             ensure_ascii=False,
         )
+        precedent_text = ""
+
+        if request.precedent_context:
+            precedent_json = json.dumps(
+                request.precedent_context,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+
+            precedent_text = (
+                "\n\nRetrieved residential precedent studies:\n"
+                + precedent_json
+                + "\n\nUse the precedents as topology evidence only. "
+                "Derive and adapt useful spatial patterns; do not copy "
+                "geometry, dimensions, or unsupported semantics."
+            )
+
         user_text = (
             "Original client brief:\n"
             + request.original_prompt
             + "\n\nHuman-confirmed planning requirements:\n"
             + confirmed_json
+            + precedent_text
             + "\n\n"
             + schema_instruction(ArchitecturalDesignIntent.model_json_schema())
         )

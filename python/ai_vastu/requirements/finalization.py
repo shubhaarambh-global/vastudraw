@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import math
 import os
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid5
 
+from ai_vastu.architectural_geometry import BuildingDiagnosticSeverity
 from ai_vastu.generation.models import ArchitecturalGenerationResult
 from ai_vastu.plan_schema.geometry import IntPolygon
 from ai_vastu.plan_schema.models import (
@@ -23,6 +25,9 @@ from ai_vastu.plan_schema.models import (
     Road,
     RoomType,
     ScoringSummary,
+    ValidationReport,
+    ValidationResult,
+    ValidationSeverity,
     VastuAnalysis,
     VastuResult,
     VerificationStatus,
@@ -284,6 +289,150 @@ def build_vastu_analysis(
     )
 
 
+def _building_floors(result: ArchitecturalGenerationResult) -> tuple[Floor, ...]:
+    if result.floor_results:
+        floors = tuple(
+            item.geometry_result.floor
+            for item in sorted(result.floor_results, key=lambda item: item.floor_index)
+            if item.geometry_result is not None
+        )
+        if len(floors) != len(result.floor_results):
+            raise Phase24FinalizationError(
+                "Accepted multi-floor generation is missing floor geometry."
+            )
+        return floors
+    if result.geometry_result is None:
+        raise Phase24FinalizationError("Accepted generation is missing floor geometry.")
+    return (result.geometry_result.floor,)
+
+
+def _building_validation_report(result: ArchitecturalGenerationResult) -> ValidationReport:
+    """Bind every floor and 2D9G building diagnostic into canonical evidence."""
+
+    if not result.floor_results:
+        if result.validation_result is None:
+            raise Phase24FinalizationError("Accepted generation is missing validation output.")
+        return result.validation_result.report
+    if result.building_validation is None or not result.building_validation.accepted:
+        raise Phase24FinalizationError(
+            "BUILDING_CIRCULATION_DISCONNECTED: accepted multi-floor generation lacks "
+            "successful independent whole-building validation."
+        )
+
+    errors: list[ValidationResult] = []
+    warnings: list[ValidationResult] = []
+    informational: list[ValidationResult] = []
+    for floor_result in sorted(result.floor_results, key=lambda item: item.floor_index):
+        if floor_result.validation_result is None:
+            raise Phase24FinalizationError(
+                "Accepted multi-floor generation is missing per-floor validation output."
+            )
+        report = floor_result.validation_result.report
+        errors.extend(report.errors)
+        warnings.extend(report.warnings)
+        informational.extend(report.informational)
+
+    destinations = {
+        BuildingDiagnosticSeverity.ERROR: errors,
+        BuildingDiagnosticSeverity.WARNING: warnings,
+        BuildingDiagnosticSeverity.INFO: informational,
+    }
+    severities = {
+        BuildingDiagnosticSeverity.ERROR: ValidationSeverity.ERROR,
+        BuildingDiagnosticSeverity.WARNING: ValidationSeverity.WARNING,
+        BuildingDiagnosticSeverity.INFO: ValidationSeverity.INFO,
+    }
+    for diagnostic in result.building_validation.diagnostics:
+        destinations[diagnostic.severity].append(
+            ValidationResult(
+                check_id=f"phase2d9g.building.{diagnostic.code.lower()}",
+                severity=severities[diagnostic.severity],
+                entity_refs=diagnostic.entity_refs,
+                message_code=diagnostic.code,
+                evidence=(
+                    EvidenceItem(
+                        key="floor_indices",
+                        value=",".join(str(item) for item in diagnostic.floor_indices),
+                    ),
+                    EvidenceItem(key="message", value=diagnostic.message),
+                ),
+                validator_version="2D9G.1",
+            )
+        )
+
+    def ordered(values: list[ValidationResult]) -> tuple[ValidationResult, ...]:
+        return tuple(
+            sorted(
+                values,
+                key=lambda item: (
+                    item.check_id,
+                    item.message_code,
+                    tuple(str(ref) for ref in item.entity_refs),
+                ),
+            )
+        )
+
+    return ValidationReport(
+        valid=not errors,
+        errors=ordered(errors),
+        warnings=ordered(warnings),
+        informational=ordered(informational),
+    )
+
+
+def _validate_building_program(
+    *,
+    confirmed: ConfirmedRequirements,
+    compiled: CompiledGeneration,
+    floors: tuple[Floor, ...],
+) -> None:
+    expected = Counter(
+        requirement.room_type.value
+        for requirement in compiled.request.room_requirements
+        for _ in range(requirement.quantity)
+    )
+    actual = Counter(room.room_type.value for floor in floors for room in floor.rooms)
+    if actual != expected:
+        raise Phase24FinalizationError(
+            "BUILDING_PROGRAM_INCOMPLETE: generated room instances do not exactly "
+            f"match the confirmed program for floor_count={confirmed.floor_count}; "
+            f"expected={dict(expected)} actual={dict(actual)}."
+        )
+    indexes = tuple(floor.index for floor in floors)
+    if indexes != tuple(range(confirmed.floor_count)):
+        raise Phase24FinalizationError(
+            "INVALID_FLOOR_COUNT: canonical floors must be ordered consecutively from index 0."
+        )
+
+
+def _build_building_vastu_analysis(
+    *,
+    bundle: RuleBundle,
+    floors: tuple[Floor, ...],
+    plot_boundary: IntPolygon,
+    north_rotation_udeg: int,
+) -> VastuAnalysis:
+    analyses = tuple(
+        build_vastu_analysis(
+            bundle=bundle,
+            floor=floor,
+            plot_boundary=plot_boundary,
+            north_rotation_udeg=north_rotation_udeg,
+        )
+        for floor in floors
+    )
+    results = tuple(item for analysis in analyses for item in analysis.results)
+    raw = sum(item.raw_weight for item in results)
+    earned = sum(item.earned_weight for item in results)
+    return VastuAnalysis(
+        spec_version=bundle.spec_version,
+        results=results,
+        overall_basis_points=None if raw == 0 else (earned * 10_000 + raw // 2) // raw,
+        major_violations=sum(item.major_violations for item in analyses),
+        minor_compromises=sum(item.minor_compromises for item in analyses),
+    )
+
+
 def _circular_difference(first: float, second: float) -> float:
     raw = abs(first - second) % 360.0
     return min(raw, 360.0 - raw)
@@ -421,11 +570,6 @@ def build_canonical_plan_document(
         raise Phase24FinalizationError(
             "Invalid geometry cannot become a canonical project revision."
         )
-    if confirmed.floor_count != 1:
-        raise Phase24FinalizationError(
-            "Commercial MVP currently supports exactly one generated floor."
-        )
-
     bundle = load_production_vastu_bundle()
     north = quantize_angle_udeg(str(confirmed.north_rotation_deg)).microdegrees
     candidate_id = _candidate_id(confirmed.project_id, confirmed.draft_id, result)
@@ -467,9 +611,15 @@ def build_canonical_plan_document(
         verified=True,
     )
 
-    vastu_analysis = build_vastu_analysis(
+    floors = _building_floors(result)
+    _validate_building_program(
+        confirmed=confirmed,
+        compiled=compiled,
+        floors=floors,
+    )
+    vastu_analysis = _build_building_vastu_analysis(
         bundle=bundle,
-        floor=result.geometry_result.floor,
+        floors=floors,
         plot_boundary=plot_boundary,
         north_rotation_udeg=north,
     )
@@ -477,7 +627,7 @@ def build_canonical_plan_document(
 
     metadata = result.planner_result.metadata
     document = PlanDocument(
-        schema_version="1.0.0",
+        schema_version="1.1.0",
         project_id=confirmed.project_id,
         revision_id=revision_id,
         canonical_units="mm",
@@ -486,10 +636,10 @@ def build_canonical_plan_document(
         roads=(road,),
         buildable_area=compiled.request.buildable_area,
         room_requirements=compiled.request.room_requirements,
-        floors=(result.geometry_result.floor,),
+        floors=floors,
         vastu_spec_version=bundle.spec_version,
         vastu_analysis=vastu_analysis,
-        validation=result.validation_result.report,
+        validation=_building_validation_report(result),
         scoring=scoring,
         assumptions=(
             *compiled.request.assumptions,

@@ -12,6 +12,7 @@ from ..models import ArchitecturalDesignIntent
 class ArchitecturalReasoningInput:
     confirmed: ConfirmedRequirements
     original_prompt: str
+    precedent_context: tuple[dict[str, object], ...] = ()
 
 
 class ArchitecturalIntelligenceProvider(Protocol):

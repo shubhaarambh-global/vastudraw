@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from ai_vastu.architectural_geometry import evaluate_wet_stacks
 from ai_vastu.plan_schema import IntPoint, PlanDocument
 
 from .models import ArchitecturalQualityScore, EvidenceStatus, QualityMetric
+from .site_accounting import analyze_floor_site_accounting
 
 
 def _polygon_area(points: tuple[IntPoint, ...]) -> int:
@@ -40,26 +42,33 @@ def _score_weighted(metrics: Iterable[QualityMetric]) -> ArchitecturalQualitySco
 
 def score_plan_document(document: PlanDocument) -> ArchitecturalQualityScore:
     floor = document.floors[0]
-    envelope_area = _polygon_area(document.buildable_area.polygon.outer)
-    room_area = sum(_polygon_area(room.polygon.outer) for room in floor.rooms)
-    utilization = min(10_000, round(room_area * 10_000 / max(1, envelope_area)))
+    site_accounting = analyze_floor_site_accounting(
+        envelope=document.buildable_area.polygon,
+        floor=floor,
+        solver_step_mm=document.generation_metadata.solver_step_mm or 1,
+    )
+    utilization = site_accounting.accounting.allocation_basis_points
 
     proportion_scores: list[int] = []
-    for room in floor.rooms:
-        xs = [point.x_mm for point in room.polygon.outer]
-        ys = [point.y_mm for point in room.polygon.outer]
-        width = max(xs) - min(xs)
-        depth = max(ys) - min(ys)
-        short = max(1, min(width, depth))
-        long = max(width, depth)
-        ratio = long / short
-        proportion_scores.append(10_000 if ratio <= 1.8 else 7500 if ratio <= 2.4 else 4000)
+    for candidate_floor in document.floors:
+        for room in candidate_floor.rooms:
+            xs = [point.x_mm for point in room.polygon.outer]
+            ys = [point.y_mm for point in room.polygon.outer]
+            width = max(xs) - min(xs)
+            depth = max(ys) - min(ys)
+            short = max(1, min(width, depth))
+            long = max(width, depth)
+            ratio = long / short
+            proportion_scores.append(
+                10_000 if ratio <= 1.8 else 7500 if ratio <= 2.4 else 4000
+            )
     room_quality = (
         round(sum(proportion_scores) / len(proportion_scores)) if proportion_scores else 0
     )
 
-    opening_count = len(floor.openings)
+    opening_count = sum(len(candidate_floor.openings) for candidate_floor in document.floors)
     access_score = min(10_000, opening_count * 1200)
+    wet_stack = evaluate_wet_stacks(document.floors) if len(document.floors) > 1 else None
 
     metrics = (
         QualityMetric(
@@ -68,7 +77,10 @@ def score_plan_document(document: PlanDocument) -> ArchitecturalQualityScore:
             status=EvidenceStatus.EVALUATED,
             score_basis_points=utilization,
             weight=15,
-            evidence=(f"Room polygons occupy {utilization / 100:.1f}% of envelope.",),
+            evidence=(
+                "Explicit room and purposeful-site polygons account for "
+                f"{utilization / 100:.1f}% of the buildable envelope.",
+            ),
         ),
         QualityMetric(
             key="room_proportions",
@@ -122,20 +134,48 @@ def score_plan_document(document: PlanDocument) -> ArchitecturalQualityScore:
             weight=8,
             note="Needs deterministic furniture-fit evaluation.",
         ),
-        QualityMetric(
-            key="service_planning",
-            label="Service planning",
-            status=EvidenceStatus.NOT_EVALUATED,
-            weight=4,
-            note="Needs plumbing-wall/shaft evidence.",
+        (
+            QualityMetric(
+                key="service_planning",
+                label="Vertical wet/service coordination",
+                status=EvidenceStatus.EVALUATED,
+                score_basis_points=wet_stack.score_basis_points,
+                weight=4,
+                evidence=(
+                    f"Aligned={wet_stack.aligned_count}; "
+                    f"proximate={wet_stack.proximate_count}; "
+                    f"dispersed={wet_stack.dispersed_count}; "
+                    f"unpaired={len(wet_stack.unpaired_upper_room_ids)}.",
+                ),
+            )
+            if wet_stack is not None
+            else QualityMetric(
+                key="service_planning",
+                label="Service planning",
+                status=EvidenceStatus.NOT_EVALUATED,
+                weight=4,
+                note="Vertical wet-stack evidence requires a multi-floor building.",
+            )
         ),
         QualityMetric(
             key="buildability",
             label="Wall/buildability efficiency",
             status=EvidenceStatus.EVALUATED,
-            score_basis_points=max(0, 10_000 - max(0, len(floor.walls) - 24) * 250),
+            score_basis_points=max(
+                0,
+                10_000
+                - max(
+                    0,
+                    sum(len(candidate_floor.walls) for candidate_floor in document.floors)
+                    - 24 * len(document.floors),
+                )
+                * 250,
+            ),
             weight=4,
-            evidence=(f"{len(floor.walls)} wall segments.",),
+            evidence=(
+                f"{sum(len(candidate_floor.walls) for candidate_floor in document.floors)} "
+                "wall segments across the building.",
+            ),
         ),
     )
     return _score_weighted(metrics)

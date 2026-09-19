@@ -14,6 +14,7 @@ from ai_vastu.constraints import (
     AspectRatioConstraint,
     AvailableFloorsConstraint,
     CompiledConstraintProblem,
+    ConstraintOrigin,
     ContainmentConstraint,
     DimensionAxis,
     FloorPreferenceObjective,
@@ -37,6 +38,7 @@ from .models import (
     PlannerResult,
     PlannerSearchVariant,
     PlannerStatus,
+    ResidentialPlanningConfig,
     RoomPlacement,
     SolverRunMetadata,
 )
@@ -44,6 +46,18 @@ from .residential_quality import RoomAreaBasis, allocate_room_area_targets
 
 _SYSTEM_OBJECTIVE_NAMESPACE = UUID("38cf35f1-3f68-52d2-88b5-b455219a54cf")
 _AREA_PENALTY_DIVISOR_MM2 = 1_000
+_WET_ROOM_TYPES = frozenset(
+    {
+        RoomType.KITCHEN,
+        RoomType.UTILITY,
+        RoomType.LAUNDRY,
+        RoomType.ATTACHED_TOILET,
+        RoomType.COMMON_TOILET,
+        RoomType.POWDER_ROOM,
+        RoomType.BATH,
+        RoomType.SERVANT_TOILET,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +77,8 @@ class _RoomVars:
     x_end: Any
     y_end: Any
     area_cells2: Any
+    clear_width_mm: Any
+    clear_depth_mm: Any
     clear_area_mm2: Any
     x_interval: Any
     y_interval: Any
@@ -103,6 +119,32 @@ def _pin_room_to_boundary(
         model.add(room.y_end == depth_cells)
     else:
         model.add(room.x == 0)
+
+
+def _apply_parking_clear_dimension_constraints(
+    model: Any,
+    room: _RoomVars,
+    *,
+    side: PlannerBoundarySide,
+    planning: ResidentialPlanningConfig,
+) -> None:
+    """Require a usable parking bay relative to the confirmed road edge.
+
+    Frontage is the clear dimension parallel to the road boundary.
+    Depth is the clear dimension extending inward from that boundary.
+    These constraints apply to clear usable dimensions after the
+    wall/clearance reserve has been deducted.
+    """
+
+    if side in {
+        PlannerBoundarySide.NORTH,
+        PlannerBoundarySide.SOUTH,
+    }:
+        model.add(room.clear_width_mm >= planning.parking_min_frontage_mm)
+        model.add(room.clear_depth_mm >= planning.parking_min_depth_mm)
+    else:
+        model.add(room.clear_depth_mm >= planning.parking_min_frontage_mm)
+        model.add(room.clear_width_mm >= planning.parking_min_depth_mm)
 
 
 def _scaled_area_penalty(
@@ -165,12 +207,19 @@ def _apply_residential_boundary_constraints(
                 "Road-connected parking requires a deterministic local road boundary side."
             )
         for room in parking_rooms:
+            room_var = room_vars[room.id]
             _pin_room_to_boundary(
                 model,
-                room_vars[room.id],
+                room_var,
                 side=planning.road_boundary_side,
                 width_cells=width_cells,
                 depth_cells=depth_cells,
+            )
+            _apply_parking_clear_dimension_constraints(
+                model,
+                room_var,
+                side=planning.road_boundary_side,
+                planning=planning,
             )
         _append_notice(
             notices,
@@ -204,6 +253,115 @@ def _apply_residential_boundary_constraints(
                 "entrance-facing boundary."
             ),
             room_instance_id=entry.id,
+        )
+
+
+def _apply_vertical_core_reservation(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+    bounds: _RectangleBounds,
+    notices: list[PlannerNotice],
+) -> None:
+    footprint = config.residential_planning.vertical_core_footprint
+    if footprint is None:
+        return
+
+    staircase_rooms = tuple(
+        room for room in problem.room_instances if room.room_type is RoomType.STAIRCASE
+    )
+    if len(staircase_rooms) != 1:
+        raise SolverModelError(
+            "A vertical-core reservation requires exactly one staircase room per floor."
+        )
+
+    xs = {point.x_mm for point in footprint.outer}
+    ys = {point.y_mm for point in footprint.outer}
+    if len(xs) != 2 or len(ys) != 2 or len(footprint.outer) != 4:
+        raise SolverModelError("Vertical-core reservation must be a rectangular footprint.")
+
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    values_mm = (
+        min_x - bounds.min_x_mm,
+        min_y - bounds.min_y_mm,
+        max_x - min_x,
+        max_y - min_y,
+    )
+    step = config.solver_step_mm
+    if any(value < 0 or value % step for value in values_mm):
+        raise SolverModelError(
+            "Vertical-core reservation must lie on the configured solver lattice."
+        )
+
+    x_cells, y_cells, width_cells, depth_cells = (
+        value // step for value in values_mm
+    )
+    room = room_vars[staircase_rooms[0].id]
+    model.add(room.x == x_cells)
+    model.add(room.y == y_cells)
+    model.add(room.width == width_cells)
+    model.add(room.depth == depth_cells)
+    _append_notice(
+        notices,
+        code="VERTICAL_CORE_RESERVED",
+        message=(
+            "The staircase room envelope was pinned to the building-level vertical-core "
+            "reservation before room geometry was finalized."
+        ),
+        room_instance_id=staircase_rooms[0].id,
+    )
+
+
+def _append_wet_stack_objectives(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+    bounds: _RectangleBounds,
+    width_cells: int,
+    depth_cells: int,
+    notices: list[PlannerNotice],
+    penalty_terms: list[_PenaltyTerm],
+) -> None:
+    planning = config.residential_planning
+    anchor = planning.wet_stack_anchor
+    if anchor is None or planning.wet_stack_weight == 0:
+        return
+
+    step = config.solver_step_mm
+    target_x2 = 2 * ((anchor.x_mm - bounds.min_x_mm) // step)
+    target_y2 = 2 * ((anchor.y_mm - bounds.min_y_mm) // step)
+    added = 0
+    for room in sorted(problem.room_instances, key=lambda item: str(item.id)):
+        if room.room_type not in _WET_ROOM_TYPES:
+            continue
+        values = room_vars[room.id]
+        dx = model.new_int_var(0, width_cells * 2, f"wet_stack_dx_{room.id.hex}")
+        dy = model.new_int_var(0, depth_cells * 2, f"wet_stack_dy_{room.id.hex}")
+        model.add_abs_equality(dx, values.x * 2 + values.width - target_x2)
+        model.add_abs_equality(dy, values.y * 2 + values.depth - target_y2)
+        penalty_terms.append(
+            _PenaltyTerm(
+                _system_objective_id(problem, f"wet-stack:{room.id}"),
+                "WET_STACK_PROXIMITY",
+                planning.wet_stack_weight,
+                dx + dy,
+            )
+        )
+        added += 1
+
+    if added:
+        _append_notice(
+            notices,
+            code="WET_STACK_PROXIMITY_ACTIVE",
+            message=(
+                f"{added} wet/service room(s) received a soft building-level plumbing-zone "
+                "proximity objective; exact cross-floor replication was not required."
+            ),
         )
 
 
@@ -248,6 +406,14 @@ def _topology_target(
             return (RoomType.LIVING, 100, 1_100)
         if RoomType.DRAWING in present:
             return (RoomType.DRAWING, 100, 1_100)
+
+    if room_type is RoomType.STAIRCASE:
+        if RoomType.LOBBY in present:
+            return (RoomType.LOBBY, 100, 1_100)
+        if RoomType.CORRIDOR in present:
+            return (RoomType.CORRIDOR, 100, 1_100)
+        if RoomType.FOYER in present:
+            return (RoomType.FOYER, 100, 1_100)
 
     if room_type is RoomType.KITCHEN:
         if RoomType.DINING in present:
@@ -302,6 +468,8 @@ def _append_residential_topology_objectives(
     present = {room.room_type for room in problem.room_instances}
     added = 0
     for room in sorted(problem.room_instances, key=lambda item: str(item.id)):
+        if room.room_type in {RoomType.PARKING, RoomType.GARAGE}:
+            continue
         target = _topology_target(room.room_type, present)
         if target is None:
             continue
@@ -375,6 +543,71 @@ def _append_residential_topology_objectives(
         )
 
 
+def _append_hard_residential_circulation(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+    width_cells: int,
+    depth_cells: int,
+    notices: list[PlannerNotice],
+) -> None:
+    if not config.residential_planning.require_horizontal_circulation:
+        return
+
+    present = {room.room_type for room in problem.room_instances}
+    added = 0
+    for room in sorted(problem.room_instances, key=lambda item: str(item.id)):
+        if room.room_type in {RoomType.PARKING, RoomType.GARAGE}:
+            continue
+        target = _topology_target(room.room_type, present)
+        if target is None:
+            continue
+        target_room_type, _weight, shared_length_mm = target
+        targets = tuple(
+            item
+            for item in problem.room_instances
+            if item.room_type is target_room_type and item.id != room.id
+        )
+        if not targets:
+            continue
+        penalties = [
+            _adjacency_pair_penalty(
+                model,
+                room_vars[room.id],
+                room_vars[item.id],
+                config=config,
+                buildable_width_cells=width_cells,
+                buildable_depth_cells=depth_cells,
+                objective=_AdjacencyTargetSpec(
+                    max_gap_mm=0,
+                    min_shared_length_mm=shared_length_mm,
+                ),
+                name=f"hard_circulation_{room.id.hex}_{item.id.hex}",
+            )
+            for item in targets
+        ]
+        if len(penalties) == 1:
+            best = penalties[0]
+        else:
+            upper = (width_cells + depth_cells) * config.solver_step_mm + shared_length_mm
+            best = model.new_int_var(0, upper, f"hard_circulation_best_{room.id.hex}")
+            model.add_min_equality(best, penalties)
+        model.add(best == 0)
+        added += 1
+
+    if added:
+        _append_notice(
+            notices,
+            code="RESIDENTIAL_CIRCULATION_HARD",
+            message=(
+                f"{added} hard per-room circulation relation(s) were enforced before "
+                "canonical geometry and opening synthesis."
+            ),
+        )
+
+
 def _append_residential_quality_objectives(
     model: Any,
     problem: CompiledConstraintProblem,
@@ -423,6 +656,32 @@ def _append_residential_quality_objectives(
         "residential_total_area_mm2",
     )
     model.add(total_area_mm2 == total_area_cells2 * step2)
+
+    # Residential plans whose requested occupied-area target is at least the
+    # architectural quality floor must satisfy that floor as a feasibility
+    # condition. It must not be traded away against topology or other soft
+    # objective terms.
+    #
+    # The floor is capped by the allocator's effective target so a small
+    # confirmed program is never artificially inflated beyond its legitimate
+    # room-role expansion capacity.
+    residential_quality_floor_bp = 8_500
+    if planning.target_occupied_area_basis_points >= residential_quality_floor_bp:
+        requested_floor_mm2 = buildable_area_mm2 * residential_quality_floor_bp // 10_000
+        effective_floor_mm2 = min(
+            requested_floor_mm2,
+            effective_target_mm2,
+        )
+        model.add(total_area_mm2 >= effective_floor_mm2)
+        _append_notice(
+            notices,
+            code="RESIDENTIAL_OCCUPANCY_FLOOR_ENFORCED",
+            message=(
+                "Residential occupied-room area must satisfy at least "
+                f"{effective_floor_mm2 * 10_000 // buildable_area_mm2 / 100:.1f}% "
+                "of the buildable rectangle before soft objectives are optimized."
+            ),
+        )
 
     if planning.occupied_area_weight > 0:
         deviation = model.new_int_var(
@@ -637,6 +896,124 @@ def _new_nonnegative_max(
     return var
 
 
+def _append_hard_adjacency_prohibitions(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+) -> None:
+    """Enforce physical separation for every hard adjacency prohibition.
+
+    For ordinary user-authored prohibitions, at least one solver lattice step
+    separates the room envelopes.
+
+    Architectural invariants use the configured clearance reserve so the
+    prohibited spaces cannot merely touch at a wall.
+    """
+
+    pair_gap_cells: dict[
+        tuple[Any, Any],
+        int,
+    ] = {}
+
+    for constraint in sorted(
+        (
+            item
+            for item in problem.hard_constraints
+            if isinstance(
+                item,
+                AdjacencyProhibitionConstraint,
+            )
+        ),
+        key=lambda item: str(item.id),
+    ):
+        source_room = next(
+            (room for room in problem.room_instances if room.id == constraint.room_instance_id),
+            None,
+        )
+
+        if source_room is None:
+            raise SolverModelError("Adjacency prohibition references an unknown source room.")
+
+        targets = _target_rooms(
+            problem,
+            constraint.target_room_type,
+        )
+
+        for target_room in targets:
+            if target_room.id == source_room.id:
+                continue
+
+            if constraint.origin is ConstraintOrigin.ARCHITECTURAL_INVARIANT:
+                required_gap_mm = max(
+                    config.solver_step_mm,
+                    config.clearance_reserve_mm,
+                )
+            else:
+                required_gap_mm = config.solver_step_mm
+
+            gap_cells = max(
+                1,
+                (required_gap_mm + config.solver_step_mm - 1) // config.solver_step_mm,
+            )
+
+            first_id, second_id = sorted(
+                (
+                    source_room.id,
+                    target_room.id,
+                ),
+                key=str,
+            )
+
+            key = (
+                first_id,
+                second_id,
+            )
+
+            pair_gap_cells[key] = max(
+                pair_gap_cells.get(key, 0),
+                gap_cells,
+            )
+
+    for (
+        first_id,
+        second_id,
+    ), gap_cells in sorted(
+        pair_gap_cells.items(),
+        key=lambda item: (
+            str(item[0][0]),
+            str(item[0][1]),
+        ),
+    ):
+        first = room_vars[first_id]
+        second = room_vars[second_id]
+
+        prefix = f"hard_adj_{str(first_id).replace('-', '')}_{str(second_id).replace('-', '')}"
+
+        first_left = model.new_bool_var(f"{prefix}_first_left")
+        second_left = model.new_bool_var(f"{prefix}_second_left")
+        first_below = model.new_bool_var(f"{prefix}_first_below")
+        second_below = model.new_bool_var(f"{prefix}_second_below")
+
+        model.add(first.x_end + gap_cells <= second.x).only_enforce_if(first_left)
+
+        model.add(second.x_end + gap_cells <= first.x).only_enforce_if(second_left)
+
+        model.add(first.y_end + gap_cells <= second.y).only_enforce_if(first_below)
+
+        model.add(second.y_end + gap_cells <= first.y).only_enforce_if(second_below)
+
+        model.add_bool_or(
+            [
+                first_left,
+                second_left,
+                first_below,
+                second_below,
+            ]
+        )
+
+
 def _adjacency_pair_penalty(
     model: Any,
     source: _RoomVars,
@@ -771,11 +1148,6 @@ def solve_rectangular_problem(
 
     for room in ordered_rooms:
         constraints = hard_by_room.get(room.id, [])
-        if any(isinstance(item, AdjacencyProhibitionConstraint) for item in constraints):
-            raise UnsupportedSolverProblemError(
-                "Hard adjacency prohibitions are not yet modeled by the Phase 7 planner."
-            )
-
         min_width_mm = 1
         min_depth_mm = 1
         max_width_mm = bounds.width_mm
@@ -809,6 +1181,9 @@ def solve_rectangular_problem(
                     raise SolverModelError(
                         f"Room {room.id} cannot be placed on the only available floor."
                     )
+            elif isinstance(constraint, AdjacencyProhibitionConstraint):
+                # Applied after every room variable exists.
+                pass
             else:
                 raise UnsupportedSolverProblemError(
                     f"Unsupported hard constraint in Phase 7: {constraint.kind}."
@@ -897,6 +1272,8 @@ def solve_rectangular_problem(
             x_end=x_end,
             y_end=y_end,
             area_cells2=area_cells2,
+            clear_width_mm=clear_width_mm,
+            clear_depth_mm=clear_depth_mm,
             clear_area_mm2=clear_area_mm2,
             x_interval=x_interval,
             y_interval=y_interval,
@@ -908,6 +1285,13 @@ def solve_rectangular_problem(
         [room_vars[room.id].y_interval for room in ordered_rooms],
     )
 
+    _append_hard_adjacency_prohibitions(
+        model,
+        problem,
+        room_vars,
+        config=config,
+    )
+
     notices: list[PlannerNotice] = []
     _apply_residential_boundary_constraints(
         model,
@@ -916,6 +1300,14 @@ def solve_rectangular_problem(
         config=config,
         width_cells=width_cells,
         depth_cells=depth_cells,
+        notices=notices,
+    )
+    _apply_vertical_core_reservation(
+        model,
+        problem,
+        room_vars,
+        config=config,
+        bounds=bounds,
         notices=notices,
     )
 
@@ -1036,6 +1428,28 @@ def solve_rectangular_problem(
         penalty_terms=penalty_terms,
     )
 
+    _append_hard_residential_circulation(
+        model,
+        problem,
+        room_vars,
+        config=config,
+        width_cells=width_cells,
+        depth_cells=depth_cells,
+        notices=notices,
+    )
+
+    _append_wet_stack_objectives(
+        model,
+        problem,
+        room_vars,
+        config=config,
+        bounds=bounds,
+        width_cells=width_cells,
+        depth_cells=depth_cells,
+        notices=notices,
+        penalty_terms=penalty_terms,
+    )
+
     _append_residential_quality_objectives(
         model,
         problem,
@@ -1092,7 +1506,17 @@ def solve_rectangular_problem(
     solver.parameters.max_number_of_conflicts = config.max_conflicts
     solver.parameters.random_seed = config.random_seed
     solver.parameters.num_search_workers = 1
-    solver.parameters.search_branching = cp_model.FIXED_SEARCH
+    # The legacy planner retains its explicit deterministic branch order.
+    # Residential planning has a materially richer objective model
+    # (occupancy, room-area balance, compactness and topology). Forcing
+    # positions first and minimum room sizes last is hostile to that model
+    # and can exhaust the time budget before finding a useful incumbent.
+    #
+    # AUTOMATIC_SEARCH remains reproducible here because the planner keeps
+    # one search worker and the configured deterministic random seed.
+    solver.parameters.search_branching = (
+        cp_model.AUTOMATIC_SEARCH if config.residential_planning.enabled else cp_model.FIXED_SEARCH
+    )
     solver.parameters.log_search_progress = False
 
     raw_status = solver.solve(model)

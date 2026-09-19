@@ -37,8 +37,16 @@ def test_auto_area_distribution_caps_parking_before_habitable_rooms() -> None:
 
     parking = by_id[rooms[2].room_instance_id]
     living = by_id[rooms[0].room_instance_id]
-    assert expansion_cap_basis_points(RoomType.PARKING) == 10_500
-    assert parking.target_area_mm2 <= 13_125_000
+    assert expansion_cap_basis_points(RoomType.PARKING) == 14_000
+
+    assert parking.maximum_auto_target_area_mm2 == 17_500_000
+
+    assert parking.target_area_mm2 <= parking.maximum_auto_target_area_mm2
+
+    parking_growth_ratio = parking.target_area_mm2 / parking.minimum_envelope_area_mm2
+    living_growth_ratio = living.target_area_mm2 / living.minimum_envelope_area_mm2
+
+    assert living_growth_ratio > parking_growth_ratio
     assert living.target_area_mm2 > living.minimum_envelope_area_mm2
     assert sum(item.target_area_mm2 for item in targets) <= 55_000_000
 

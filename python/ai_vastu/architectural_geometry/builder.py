@@ -33,6 +33,7 @@ from .models import (
     OpeningBuildRequest,
     StairBuildRequest,
 )
+from .site_spaces import derive_purposeful_site_spaces
 
 _WALL_NAMESPACE = UUID("fd8f64f2-1f64-54e5-bb83-cffea250f7d4")
 _OPENING_NAMESPACE = UUID("92a968d6-25ed-51d9-b19b-8f142324e817")
@@ -117,7 +118,13 @@ def _atomic_room_segments(room_polygons: tuple[IntPolygon, ...]) -> tuple[_Atomi
     return tuple(sorted(set(atomic)))
 
 
-def _segment_on_boundary(segment: _AtomicSegment, boundary: IntPolygon) -> bool:
+def _segment_on_boundary(
+    segment: _AtomicSegment,
+    boundary: IntPolygon,
+    *,
+    solver_step_mm: int = 1,
+) -> bool:
+    # Preserve the original exact-boundary behaviour first.
     for a, b in _polygon_edges(boundary):
         try:
             key, interval = _edge_interval(a, b)
@@ -127,6 +134,52 @@ def _segment_on_boundary(segment: _AtomicSegment, boundary: IntPolygon) -> bool:
             continue
         if interval.lo <= segment.lo and segment.hi <= interval.hi:
             return True
+
+    # CP-SAT represents rectangular residential geometry on an integer
+    # lattice. When a buildable dimension is not divisible by the lattice
+    # step, its positive-side boundary is the largest representable
+    # coordinate inside the exact buildable polygon.
+    #
+    # Example: 30 ft = 9144 mm on a 10 mm lattice -> EAST = 9140 mm.
+    #
+    # Only apply this projection to rectangular boundaries. Non-rectangular
+    # geometry retains the exact-boundary behaviour above.
+    if solver_step_mm <= 1:
+        return False
+
+    points = boundary.outer
+    xs = {point.x_mm for point in points}
+    ys = {point.y_mm for point in points}
+    if len(xs) != 2 or len(ys) != 2:
+        return False
+
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+
+    lattice_max_x = min_x + ((max_x - min_x) // solver_step_mm) * solver_step_mm
+    lattice_max_y = min_y + ((max_y - min_y) // solver_step_mm) * solver_step_mm
+
+    for a, b in _polygon_edges(boundary):
+        try:
+            key, interval = _edge_interval(a, b)
+        except ArchitecturalGeometryInputError:
+            continue
+
+        projected_fixed = key.fixed
+
+        if a.x_mm == b.x_mm and key.fixed == max_x:
+            projected_fixed = lattice_max_x
+        elif a.y_mm == b.y_mm and key.fixed == max_y:
+            projected_fixed = lattice_max_y
+
+        if (
+            key.orientation == segment.orientation
+            and projected_fixed == segment.fixed
+            and interval.lo <= segment.lo
+            and segment.hi <= interval.hi
+        ):
+            return True
+
     return False
 
 
@@ -292,9 +345,22 @@ def build_architectural_geometry(
         for placement in placements
     )
 
+    planning = request.planner_result.metadata.config.residential_planning
+    site_spaces = derive_purposeful_site_spaces(
+        floor_id=request.floor_id,
+        envelope=request.problem.buildable_area.polygon,
+        rooms=rooms,
+        road_boundary_side=planning.road_boundary_side,
+        solver_step_mm=(request.planner_result.metadata.config.solver_step_mm),
+    )
+
     wall_list: list[Wall] = []
     for segment in _atomic_room_segments(tuple(room_polygons.values())):
-        external = _segment_on_boundary(segment, request.problem.buildable_area.polygon)
+        external = _segment_on_boundary(
+            segment,
+            request.problem.buildable_area.polygon,
+            solver_step_mm=request.planner_result.metadata.config.solver_step_mm,
+        )
         category = WallCategory.EXTERNAL if external else WallCategory.INTERNAL
         thickness = (
             request.wall_config.external_wall_thickness_mm
@@ -330,6 +396,7 @@ def build_architectural_geometry(
         floor_to_floor_mm=request.floor_to_floor_mm,
         boundary=request.problem.buildable_area.polygon,
         rooms=rooms,
+        site_spaces=site_spaces,
         walls=walls,
         openings=openings,
         stairs=stairs,

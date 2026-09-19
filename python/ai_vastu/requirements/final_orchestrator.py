@@ -78,6 +78,9 @@ class FinalGenerationOrchestrator:
         project_id: UUID,
         draft_id: UUID,
     ) -> FinalGenerationRun:
+        # Retired Phase 24 single-floor guards: confirmed.floor_count != 1;
+        # room.floor_preference not in {None, 0}. 2D9F replaces them with
+        # deterministic bounded allocation and explicit preference validation.
         if not self._project_service.is_project_owner(
             project_id,
             authenticated_user_id,
@@ -89,11 +92,14 @@ class FinalGenerationOrchestrator:
             raise PermissionError("Confirmed requirements do not belong to this user.")
         if confirmed.project_id != project_id:
             raise PermissionError("Confirmed requirements belong to another project.")
-        if confirmed.floor_count != 1:
-            raise ValueError("Commercial MVP currently supports exactly one generated floor.")
         for room in confirmed.rooms:
-            if room.floor_preference not in {None, 0}:
-                raise ValueError("Commercial MVP cannot silently drop an upper-floor preference.")
+            if (
+                room.floor_preference is not None
+                and not 0 <= room.floor_preference < confirmed.floor_count
+            ):
+                raise ValueError(
+                    "PROGRAM_DISTRIBUTION_FAILURE: room floor preference is outside the building."
+                )
 
         user_key = str(authenticated_user_id)
         project_key = str(project_id)

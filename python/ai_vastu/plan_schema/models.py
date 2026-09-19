@@ -23,7 +23,7 @@ from .units import (
     Priority100,
 )
 
-PLAN_SCHEMA_VERSION = "1.0.0"
+PLAN_SCHEMA_VERSION = "1.1.0"
 CanonicalUnits = Literal["mm"]
 EntityId = UUID
 NonNegativeInt = Annotated[int, Field(ge=0)]
@@ -128,6 +128,22 @@ class RoomType(StrEnum):
     LAUNDRY = "laundry"
     STUDY = "study"
     FAMILY_LOUNGE = "family_lounge"
+
+
+class SiteSpaceKind(StrEnum):
+    LIGHTWELL = "LIGHTWELL"
+    LANDSCAPE = "LANDSCAPE"
+    OPEN_SPACE = "OPEN_SPACE"
+    UTILITY_YARD = "UTILITY_YARD"
+    VEHICLE_ACCESS = "VEHICLE_ACCESS"
+    SHAFT = "SHAFT"
+    PORCH = "PORCH"
+
+
+class SiteSpaceSource(StrEnum):
+    USER = "USER"
+    SYSTEM_DERIVED = "SYSTEM_DERIVED"
+    AI_SUGGESTED = "AI_SUGGESTED"
 
 
 class VastuStatus(StrEnum):
@@ -291,6 +307,16 @@ class RoomGeometry(FrozenModel):
     locked: bool = False
 
 
+class PurposefulSiteSpace(FrozenModel):
+    """Explicit non-room site geometry with a declared architectural purpose."""
+
+    id: EntityId
+    kind: SiteSpaceKind
+    polygon: IntPolygon
+    label: str | None = None
+    source: SiteSpaceSource = SiteSpaceSource.SYSTEM_DERIVED
+
+
 class Wall(FrozenModel):
     id: EntityId
     axis: AxisSegment
@@ -370,6 +396,7 @@ class Floor(FrozenModel):
     floor_to_floor_mm: PositiveMM
     boundary: IntPolygon | None = None
     rooms: tuple[RoomGeometry, ...] = ()
+    site_spaces: tuple[PurposefulSiteSpace, ...] = ()
     walls: tuple[Wall, ...] = ()
     openings: tuple[Opening, ...] = ()
     stairs: tuple[Stair, ...] = ()
@@ -481,7 +508,7 @@ class GenerationMetadata(FrozenModel):
 
 
 class PlanDocument(FrozenModel):
-    schema_version: Literal["1.0.0"]
+    schema_version: Literal["1.1.0"]
     project_id: EntityId
     revision_id: EntityId
     canonical_units: CanonicalUnits
@@ -521,6 +548,10 @@ class PlanDocument(FrozenModel):
         if len(requirement_ids) != len(self.room_requirements):
             raise ValueError("RoomRequirement IDs must be unique.")
         for floor in self.floors:
+            site_space_ids = {space.id for space in floor.site_spaces}
+            if len(site_space_ids) != len(floor.site_spaces):
+                raise ValueError("PurposefulSiteSpace IDs must be unique within a floor.")
+
             wall_ids = {wall.id for wall in floor.walls}
             if len(wall_ids) != len(floor.walls):
                 raise ValueError("Wall IDs must be unique within a floor.")

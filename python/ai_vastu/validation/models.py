@@ -25,6 +25,7 @@ class SwingSpace(StrEnum):
 class ValidationConfig(FrozenModel):
     tiny_sliver_area_mm2: PositiveMM2
     door_clearance_margin_mm: NonNegativeMM
+    require_exterior_access: bool = True
 
 
 class DoorSwingContext(FrozenModel):
@@ -47,6 +48,7 @@ class ArchitecturalValidationRequest(FrozenModel):
     geometry: ArchitecturalGeometryResult
     config: ValidationConfig
     swing_contexts: tuple[DoorSwingContext, ...] = ()
+    circulation_anchor_room_ids: tuple[EntityId, ...] = ()
 
 
 class ValidationRunResult(FrozenModel):

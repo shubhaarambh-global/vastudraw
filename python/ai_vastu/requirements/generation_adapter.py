@@ -12,6 +12,7 @@ from ai_vastu.generation.models import (
     ArchitecturalGenerationResult,
 )
 from ai_vastu.generation.service import generate_architectural_plan
+from ai_vastu.plan_schema import RoomRequirement
 from ai_vastu.requirements.generation_profile import (
     PROFILE_VERSION,
     ROOM_MINIMUMS,
@@ -37,6 +38,98 @@ class CompiledGeneration:
     request: ArchitecturalGenerationRequest
     profile_version: str
     notices: tuple[str, ...]
+
+
+_MAX_SUPPORTED_FLOORS = 4
+_GROUND_ROOM_TYPES = frozenset(
+    {
+        "drawing",
+        "foyer",
+        "verandah",
+        "living",
+        "kitchen",
+        "parking",
+        "garage",
+        "puja",
+        "lobby",
+        "corridor",
+        "common_toilet",
+        "bath",
+    }
+)
+_PRIVATE_ROOM_TYPES = frozenset(
+    {
+        "bedroom",
+        "master_bedroom",
+        "parents_bedroom",
+        "guest_bedroom",
+        "children_bedroom",
+    }
+)
+
+
+def _allocate_floor_requirements(
+    requirements: tuple[RoomRequirement, ...],
+    *,
+    floor_count: int,
+) -> tuple[tuple[RoomRequirement, ...], ...]:
+    assignments: list[list[RoomRequirement]] = [[] for _ in range(floor_count)]
+    private_ordinals = [
+        (requirement, ordinal)
+        for requirement in requirements
+        for ordinal in range(requirement.quantity)
+        if requirement.room_type.value in _PRIVATE_ROOM_TYPES
+    ]
+    if floor_count > 1 and len(private_ordinals) < floor_count - 1:
+        raise UnsupportedConfirmedRequirement(
+            "PROGRAM_DISTRIBUTION_FAILURE: multi-floor generation requires at least "
+            "one private room instance for every upper floor."
+        )
+
+    private_targets: dict[tuple[str, int], int] = {}
+    for index, (requirement, ordinal) in enumerate(private_ordinals):
+        target = (index % (floor_count - 1)) + 1 if floor_count > 1 else 0
+        private_targets[(str(requirement.id), ordinal)] = target
+
+    for requirement in requirements:
+        assigned_counts = [0] * floor_count
+        for ordinal in range(requirement.quantity):
+            if requirement.floor_preference:
+                allowed = tuple(
+                    sorted(
+                        set(requirement.floor_preference)
+                        & set(range(floor_count))
+                    )
+                )
+                if not allowed:
+                    raise UnsupportedConfirmedRequirement(
+                        "PROGRAM_DISTRIBUTION_FAILURE: room floor preference is outside "
+                        "the confirmed building floor count."
+                    )
+                target = allowed[ordinal % len(allowed)]
+            elif requirement.room_type.value in _PRIVATE_ROOM_TYPES:
+                target = private_targets[(str(requirement.id), ordinal)]
+            else:
+                target = 0
+            assigned_counts[target] += 1
+
+        for floor_index, quantity in enumerate(assigned_counts):
+            if quantity:
+                assignments[floor_index].append(
+                    requirement.model_copy(
+                        update={
+                            "quantity": quantity,
+                            "floor_preference": (floor_index,),
+                        }
+                    )
+                )
+
+    if any(not floor for floor in assignments):
+        raise UnsupportedConfirmedRequirement(
+            "PROGRAM_DISTRIBUTION_FAILURE: every generated floor must receive at least "
+            "one requested room instance."
+        )
+    return tuple(tuple(floor) for floor in assignments)
 
 
 def _stable_id(project_id: UUID, key: str) -> UUID:
@@ -77,14 +170,18 @@ def _room_requirement(
 def compile_confirmed_requirements(
     confirmed: ConfirmedRequirements,
 ) -> CompiledGeneration:
-    if confirmed.floor_count != 1:
+    if confirmed.floor_count < 1 or confirmed.floor_count > _MAX_SUPPORTED_FLOORS:
         raise UnsupportedConfirmedRequirement(
-            "Commercial MVP currently supports exactly one generated floor."
+            "INVALID_FLOOR_COUNT: supported residential generation is limited to 1-4 floors."
         )
     for room in confirmed.rooms:
-        if room.floor_preference not in {None, 0}:
+        if (
+            room.floor_preference is not None
+            and not 0 <= room.floor_preference < confirmed.floor_count
+        ):
             raise UnsupportedConfirmedRequirement(
-                "Commercial MVP cannot silently drop an upper-floor preference."
+                "PROGRAM_DISTRIBUTION_FAILURE: room floor preference is outside the "
+                "confirmed building floor count."
             )
 
     width = confirmed.plot_width_mm
@@ -161,6 +258,40 @@ def compile_confirmed_requirements(
         )
         ordinal += 1
 
+    added_system_core = False
+    if confirmed.floor_count > 1:
+        staircase_payloads = [
+            item for item in room_requirements if item["room_type"] == "staircase"
+        ]
+        explicit_stair_count = 0
+        for staircase_payload in staircase_payloads:
+            quantity = staircase_payload["quantity"]
+            if not isinstance(quantity, int):
+                raise UnsupportedConfirmedRequirement(
+                    "VERTICAL_CORE_INVALID: staircase quantity must be an integer."
+                )
+            explicit_stair_count += quantity
+        if explicit_stair_count > 1:
+            raise UnsupportedConfirmedRequirement(
+                "VERTICAL_CORE_AMBIGUOUS: the current residential generator supports "
+                "one continuous stair core, not multiple independent staircase requests."
+            )
+        if staircase_payloads:
+            staircase_payloads[0]["quantity"] = confirmed.floor_count
+            staircase_payloads[0]["floor_preference"] = list(range(confirmed.floor_count))
+        else:
+            staircase = _room_requirement(
+                project_id=confirmed.project_id,
+                room_type="staircase",
+                quantity=confirmed.floor_count,
+                floor_preference=None,
+                ordinal=ordinal,
+            )
+            staircase["floor_preference"] = list(range(confirmed.floor_count))
+            room_requirements.append(staircase)
+            ordinal += 1
+            added_system_core = True
+
     existing_types = {str(item["room_type"]) for item in room_requirements}
     circulation_types = {"lobby", "corridor", "foyer"}
     added_system_lobby = False
@@ -181,6 +312,35 @@ def compile_confirmed_requirements(
         raise UnsupportedConfirmedRequirement(
             "At least one confirmed room requirement is required."
         )
+
+    compiled_room_requirements = tuple(
+        RoomRequirement.model_validate_json(json.dumps(item)) for item in room_requirements
+    )
+    floor_requirements = _allocate_floor_requirements(
+        compiled_room_requirements,
+        floor_count=confirmed.floor_count,
+    )
+    allocated = [list(floor) for floor in floor_requirements]
+    all_compiled = list(compiled_room_requirements)
+    for floor_index in range(1, confirmed.floor_count):
+        if any(
+            item.room_type.value in {"lobby", "corridor", "foyer"}
+            for item in allocated[floor_index]
+        ):
+            continue
+        lobby_payload = _room_requirement(
+            project_id=confirmed.project_id,
+            room_type="lobby",
+            quantity=1,
+            floor_preference=floor_index,
+            ordinal=ordinal + floor_index,
+        )
+        lobby = RoomRequirement.model_validate_json(json.dumps(lobby_payload))
+        all_compiled.append(lobby)
+        allocated[floor_index].append(lobby)
+        room_requirements.append(lobby_payload)
+    floor_requirements = tuple(tuple(floor) for floor in allocated)
+    compiled_room_requirements = tuple(all_compiled)
 
     try:
         road_boundary_side = local_boundary_side(
@@ -226,6 +386,24 @@ def compile_confirmed_requirements(
             "affected_entity_ids": [],
         },
     ]
+    if confirmed.floor_count > 1:
+        assumptions.append(
+            {
+                "id": str(
+                    _stable_id(confirmed.project_id, "phase2d9g-vertical-architecture")
+                ),
+                "code": "PHASE2D9G_VERTICAL_ARCHITECTURE",
+                "description": (
+                    "Multi-floor generation reserves one deterministic continuous dog-legged "
+                    "stair core before floor solving and applies soft wet/service-zone "
+                    "coordination. "
+                    f"System vertical core added={added_system_core}."
+                ),
+                "source": "DOCUMENTED_DEFAULT",
+                "confirmed_by_user": True,
+                "affected_entity_ids": [],
+            }
+        )
 
     payload: dict[str, object] = {
         "plot_boundary": polygon,
@@ -237,6 +415,14 @@ def compile_confirmed_requirements(
         "floor_id": str(_stable_id(confirmed.project_id, "floor:0")),
         "floor_name": "Ground Floor",
         "floor_index": 0,
+        "floor_count": confirmed.floor_count,
+        "floor_requirements": tuple(
+            tuple(item.model_dump(mode="json") for item in floor)
+            for floor in floor_requirements
+        ),
+        "vertical_circulation_status": (
+            "GROUND_ONLY" if confirmed.floor_count == 1 else "PLANNING_REQUIRED"
+        ),
         "elevation_mm": 0,
         "floor_to_floor_mm": 3000,
         "wall_config": {
@@ -245,18 +431,21 @@ def compile_confirmed_requirements(
             "wall_height_mm": 3000,
         },
         "planner_config": {
-            "solver_step_mm": 1,
+            "solver_step_mm": 10,
             "clearance_reserve_mm": 230,
             "residential_planning": {
                 "enabled": True,
-                "target_occupied_area_basis_points": 7000,
-                "occupied_area_weight": 40,
-                "room_area_balance_weight": 10,
-                "compactness_weight": 40,
+                "target_occupied_area_basis_points": 9000,
+                "occupied_area_weight": 80,
+                "room_area_balance_weight": 15,
+                "compactness_weight": 60,
                 "road_boundary_side": road_boundary_side.value,
                 "entrance_boundary_side": entrance_boundary_side.value,
                 "require_road_connected_parking": confirmed.parking_count > 0,
+                "parking_min_frontage_mm": 3000,
+                "parking_min_depth_mm": 5500,
                 "require_entrance_boundary_access": True,
+                "require_horizontal_circulation": confirmed.floor_count > 1,
             },
             "max_time_ms": 5000,
             "max_conflicts": 100000,

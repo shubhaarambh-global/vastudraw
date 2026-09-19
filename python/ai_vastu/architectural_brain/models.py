@@ -111,10 +111,12 @@ class SpaceAllocation(BaseModel):
         "PARKING",
         "PORCH",
         "COURTYARD",
+        "LIGHTWELL",
         "SHAFT",
         "SETBACK",
         "LANDSCAPE",
         "UTILITY_YARD",
+        "VEHICLE_ACCESS",
         "OPEN_SPACE",
         "OTHER_PURPOSEFUL",
     ]
@@ -137,6 +139,44 @@ class SiteAccounting(BaseModel):
             raise ValueError("classified_area_mm2 must equal allocation sum.")
         if self.classified_area_mm2 + self.residual_area_mm2 != self.envelope_area_mm2:
             raise ValueError("Site accounting must exactly close.")
+        return self
+
+
+class ResidualRegion(BaseModel):
+    """A geometrically measured, currently unclassified part of the site."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    area_mm2: int = Field(gt=0)
+    centroid_x_mm: int
+    centroid_y_mm: int
+    min_x_mm: int
+    min_y_mm: int
+    max_x_mm: int
+    max_y_mm: int
+
+
+class SiteAccountingAnalysis(BaseModel):
+    """Geometry-derived site accounting with auditable residual evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    accounting: SiteAccounting
+    residual_regions: tuple[ResidualRegion, ...] = ()
+    numerical_tolerance_mm2: int = Field(ge=0)
+    unexplained_residual_area_mm2: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_residual(self) -> SiteAccountingAnalysis:
+        expected = max(
+            0,
+            self.accounting.residual_area_mm2 - self.numerical_tolerance_mm2,
+        )
+        if self.unexplained_residual_area_mm2 != expected:
+            raise ValueError(
+                "unexplained_residual_area_mm2 must equal residual area "
+                "after deterministic numerical tolerance."
+            )
         return self
 
 
