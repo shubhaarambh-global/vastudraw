@@ -69,6 +69,7 @@ def build_drawing_scene(document: PlanDocument, *, floor_id: UUID | None = None)
         floor_boundary=floor_boundary,
         roads=tuple(roads),
         rooms=tuple(sorted(floor.rooms, key=lambda item: str(item.id))),
+        site_spaces=tuple(sorted(floor.site_spaces, key=lambda item: str(item.id))),
         walls=tuple(sorted(floor.walls, key=lambda item: str(item.id))),
         openings=tuple(sorted(floor.openings, key=lambda item: str(item.id))),
         stairs=tuple(sorted(floor.stairs, key=lambda item: str(item.id))),

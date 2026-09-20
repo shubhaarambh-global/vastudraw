@@ -29,3 +29,23 @@ def export_plan_bundle(
         pdf=render_pdf(scene, pdf_config),
         dxf=render_dxf(scene, dxf_config),
     )
+
+
+def export_all_floor_bundles(
+    document: PlanDocument,
+    *,
+    raster: RasterExportConfig | None = None,
+    pdf: PdfExportConfig | None = None,
+    dxf: DxfExportConfig | None = None,
+) -> tuple[ExportBundle, ...]:
+    """Render every canonical floor independently in stable floor order."""
+    return tuple(
+        export_plan_bundle(
+            document,
+            floor_id=floor.id,
+            raster=raster,
+            pdf=pdf,
+            dxf=dxf,
+        )
+        for floor in sorted(document.floors, key=lambda item: item.index)
+    )

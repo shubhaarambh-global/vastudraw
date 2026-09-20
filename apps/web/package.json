@@ -9,7 +9,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test ./src/bootstrap.test.mjs ./src/editor/math.test.ts ./src/editor/history.test.ts ./src/editor/commands.test.ts ./src/api/client.test.ts ./src/editor/project-workspace.test.ts ./src/components/shell/navigation.test.ts",
+    "test": "node --experimental-strip-types --test --test-isolation=none ./src/bootstrap.test.mjs ./src/editor/math.test.ts ./src/editor/history.test.ts ./src/editor/commands.test.ts ./src/api/client.test.ts ./src/editor/project-workspace.test.ts ./src/components/shell/navigation.test.ts ./src/components/generation/professional-plan-model.test.ts",
     "build": "next build"
   },
   "devDependencies": {

@@ -17,6 +17,7 @@ from ai_vastu.plan_schema import (
     Furniture,
     IntPolygon,
     Opening,
+    PurposefulSiteSpace,
     RoomGeometry,
     Stair,
     Wall,
@@ -24,7 +25,7 @@ from ai_vastu.plan_schema import (
 from ai_vastu.plan_schema.base import FrozenModel
 from ai_vastu.plan_schema.units import MicroDegrees, PositiveMM
 
-EXPORT_SCENE_VERSION = "1.0.0"
+EXPORT_SCENE_VERSION = "1.1.0"
 _HASH_RE_LENGTH = 64
 PositiveInt = Annotated[int, Field(gt=0)]
 NonNegativeInt = Annotated[int, Field(ge=0)]
@@ -51,7 +52,7 @@ class SceneRoad(FrozenModel):
 
 
 class DrawingScene(FrozenModel):
-    version: Literal["1.0.0"] = "1.0.0"
+    version: Literal["1.1.0"] = "1.1.0"
     project_id: UUID
     revision_id: UUID
     floor_id: UUID
@@ -64,6 +65,7 @@ class DrawingScene(FrozenModel):
     floor_boundary: IntPolygon
     roads: tuple[SceneRoad, ...] = ()
     rooms: tuple[RoomGeometry, ...] = ()
+    site_spaces: tuple[PurposefulSiteSpace, ...] = ()
     walls: tuple[Wall, ...] = ()
     openings: tuple[Opening, ...] = ()
     stairs: tuple[Stair, ...] = ()

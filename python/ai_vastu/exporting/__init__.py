@@ -13,8 +13,9 @@ from .models import (
     SceneRoad,
 )
 from .pdf_exporter import render_pdf
+from .presentation import ProfessionalPresentation, build_professional_presentation
 from .scene import build_drawing_scene
-from .service import export_plan_bundle
+from .service import export_all_floor_bundles, export_plan_bundle
 
 __all__ = [
     "EXPORT_SCENE_VERSION",
@@ -27,9 +28,12 @@ __all__ = [
     "ExportRenderError",
     "ExportSceneError",
     "PdfExportConfig",
+    "ProfessionalPresentation",
     "RasterExportConfig",
     "SceneRoad",
     "build_drawing_scene",
+    "build_professional_presentation",
+    "export_all_floor_bundles",
     "export_plan_bundle",
     "render_dxf",
     "render_jpeg",

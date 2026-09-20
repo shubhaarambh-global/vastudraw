@@ -2,7 +2,7 @@
 
 ## Authority
 
-`PlanDocument` remains authoritative geometry. `DrawingScene` is a deterministic export projection and carries both source-plan and scene SHA-256 hashes.
+`PlanDocument` remains authoritative geometry. `DrawingScene` is a deterministic export projection and carries both source-plan and scene SHA-256 hashes. DrawingScene 1.1.0 also projects canonical purposeful site spaces; it does not add or reinterpret PlanDocument geometry.
 
 ## Coordinate units
 

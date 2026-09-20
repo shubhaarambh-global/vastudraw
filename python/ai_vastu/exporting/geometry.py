@@ -67,6 +67,17 @@ def scene_bounds(scene: DrawingScene) -> SceneBounds:
     )
 
 
+def padded_scene_bounds(scene: DrawingScene, padding_mm: float = 1_200.0) -> SceneBounds:
+    """Return one centralized world extent for dimensions and plan linework."""
+    bounds = scene_bounds(scene)
+    return SceneBounds(
+        min_x_mm=bounds.min_x_mm - padding_mm,
+        min_y_mm=bounds.min_y_mm - padding_mm,
+        max_x_mm=bounds.max_x_mm + padding_mm,
+        max_y_mm=bounds.max_y_mm + padding_mm,
+    )
+
+
 def polygon_center(polygon: IntPolygon) -> tuple[float, float]:
     bounds = polygon_bounds(polygon)
     return (

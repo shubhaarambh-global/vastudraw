@@ -15,6 +15,7 @@ from .geometry import (
     visible_wall_segments,
 )
 from .models import DrawingScene, DxfExportConfig, ExportArtifact
+from .presentation import build_professional_presentation, site_space_label
 
 # ezdxf 1.4.x does not fully expose its public package API to static typing.
 ezdxf_api: Any = ezdxf
@@ -24,14 +25,19 @@ _LAYER_SPECS: tuple[tuple[str, int], ...] = (
     ("AIA_BUILDABLE", 9),
     ("AIA_FLOOR", 7),
     ("AIA_ROAD", 4),
+    ("AIA_SITE", 8),
     ("AIA_ROOM", 8),
     ("AIA_WALL_EXT", 7),
     ("AIA_WALL_INT", 8),
     ("AIA_OPENING", 3),
+    ("AIA_DOOR", 7),
+    ("AIA_WINDOW", 4),
     ("AIA_STAIR", 6),
+    ("AIA_STAIR_TREAD", 8),
     ("AIA_FURNITURE", 9),
     ("AIA_FIXTURE", 9),
     ("AIA_DIM", 2),
+    ("AIA_DIM_AUTO", 8),
     ("AIA_ANNOT", 7),
     ("AIA_NORTH", 1),
 )
@@ -63,10 +69,25 @@ def render_dxf(scene: DrawingScene, config: DxfExportConfig) -> ExportArtifact:
             if name not in doc.layers:
                 doc.layers.add(name=name, color=color)
         msp = doc.modelspace()
+        presentation = build_professional_presentation(
+            scene,
+            dimension_unit=config.dimension_unit,
+        )
 
         _add_closed_polyline(msp, scene.plot_boundary, "AIA_PLOT")
         _add_closed_polyline(msp, scene.buildable_boundary, "AIA_BUILDABLE")
         _add_closed_polyline(msp, scene.floor_boundary, "AIA_FLOOR")
+
+        for space in scene.site_spaces:
+            _add_closed_polyline(msp, space.polygon, "AIA_SITE")
+            msp.add_text(
+                site_space_label(space.kind, space.label),
+                height=float(config.annotation_height_mm),
+                dxfattribs={"layer": "AIA_SITE"},
+            ).set_placement(
+                polygon_center(space.polygon),
+                align=TextEntityAlignment.MIDDLE_CENTER,
+            )
 
         for road in scene.roads:
             for axis in road.axes:
@@ -98,8 +119,24 @@ def render_dxf(scene: DrawingScene, config: DxfExportConfig) -> ExportArtifact:
         for opening in opening_segments(scene):
             msp.add_line(opening.start, opening.end, dxfattribs={"layer": "AIA_OPENING"})
 
-        for stair in scene.stairs:
-            _add_closed_polyline(msp, stair.footprint, "AIA_STAIR")
+        for door in presentation.doors:
+            end = door.closed_end if door.sliding else door.open_end
+            msp.add_line(door.hinge, end, dxfattribs={"layer": "AIA_DOOR"})
+            if door.swing_arc:
+                msp.add_lwpolyline(door.swing_arc, dxfattribs={"layer": "AIA_DOOR"})
+        for window in presentation.windows:
+            for line in window.lines:
+                msp.add_line(line.start, line.end, dxfattribs={"layer": "AIA_WINDOW"})
+
+        for stair in presentation.stairs:
+            _add_closed_polyline(msp, stair.outline, "AIA_STAIR")
+            for tread in stair.treads:
+                msp.add_line(tread.start, tread.end, dxfattribs={"layer": "AIA_STAIR_TREAD"})
+            msp.add_line(
+                stair.arrow.start,
+                stair.arrow.end,
+                dxfattribs={"layer": "AIA_STAIR"},
+            )
         for furniture in scene.furniture:
             _add_closed_polyline(msp, furniture.footprint, "AIA_FURNITURE")
         for fixture in scene.fixtures:
@@ -134,6 +171,23 @@ def render_dxf(scene: DrawingScene, config: DxfExportConfig) -> ExportArtifact:
                     dimstyle="EZDXF",
                     override=override,
                     dxfattribs={"layer": "AIA_DIM"},
+                )
+                dim.render()
+            for auto_dimension in presentation.dimensions:
+                dx = auto_dimension.dimension_start[0] - auto_dimension.start[0]
+                dy = auto_dimension.dimension_start[1] - auto_dimension.start[1]
+                distance = (dx * dx + dy * dy) ** 0.5
+                dim = msp.add_aligned_dim(
+                    p1=auto_dimension.start,
+                    p2=auto_dimension.end,
+                    distance=float(distance),
+                    text=auto_dimension.label,
+                    dimstyle="EZDXF",
+                    override={
+                        "dimtxt": float(config.dimension_text_height_mm),
+                        "dimasz": float(config.dimension_arrow_size_mm),
+                    },
+                    dxfattribs={"layer": "AIA_DIM_AUTO"},
                 )
                 dim.render()
 
