@@ -37,10 +37,6 @@ export interface SiteSpaceLike {
   readonly label?: string | null;
 }
 
-interface RenderableFloor extends Floor {
-  readonly site_spaces?: readonly SiteSpaceLike[];
-}
-
 export interface WallGraphic extends ScreenSegment {
   readonly id: string;
   readonly category: Wall["category"];
@@ -652,7 +648,7 @@ export function buildFloorRenderModel(
   document: PlanDocument,
   sourceFloor: Floor,
 ): FloorRenderModel {
-  const floor = sourceFloor as RenderableFloor;
+  const floor = sourceFloor;
   const transform = createPlanTransform(document.plot.boundary);
   const rooms = floor.rooms ?? [];
   const walls = floor.walls ?? [];

@@ -2,265 +2,23 @@
 
 ## Completed phase
 
-Stage 2D9I - production export and download workflow - is GREEN on the
-affected export, API, browser, generation-regression, and static-validation
-gates.
+Stage 2D9J - baseline reconciliation and full repository green - is complete.
 
-The selected, persisted canonical candidate is now downloadable as SVG, JPEG,
-PDF, or DXF without regenerating or mutating architectural geometry. Multi-floor
-projects support individual floor artifacts in stable floor order and a genuine
-combined multi-page PDF with one canonical floor per page.
+All application test baselines are eliminated:
 
-Canonical `PlanDocument` remains authoritative and stays at version `1.1.0`.
-The full backend gate is 472 passed with the exact same 13 documented
-UI/schema/release-policy failures. No 2D9I regression is present.
+- backend: 486 collected, 486 passed, 0 failed;
+- web: 26 passed, 0 failed;
+- contracts: 1 passed, 0 failed;
+- Ruff, mypy, TypeScript, web lint, schema drift, release policy, and release API: GREEN.
 
-## Preflight findings
+Canonical `PlanDocument` remains authoritative at version `1.1.0`. No canonical
+schema shape, migration, serialization, or content-hash rule changed in 2D9J.
+Stages 2D9A through 2D9I remain green.
 
-- The 2D9H Python renderer already provided professional JPEG, per-floor PDF,
-  and canonical vector DXF output. Browser SVG used equivalent professional
-  presentation semantics, but there was no backend SVG exporter.
-- `export_all_floor_bundles` produced every floor but emitted one PDF per floor;
-  it did not produce a combined PDF document.
-- Candidate selection is persisted as an immutable project `RevisionRecord`.
-  Its canonical document, content hash, and `source_candidate_id` provide the
-  correct production export boundary.
-- Existing project services provide server-side project ownership checks. The
-  export endpoint reuses those checks and returns not-found semantics for a
-  project owned by another user.
-- Existing billing and entitlement policy is enforced during generation and
-  candidate selection. Export consumes only an already selected persisted
-  revision, adds no charge, and adds no development or billing bypass.
-- Direct in-memory responses fit the current storage architecture. Export does
-  not need repository files, permanent temporary files, or a new object-storage
-  subsystem.
-- The existing `PlanDocument 1.1.0` contract is sufficient. Export manifests
-  are operational response metadata rather than canonical geometry.
+## Starting baseline reproduced
 
-## Export and download architecture
-
-### Authoritative source and candidate identity
-
-The identity chain is explicit:
-
-`selected UI candidate -> selection response -> persisted revision -> export request -> rendered artifact`
-
-- The browser verifies that the candidate ID and source hash returned by
-  selection match the candidate currently displayed before enabling export.
-- `POST /projects/{project_id}/exports` loads the persisted revision; it never
-  invokes generation or accepts client-authored export geometry.
-- The request candidate ID must equal the revision's `source_candidate_id`.
-  Cross-candidate and cross-project mismatches fail closed.
-- Idempotent selection now also rejects an existing revision when its source
-  candidate or canonical hash differs from the posted selection.
-- Every response includes the source document hash, selected candidate ID, and
-  artifact hash. The browser verifies source and candidate identity again
-  before starting the download.
-- Export checks the canonical hash before rendering and compares the serialized
-  document and hash afterward. Rendering cannot alter the source document.
-
-### API route, authorization, and errors
-
-- Route: `POST /projects/{project_id}/exports`.
-- Request fields are explicit: `candidate_id`, `revision_id`, allowlisted
-  `format`, `scope`, and optional `floor_index`.
-- Supported formats are the closed enum `svg`, `jpeg`, `pdf`, and `dxf`.
-  Path-like or otherwise malformed format values are rejected by validation;
-  raw extensions are never concatenated into a filesystem path.
-- The route uses established authentication and `is_project_owner` server-side
-  ownership validation. It does not trust browser IDs alone and does not expose
-  local paths.
-- Candidate/revision/project mismatch, missing floor, source-hash mismatch, and
-  renderer failure produce bounded errors without stack traces or partial
-  artifacts.
-- Each request is atomic: one complete in-memory artifact is returned or no
-  artifact is returned.
-- Responses use `Content-Disposition`, `ETag`, private immutable cache control,
-  identity/hash headers, and a base64url-encoded export-manifest header. CORS
-  exposes only the download metadata needed by the browser.
-
-### Export manifest and filenames
-
-The internal operational manifest records:
-
-- format;
-- floor index and floor label where applicable;
-- sanitized filename and media type;
-- source `PlanDocument` hash;
-- selected candidate identity;
-- artifact byte size and artifact hash;
-- combined versus single-floor scope.
-
-Filenames are deterministic, bounded, lowercase, and sanitized through Unicode
-normalization plus a conservative ASCII allowlist. Examples:
-
-- `vastudraw-sharma-residence-ground-floor.svg`
-- `vastudraw-sharma-residence-first-floor.dxf`
-- `vastudraw-sharma-residence-all-floors.pdf`
-
-No internal UUID is exposed in the normal filename, and user input cannot add a
-path, arbitrary extension, or invalid filename characters.
-
-### Format behavior
-
-- SVG: a new deterministic backend vector exporter uses the 2D9H drawing scene
-  and presentation model. It includes the site, canonical walls and openings,
-  door/window symbols, canonical stair/treads, room labels, dimensions, north,
-  scale, purposeful spaces, and presentation fixtures/furniture.
-- JPEG: continues to use the professional 2D9H raster renderer.
-- PDF: individual floors use the professional renderer. Combined export uses a
-  true ReportLab multi-page document, one sorted canonical floor per page, with
-  the same sheet semantics and no blank intermediary pages.
-- DXF: remains vector/canonical output. It is never rasterized.
-- Ground-only export produces one Ground Floor artifact. G+1, G+2, and G+3
-  expose 2, 3, and 4 individual floors respectively in canonical order.
-- Combined scope is intentionally PDF-only. Individual SVG/JPEG/PDF/DXF floor
-  artifacts remain available for every canonical floor.
-
-### Browser experience
-
-- Restrained controls were added to the approved candidate workspace without a
-  SaaS-shell or wizard redesign.
-- Users can download PDF, SVG, JPEG, or DXF for the selected floor. Multi-floor
-  candidates receive a stable floor selector and a separate combined-PDF action.
-- Preparing/downloading, success, and bounded failure states are visible.
-  Actions are disabled during an active request and reliably re-enabled after
-  success or failure.
-- Switching candidates clears selection and export state, preventing a stale
-  artifact from being downloaded under a new visual selection.
-
-### Persistence, caching, and bundles
-
-- Artifacts are rendered and returned in memory. Production requests create no
-  arbitrary files inside the repository and no indefinite temporary artifacts.
-- Stable `ETag`/artifact hashes allow ordinary HTTP/client reuse. There is no new
-  cross-request render cache, so stale geometry cannot survive a source-hash
-  change.
-- A ZIP bundle was not introduced. The current product flow benefits from direct
-  per-format downloads plus a combined PDF, without adding another archive
-  lifecycle or partial-bundle failure mode.
-
-## Schema and version impact
-
-- Canonical `PlanDocument` stays at `1.1.0`.
-- No canonical model, persisted JSON schema, migration, content-hash rule, or
-  generated schema changed.
-- `ExportFormat` gained SVG and transient export bundles gained SVG bytes. The
-  production request/manifest models are operational export contracts only.
-- No `vastudraw-schema-change` workflow was required.
-
-## Files changed for 2D9I
-
-Backend export/API:
-
-- `python/ai_vastu/exporting/svg_exporter.py` (new)
-- `python/ai_vastu/exporting/workflow.py` (new)
-- `python/ai_vastu/exporting/models.py`
-- `python/ai_vastu/exporting/pdf_exporter.py`
-- `python/ai_vastu/exporting/service.py`
-- `python/ai_vastu/exporting/__init__.py`
-- `python/ai_vastu/requirements/candidate_orchestrator.py`
-- `apps/api/app/main.py`
-- `apps/api/app/confirmed_generation_routes.py` (narrow additions while
-  preserving pre-existing user changes)
-
-Browser:
-
-- `apps/web/src/api/client.ts`
-- `apps/web/src/api/client.test.ts`
-- `apps/web/src/components/generation/Phase26CCandidateWorkspace.tsx`
-- `apps/web/src/components/generation/phase26c3.css`
-
-Tests and documentation:
-
-- `tests/exporting/test_production_workflow.py` (new)
-- `apps/api/tests/test_exports.py` (new)
-- `docs/exporting/phase-2d9i-workflow.md` (new)
-- `docs/CURRENT_HANDOFF.md`
-
-The worktree also contains extensive intentional pre-existing frontend,
-API/auth/billing, local configuration, archive, script, and generated-package
-changes. They were preserved and are not attributed to 2D9I.
-
-## Tests added
-
-The 28 focused Python tests cover:
-
-- selected-candidate SVG, JPEG, PDF, and DXF;
-- professional renderer semantics in SVG/JPEG/PDF and vector DXF output;
-- Ground, G+1, G+2, and G+3 floor counts and deterministic ordering;
-- true 2-, 3-, and 4-page combined PDFs;
-- individual and combined deterministic filenames;
-- every canonical upper floor in individual export;
-- source serialization and content-hash immutability;
-- deterministic repeated SVG/PDF output;
-- selected-candidate identity and cross-candidate isolation;
-- project ownership and unauthorized/cross-project rejection;
-- unsupported and path-like format rejection;
-- missing floor, source-hash mismatch, and bounded atomic failure behavior;
-- canonical stairs and openings without invented geometry.
-
-Browser client tests additionally verify the authenticated binary request,
-identity response headers, and rejection of unsafe response filenames.
-
-## Representative artifact inspection
-
-The generated bytes and semantic structure were inspected programmatically:
-
-- SVG contains professional 2D9H layers, canonical opening and stair graphics,
-  labels, dimensions, north, scale, source hash, and floor identity;
-- JPEG and PDF signatures and renderer output are non-empty and deterministic;
-- DXF retains vector layers and canonical stairs/openings;
-- combined G+1/G+2/G+3 PDFs contain exactly 2/3/4 pages in Ground-to-Third order;
-- individual upper-floor artifacts contain their own canonical floor geometry;
-- no source document or content hash changes during any export.
-
-No temporary artifact or QA fixture was committed.
-
-## Validation results
-
-Focused 2D9I gate:
-
-- `python -m pytest tests/exporting/test_production_workflow.py apps/api/tests/test_exports.py -o addopts="" -q -p no:cacheprovider`
-  - 28 passed.
-
-Affected backend gate:
-
-- Exporting, plan-schema, project, billing, API, multi-candidate, generation
-  orchestration, 2D9F multi-floor, and 2D9G vertical suites:
-  - 134 passed;
-  - 2 failures, both exact known baseline failures:
-    `apps/api/tests/test_health.py::test_health` and
-    `apps/api/tests/test_release_readiness.py::test_release_readiness_endpoint_reports_ready_after_phase20b`;
-  - no new failure.
-
-Static gates:
-
-- `ruff check python apps/api tests` - PASS.
-- `mypy python apps/api/app` - PASS across 198 source files.
-
-Frontend gates:
-
-- TypeScript typecheck - PASS.
-- Web lint - PASS.
-- Focused API client plus professional renderer tests - 14 passed.
-- Full web tests - 25 passed, 1 exact pre-existing navigation-policy failure
-  (`navigation.test.ts` expects `generation`, while the intentional dirty UI
-  route is `new-plan`).
-- Next.js production source compilation completed successfully in 4.3 seconds,
-  then the managed Windows environment rejected TypeScript worker startup with
-  `spawn EPERM`. Typecheck, lint, tests, and source compilation are green; this
-  remains an environment-level final-worker limitation rather than a 2D9I
-  source failure.
-
-Full backend suite baseline comparison:
-
-- 485 tests collected: 472 passed, 13 failed.
-- The increased collection/pass count is from the 28 new 2D9I tests.
-- All 13 failing identifiers exactly match the documented pre-2D9I baseline.
-- No new, renamed, or unexplained 2D9I failure exists.
-
-Exact remaining baseline failures:
+The committed starting checkpoint was `16cfdca` (`phase2d9i-green`). Before any
+source edit, the focused backend baseline reproduced exactly 13 failures:
 
 1. `tests/release/test_readiness.py::test_current_public_mvp_is_ready_after_phase20b_freeze`
 2. `tests/test_phase19_policy.py::test_dashboard_is_real_root_route_and_editor_remains_available`
@@ -276,45 +34,219 @@ Exact remaining baseline failures:
 12. `apps/api/tests/test_health.py::test_health`
 13. `apps/api/tests/test_release_readiness.py::test_release_readiness_endpoint_reports_ready_after_phase20b`
 
-## Known limitations and open risks
+The web baseline reproduced as 25 passed and one failure:
 
-- Export is available only after a candidate has been selected into a persisted
-  revision. This is deliberate: the selected revision is the production source
-  of truth.
-- Combined scope currently applies to PDF. SVG, JPEG, and DXF are intentionally
-  downloaded per floor.
-- There is no ZIP/project bundle, persistent object-storage artifact record, or
-  cross-request render cache. The present in-memory one-artifact-per-request
-  workflow is simpler, atomic, and sufficient for the current product.
-- Entitlement is inherited from successful generation/selection; export itself
-  performs ownership and identity validation but does not create a second billable
-  event.
-- The renderer continues to expose the generator's limited canonical window
-  population rather than inventing facade openings.
-- The managed Windows runner still prevents the final Next.js worker process
-  even though source compilation, typecheck, lint, and tests complete.
-- The pre-existing ignored `.pytest-2d9h-temp/` Windows-ACL directory remains as
-  documented by 2D9H. 2D9I temporary test files and databases were removed.
+- `apps/web/src/components/shell/navigation.test.ts` expected the obsolete
+  `generation` navigation key instead of the approved `new-plan`/`analyze-plan`
+  split.
 
-## Git status
+The ordinary full pytest invocation also encountered 32 setup errors because
+the managed Windows account cannot scan
+`C:\Users\chint\AppData\Local\Temp\pytest-of-chint`. Those were host ACL errors,
+not repository failures. The complete final suite was run with a temporary
+workspace-local `tmp_path` fixture; that fixture and all temporary databases
+were removed after validation.
 
-The worktree remains intentionally dirty with the 2D9I files listed above plus
-pre-existing frontend, API/auth/billing, local configuration, archive, script,
-and generated-package changes. Existing diffs were inspected before touching
-already modified files and preserved with narrow compatible edits.
+## Root-cause classification and fixes
 
-No reset, restore, checkout, clean, history rewrite, staging, or commit was
-performed. Temporary 2D9I QA output, fixture source, and database directories
+### Canonical schema and generated contracts
+
+Root cause: obsolete tests and a stale generated consumer artifact.
+
+- `PlanDocument 1.1.0` was intentionally introduced at the 2D9G checkpoint and
+  has an explicit, tested `1.0.0 -> 1.1.0` migration.
+- The committed JSON schema already matched the authoritative Pydantic model and
+  correctly declared `1.1.0` plus `Floor.site_spaces`.
+- Six historical phase-policy tests, the API health test, and the contracts
+  bootstrap test still asserted `1.0.0`; they now assert the current explicit
+  release contract while retaining their original ownership/version invariants.
+- The official `packages/contracts` generator regenerated
+  `src/generated/plan-document.ts`. It now exposes schema `1.1.0` and canonical
+  purposeful site spaces.
+- The browser demo document now declares `1.1.0`, and the professional renderer
+  consumes the generated canonical `Floor.site_spaces` type directly.
+
+No canonical version bump or new migration was needed.
+
+### Navigation and product routes
+
+Root cause: policy tests lagged the approved product structure.
+
+Current approved navigation remains unchanged:
+
+- Workspace: Dashboard, Projects;
+- Create: New plan, Analyze plan;
+- Design: Editor, Vastu review, Exports;
+- Account: Pricing, Billing & usage, Settings.
+
+The public landing page remains `/`, the authenticated dashboard remains
+`/dashboard`, and the editor remains available. Python route-policy tests and
+the TypeScript active-navigation test now validate those real routes, both
+generation modes, all four groups, and active-state behavior. No sidebar or UI
+redesign was performed.
+
+### Release policy and API readiness
+
+Root cause: the fail-closed release evaluator supported only canonical schema
+`1.0.0`, although the current authoritative and migratable contract is `1.1.0`.
+
+- The evaluator now has an explicit supported release-schema set containing
+  `1.1.0`; it does not compare the schema constant to itself.
+- A new regression test proves an unknown future schema such as `99.0.0` still
+  produces `PLAN_SCHEMA_UNSUPPORTED` and a `BLOCKED` disposition.
+- The export gate evidence now reflects SVG/JPEG/PDF/DXF, persisted selected
+  revisions, server ownership enforcement, and multi-floor PDF sheets.
+- `/system/release-readiness` continues to delegate to the same evaluator. The
+  service and endpoint now agree on READY with zero blockers.
+- The deterministic readiness hash for the final policy is
+  `d0aec389962301981693d4825116cb2d8d43eec04a309e1764ded6de687fc658`.
+
+### Geometry vendor boundary
+
+Root cause: two generator modules directly imported Shapely, violating the
+repository rule that vendor geometry types remain confined to adapters. The
+first failure had masked the second.
+
+- Site partition measurement and purposeful residual-rectangle measurement now
+  live behind `ai_vastu.geometry.shapely_validator`.
+- Vendor-neutral immutable measurement records cross the geometry boundary;
+  Shapely objects do not.
+- Architectural Brain site accounting and purposeful-site classification keep
+  the same area, residual, adjacency, road-access, lightwell, utility-yard, and
+  open-space behavior.
+- Existing 2D9A site-accounting and architectural-geometry suites validate that
+  unexplained residuals are still rejected and legitimate classifications are
+  unchanged.
+
+### Repository-wide Ruff
+
+The established Ruff command includes `scripts/`. A pre-existing untracked
+ResPlan index builder had one extra blank line in its import block. Only that
+formatting defect was corrected; its behavior and the rest of the user-owned
+file were preserved.
+
+## Files changed for 2D9J
+
+Implementation and generated contracts:
+
+- `python/ai_vastu/release/readiness.py`
+- `python/ai_vastu/geometry/types.py`
+- `python/ai_vastu/geometry/shapely_validator.py`
+- `python/ai_vastu/geometry/__init__.py`
+- `python/ai_vastu/architectural_brain/site_accounting.py`
+- `python/ai_vastu/architectural_geometry/site_spaces.py`
+- `packages/contracts/src/generated/plan-document.ts`
+- `apps/web/src/components/generation/professional-plan-model.ts`
+- `apps/web/src/editor/demo-document.ts`
+- `scripts/build_resplan_precedent_index.py` (format-only change in a
+  pre-existing untracked user file)
+
+Tests and policy assertions:
+
+- `tests/release/test_readiness.py`
+- `tests/test_phase1_policy.py`
+- `tests/test_phase2_policy.py`
+- `tests/test_phase4_policy.py`
+- `tests/test_phase5_policy.py`
+- `tests/test_phase6_policy.py`
+- `tests/test_phase9_policy.py`
+- `tests/test_phase19_policy.py`
+- `tests/test_phase21_policy.py`
+- `apps/api/tests/test_health.py`
+- `apps/web/src/components/shell/navigation.test.ts`
+- `packages/contracts/src/bootstrap.test.mjs`
+- `docs/CURRENT_HANDOFF.md`
+
+No skip, xfail, ignored exit code, or weakened truthiness assertion was added.
+The release test surface gained an explicit fail-closed future-schema test.
+
+## Validation results
+
+### Focused and affected tests
+
+- Original 13 backend failure files plus schema, release, API, architectural
+  geometry, and Architectural Brain suites: 113 passed.
+- Release evaluator and API readiness final focused gate: 5 passed.
+- Web suite: 26 passed, 0 failed.
+- Contracts suite: 1 passed, 0 failed.
+
+### Full backend
+
+- Collection: 486 tests.
+- Result: 486 passed, 0 failed, 0 errors.
+- Command used the temporary workspace-local `tmp_path` fixture solely because
+  of the inaccessible host pytest temp root. No fixture or QA database remains.
+
+### Static, schema, and release gates
+
+- `ruff check python apps/api tests scripts`: PASS.
+- `mypy python apps/api/app`: PASS across 198 source files.
+- Web TypeScript `tsc --noEmit`: PASS.
+- Contracts TypeScript `tsc --noEmit`: PASS.
+- Web ESLint: PASS.
+- `scripts/check-plan-schema.py`: PASS; authoritative JSON schema matches
+  Pydantic.
+- Contracts generated-declaration drift check: PASS.
+- Production MVP check: READY, zero blockers.
+- Production release assertion: READY, zero blockers.
+- Release-readiness API tests: PASS.
+- `git diff --check`: PASS; only Windows LF/CRLF notices were emitted.
+
+### Production build
+
+- Standard `next build` compiled successfully in 29.1 seconds, then the managed
+  Windows host returned `spawn EPERM` while starting the TypeScript worker.
+- `next build --experimental-build-mode compile` compiled successfully in 3.6
+  seconds and then returned the same `spawn EPERM` while collecting page data
+  with 14 workers.
+- Independent web/contract TypeScript, lint, and tests are green. The failing
+  operation is child-process creation, not compilation or application code.
+- The host runs Node `20.11.1` while the repository declares Node `>=24`; pnpm
+  reports this as an engine warning. No OS security setting or repository build
+  behavior was weakened.
+
+## Schema, navigation, and release impact
+
+- Schema: no canonical change; remains `1.1.0`. Generated TypeScript is now in
+  sync with the already-current canonical JSON schema.
+- Navigation: implementation unchanged; tests now encode the approved grouped
+  navigation and public landing/authenticated dashboard separation.
+- Release policy: explicit support for current schema `1.1.0`, fail-closed for
+  unknown versions, and current export evidence.
+- Release API: unchanged endpoint architecture; now returns the evaluator's
+  correct READY state.
+- Generation/export: no semantic weakening. 2D9A purposeful-site invariants and
+  2D9I ownership/source-identity export behavior remain covered by the fully
+  green backend suite.
+
+## Environmental limitations
+
+- The managed Windows global pytest temp root is inaccessible. The repository's
+  complete suite is green with an isolated workspace-local fixture.
+- The managed host forbids the final Next.js child-worker spawn after successful
+  compilation.
+- Node is below the repository's declared supported major version. Production
+  qualification should rerun the build under Node 24+ on a host that permits
+  worker creation.
+
+These are external execution constraints; there are zero remaining application
+test baseline failures.
+
+## Git status and working-tree safety
+
+HEAD remains `16cfdca` (`phase2d9i-green`). Stage 2D9J changes are unstaged and
+uncommitted.
+
+The worktree still contains intentional pre-existing frontend, API/auth/billing,
+configuration, archive, payload, and script files. Dirty files were inspected
+before any overlapping edit. No reset, restore, checkout, clean, history
+rewrite, staging, or commit was performed. Temporary 2D9J fixtures and databases
 were removed.
 
-## Readiness and recommended next stage
+## Readiness for 2D9K
 
-Stage 2D9I is ready to hand off. The selected canonical candidate has a secure,
-deterministic, production-facing SVG/JPEG/PDF/DXF download workflow, including
-true combined multi-page PDF output and all canonical floors.
-
-Recommended next stage: begin 2D9J as a deliberate baseline/release-policy
-reconciliation phase, starting by classifying the exact 13 backend failures and
-the one web navigation-policy failure against the intentional current UI and
-schema state. Do not change generation or renderer contracts merely to make
-legacy policy assertions pass.
+Stage 2D9J is application-green and ready for handoff to 2D9K production
+qualification. The first recommended action is to checkpoint only the verified
+2D9J hunks, then run production build/route generation under Node 24+ on a host
+that permits Next.js workers. Do not reopen canonical generation or renderer
+contracts during that qualification unless a new evidence-backed defect appears.

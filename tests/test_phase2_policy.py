@@ -17,8 +17,8 @@ def test_phase2_governance_files_exist() -> None:
     assert all(path.is_file() for path in required)
 
 
-def test_phase2_does_not_change_plan_document_schema_version() -> None:
-    assert PLAN_SCHEMA_VERSION == "1.0.0"
+def test_current_plan_document_schema_version_is_explicit() -> None:
+    assert PLAN_SCHEMA_VERSION == "1.1.0"
 
 
 def test_plot_edge_ids_are_reproducible_not_random() -> None:

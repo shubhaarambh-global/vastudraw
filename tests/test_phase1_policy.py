@@ -16,6 +16,8 @@ def test_phase1_governance_files_exist() -> None:
 
 
 def test_phase1_schema_contract() -> None:
-    assert PLAN_SCHEMA_VERSION == "1.0.0"
+    # The canonical contract intentionally evolved to 1.1.0 with an explicit
+    # migration; the original Phase 1 root-ownership invariants still hold.
+    assert PLAN_SCHEMA_VERSION == "1.1.0"
     assert "rooms" not in PlanDocument.model_fields
     assert "walls" not in PlanDocument.model_fields

@@ -18,8 +18,8 @@ def test_phase6_governance_files_exist() -> None:
     assert all(path.is_file() for path in required)
 
 
-def test_phase7_keeps_phase6_and_plan_contract_versions_stable() -> None:
-    assert PLAN_SCHEMA_VERSION == "1.0.0"
+def test_current_constraint_and_plan_contract_versions_are_explicit() -> None:
+    assert PLAN_SCHEMA_VERSION == "1.1.0"
     assert CONSTRAINT_PROBLEM_VERSION == "1.0.0"
 
 

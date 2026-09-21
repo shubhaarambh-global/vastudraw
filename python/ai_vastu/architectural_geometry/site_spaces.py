@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from uuid import UUID, uuid5
 
-from shapely.geometry import LineString, MultiPolygon, Polygon, box
-from shapely.geometry.base import BaseGeometry
-from shapely.ops import unary_union
-
+from ai_vastu.geometry import (
+    ResidualRectangleMeasurement,
+    measure_site_residual_rectangles,
+)
 from ai_vastu.plan_schema import (
     IntPoint,
     IntPolygon,
@@ -46,84 +46,6 @@ _PARKING_ROOM_TYPES = {
 }
 
 
-def _polygon_shape(polygon: IntPolygon) -> Polygon:
-    shell = [(point.x_mm, point.y_mm) for point in polygon.outer]
-    holes = [[(point.x_mm, point.y_mm) for point in ring] for ring in polygon.holes]
-    return Polygon(
-        shell=shell,
-        holes=holes,
-    )
-
-
-def _polygon_components(
-    geometry: BaseGeometry,
-) -> tuple[Polygon, ...]:
-    if geometry.is_empty:
-        return ()
-
-    if isinstance(geometry, Polygon):
-        return (geometry,)
-
-    if isinstance(geometry, MultiPolygon):
-        return tuple(
-            sorted(
-                geometry.geoms,
-                key=lambda item: (
-                    item.bounds[0],
-                    item.bounds[1],
-                    item.bounds[2],
-                    item.bounds[3],
-                ),
-            )
-        )
-
-    polygons = tuple(item for item in getattr(geometry, "geoms", ()) if isinstance(item, Polygon))
-
-    return tuple(
-        sorted(
-            polygons,
-            key=lambda item: (
-                item.bounds[0],
-                item.bounds[1],
-                item.bounds[2],
-                item.bounds[3],
-            ),
-        )
-    )
-
-
-def _rectangle_bounds(
-    polygon: Polygon,
-) -> tuple[int, int, int, int] | None:
-    if polygon.interiors:
-        return None
-
-    min_x, min_y, max_x, max_y = (round(value) for value in polygon.bounds)
-
-    if min_x >= max_x or min_y >= max_y:
-        return None
-
-    rectangle = box(
-        min_x,
-        min_y,
-        max_x,
-        max_y,
-    )
-
-    # Residual geometry comes from integer orthogonal room polygons.
-    # A tiny tolerance avoids rejecting mathematically identical
-    # rectangles because Shapely operates in floating point.
-    if polygon.symmetric_difference(rectangle).area > 1.0:
-        return None
-
-    return (
-        min_x,
-        min_y,
-        max_x,
-        max_y,
-    )
-
-
 def _int_rectangle(
     bounds: tuple[int, int, int, int],
 ) -> IntPolygon:
@@ -151,146 +73,30 @@ def _int_rectangle(
     )
 
 
-def _road_segment(
-    envelope: Polygon,
-    *,
-    side: PlannerBoundarySide,
-    solver_step_mm: int,
-) -> LineString:
-    min_x, min_y, max_x, max_y = (round(value) for value in envelope.bounds)
-
-    step = max(
-        1,
-        solver_step_mm,
-    )
-
-    # Match the CP-SAT positive-side lattice projection used by
-    # architectural wall/boundary detection.
-    lattice_max_x = min_x + ((max_x - min_x) // step) * step
-    lattice_max_y = min_y + ((max_y - min_y) // step) * step
-
-    if side is PlannerBoundarySide.SOUTH:
-        return LineString(
-            (
-                (min_x, min_y),
-                (max_x, min_y),
-            )
-        )
-
-    if side is PlannerBoundarySide.NORTH:
-        return LineString(
-            (
-                (min_x, lattice_max_y),
-                (max_x, lattice_max_y),
-            )
-        )
-
-    if side is PlannerBoundarySide.WEST:
-        return LineString(
-            (
-                (min_x, min_y),
-                (min_x, max_y),
-            )
-        )
-
-    return LineString(
-        (
-            (lattice_max_x, min_y),
-            (lattice_max_x, max_y),
-        )
-    )
-
-
-def _shared_boundary_length(
-    first: Polygon,
-    second: BaseGeometry,
-) -> float:
-    return first.boundary.intersection(second).length
-
-
-def _touches_envelope_boundary(
-    polygon: Polygon,
-    envelope: Polygon,
-) -> bool:
-    return polygon.boundary.intersection(envelope.boundary).length > 0
-
-
-def _adjacent_to_room_type(
-    polygon: Polygon,
-    room_shapes: tuple[
-        tuple[RoomGeometry, Polygon],
-        ...,
-    ],
-    room_types: set[str],
-) -> bool:
-    return any(
-        room.room_type.value in room_types
-        and _shared_boundary_length(
-            polygon,
-            shape.boundary,
-        )
-        > 0
-        for room, shape in room_shapes
-    )
-
-
-def _parking_has_direct_road_access(
-    room_shapes: tuple[
-        tuple[RoomGeometry, Polygon],
-        ...,
-    ],
-    road_segment: LineString | None,
-) -> bool:
-    if road_segment is None:
-        return False
-
-    return any(
-        room.room_type.value in _PARKING_ROOM_TYPES
-        and _shared_boundary_length(
-            shape,
-            road_segment,
-        )
-        > 0
-        for room, shape in room_shapes
-    )
-
-
 def _vehicle_access_eligible(
     *,
-    polygon: Polygon,
-    bounds: tuple[int, int, int, int],
+    candidate: ResidualRectangleMeasurement,
     road_side: PlannerBoundarySide | None,
-    road_segment: LineString | None,
-    room_shapes: tuple[
-        tuple[RoomGeometry, Polygon],
-        ...,
-    ],
+    rooms: tuple[RoomGeometry, ...],
     direct_parking_access: bool,
 ) -> bool:
-    if road_side is None or road_segment is None or direct_parking_access:
+    if road_side is None or direct_parking_access:
         return False
 
-    if (
-        _shared_boundary_length(
-            polygon,
-            road_segment,
-        )
-        <= 0
+    if candidate.road_boundary_shared_length_mm <= 0:
+        return False
+
+    if not any(
+        rooms[index].room_type.value in _PARKING_ROOM_TYPES
+        for index in candidate.adjacent_polygon_indexes
     ):
         return False
 
-    if not _adjacent_to_room_type(
-        polygon,
-        room_shapes,
-        _PARKING_ROOM_TYPES,
-    ):
-        return False
-
-    min_x, min_y, max_x, max_y = bounds
+    min_x, min_y, max_x, max_y = candidate.bounds
     width_mm = max_x - min_x
     depth_mm = max_y - min_y
 
-    if polygon.area < _MIN_VEHICLE_ACCESS_AREA_MM2:
+    if candidate.area_mm2 < _MIN_VEHICLE_ACCESS_AREA_MM2:
         return False
 
     if road_side in {
@@ -304,33 +110,24 @@ def _vehicle_access_eligible(
 
 def _utility_yard_eligible(
     *,
-    polygon: Polygon,
-    bounds: tuple[int, int, int, int],
-    envelope: Polygon,
-    room_shapes: tuple[
-        tuple[RoomGeometry, Polygon],
-        ...,
-    ],
+    candidate: ResidualRectangleMeasurement,
+    rooms: tuple[RoomGeometry, ...],
 ) -> bool:
-    if not _touches_envelope_boundary(
-        polygon,
-        envelope,
+    if not candidate.touches_envelope_boundary:
+        return False
+
+    if not any(
+        rooms[index].room_type.value in _SERVICE_ROOM_TYPES
+        for index in candidate.adjacent_polygon_indexes
     ):
         return False
 
-    if not _adjacent_to_room_type(
-        polygon,
-        room_shapes,
-        _SERVICE_ROOM_TYPES,
-    ):
-        return False
-
-    min_x, min_y, max_x, max_y = bounds
+    min_x, min_y, max_x, max_y = candidate.bounds
     minimum_dimension = min(
         max_x - min_x,
         max_y - min_y,
     )
-    area = round(polygon.area)
+    area = candidate.area_mm2
 
     return (
         minimum_dimension >= _MIN_UTILITY_YARD_WIDTH_MM
@@ -341,17 +138,12 @@ def _utility_yard_eligible(
 
 def _lightwell_eligible(
     *,
-    polygon: Polygon,
-    bounds: tuple[int, int, int, int],
-    envelope: Polygon,
+    candidate: ResidualRectangleMeasurement,
 ) -> bool:
-    if _touches_envelope_boundary(
-        polygon,
-        envelope,
-    ):
+    if candidate.touches_envelope_boundary:
         return False
 
-    min_x, min_y, max_x, max_y = bounds
+    min_x, min_y, max_x, max_y = candidate.bounds
     width_mm = max_x - min_x
     depth_mm = max_y - min_y
     minimum_dimension = min(
@@ -362,7 +154,7 @@ def _lightwell_eligible(
         width_mm,
         depth_mm,
     )
-    area = round(polygon.area)
+    area = candidate.area_mm2
 
     if minimum_dimension <= 0:
         return False
@@ -380,26 +172,19 @@ def _lightwell_eligible(
 
 def _open_space_eligible(
     *,
-    polygon: Polygon,
-    bounds: tuple[int, int, int, int],
-    envelope: Polygon,
+    candidate: ResidualRectangleMeasurement,
+    envelope_area_mm2: int,
 ) -> bool:
-    if not _touches_envelope_boundary(
-        polygon,
-        envelope,
-    ):
+    if not candidate.touches_envelope_boundary:
         return False
 
-    min_x, min_y, max_x, max_y = bounds
+    min_x, min_y, max_x, max_y = candidate.bounds
     minimum_dimension = min(
         max_x - min_x,
         max_y - min_y,
     )
-    area = round(polygon.area)
-    envelope_area = max(
-        1,
-        round(envelope.area),
-    )
+    area = candidate.area_mm2
+    envelope_area = max(1, envelope_area_mm2)
     basis_points = round(area * 10_000 / envelope_area)
 
     return (
@@ -442,81 +227,52 @@ def derive_purposeful_site_spaces(
     unexplained and is rejected later by Architectural Brain site accounting.
     """
 
-    envelope_shape = _polygon_shape(envelope)
-    room_shapes = tuple(
-        (
-            room,
-            _polygon_shape(room.polygon),
-        )
-        for room in rooms
+    measurement = measure_site_residual_rectangles(
+        envelope,
+        tuple(room.polygon for room in rooms),
+        road_boundary_side=(
+            road_boundary_side.value if road_boundary_side is not None else None
+        ),
+        solver_step_mm=solver_step_mm,
     )
 
-    if room_shapes:
-        occupied = unary_union(tuple(shape for _, shape in room_shapes))
-        residual = envelope_shape.difference(occupied)
-    else:
-        residual = envelope_shape
-
-    road_segment = (
-        _road_segment(
-            envelope_shape,
-            side=road_boundary_side,
-            solver_step_mm=solver_step_mm,
-        )
-        if road_boundary_side is not None
-        else None
-    )
-
-    direct_parking_access = _parking_has_direct_road_access(
-        room_shapes,
-        road_segment,
+    direct_parking_access = any(
+        rooms[index].room_type.value in _PARKING_ROOM_TYPES
+        for index in measurement.road_adjacent_polygon_indexes
     )
 
     spaces: list[PurposefulSiteSpace] = []
 
-    for polygon in _polygon_components(residual):
-        bounds = _rectangle_bounds(polygon)
-
-        # Irregular/L-shaped residuals are intentionally NOT
-        # auto-labelled as open space.
-        if bounds is None:
-            continue
-
+    for candidate in measurement.rectangles:
+        bounds = candidate.bounds
         kind: SiteSpaceKind | None = None
         label: str | None = None
 
         if _vehicle_access_eligible(
-            polygon=polygon,
-            bounds=bounds,
+            candidate=candidate,
             road_side=road_boundary_side,
-            road_segment=road_segment,
-            room_shapes=room_shapes,
+            rooms=rooms,
             direct_parking_access=direct_parking_access,
         ):
             kind = SiteSpaceKind.VEHICLE_ACCESS
             label = "Road-to-parking vehicle access"
 
         elif _utility_yard_eligible(
-            polygon=polygon,
-            bounds=bounds,
-            envelope=envelope_shape,
-            room_shapes=room_shapes,
+            candidate=candidate,
+            rooms=rooms,
         ):
             kind = SiteSpaceKind.UTILITY_YARD
             label = "Service utility yard"
 
         elif _lightwell_eligible(
-            polygon=polygon,
-            bounds=bounds,
-            envelope=envelope_shape,
+            candidate=candidate,
         ):
             kind = SiteSpaceKind.LIGHTWELL
             label = "Internal lightwell"
 
         elif _open_space_eligible(
-            polygon=polygon,
-            bounds=bounds,
-            envelope=envelope_shape,
+            candidate=candidate,
+            envelope_area_mm2=measurement.envelope_area_mm2,
         ):
             kind = SiteSpaceKind.OPEN_SPACE
             label = "Boundary-connected open space"

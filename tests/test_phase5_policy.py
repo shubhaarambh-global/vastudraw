@@ -20,8 +20,8 @@ def test_phase5_governance_files_exist() -> None:
     assert all(path.is_file() for path in required)
 
 
-def test_phase5_keeps_plan_document_schema_version_stable() -> None:
-    assert PLAN_SCHEMA_VERSION == "1.0.0"
+def test_current_contract_versions_are_explicit() -> None:
+    assert PLAN_SCHEMA_VERSION == "1.1.0"
     assert VASTU_SPEC_VERSION == "1.0.0"
 
 

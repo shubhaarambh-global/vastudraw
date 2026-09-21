@@ -3,10 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Literal
 
-from shapely.geometry import GeometryCollection, MultiPolygon, Polygon
-from shapely.geometry.base import BaseGeometry
-from shapely.ops import unary_union
-
+from ai_vastu.geometry import measure_site_partition
 from ai_vastu.plan_schema import Floor, IntPolygon
 
 from .models import (
@@ -54,15 +51,6 @@ def require_no_unexplained_residual(
             "Unexplained residual site area exceeds tolerance; classify it as "
             "setback/open-space/courtyard/landscape/utility or allocate it to the plan."
         )
-
-
-def _polygon_shape(polygon: IntPolygon) -> Polygon:
-    shell = [(point.x_mm, point.y_mm) for point in polygon.outer]
-    holes = [[(point.x_mm, point.y_mm) for point in hole] for hole in polygon.holes]
-    shape = Polygon(shell=shell, holes=holes)
-    if shape.is_empty or not shape.is_valid:
-        raise ValueError("Site accounting requires valid non-empty polygons.")
-    return shape
 
 
 def _room_category(
@@ -159,61 +147,6 @@ def _numerical_lattice_tolerance_mm2(
     )
 
 
-def _residual_regions(
-    residual_geometry: BaseGeometry,
-) -> tuple[ResidualRegion, ...]:
-    if residual_geometry.is_empty:
-        return ()
-
-    geometries: tuple[Polygon, ...]
-
-    if isinstance(residual_geometry, Polygon):
-        geometries = (residual_geometry,)
-    elif isinstance(
-        residual_geometry,
-        (MultiPolygon, GeometryCollection),
-    ):
-        geometries = tuple(
-            geometry for geometry in residual_geometry.geoms if isinstance(geometry, Polygon)
-        )
-    else:
-        geometries = ()
-
-    regions: list[ResidualRegion] = []
-    for geometry in geometries:
-        area_mm2 = round(geometry.area)
-        if area_mm2 <= 0:
-            continue
-
-        centroid = geometry.centroid
-        min_x, min_y, max_x, max_y = geometry.bounds
-
-        regions.append(
-            ResidualRegion(
-                area_mm2=area_mm2,
-                centroid_x_mm=round(centroid.x),
-                centroid_y_mm=round(centroid.y),
-                min_x_mm=round(min_x),
-                min_y_mm=round(min_y),
-                max_x_mm=round(max_x),
-                max_y_mm=round(max_y),
-            )
-        )
-
-    return tuple(
-        sorted(
-            regions,
-            key=lambda item: (
-                -item.area_mm2,
-                item.min_x_mm,
-                item.min_y_mm,
-                item.max_x_mm,
-                item.max_y_mm,
-            ),
-        )
-    )
-
-
 def analyze_floor_site_accounting(
     *,
     envelope: IntPolygon,
@@ -231,40 +164,23 @@ def analyze_floor_site_accounting(
     overlap any other classified polygon.
     """
 
-    envelope_shape = _polygon_shape(envelope)
-    envelope_area_mm2 = round(envelope_shape.area)
-
-    room_shapes = tuple(_polygon_shape(room.polygon) for room in floor.rooms)
-    site_space_shapes = tuple(_polygon_shape(space.polygon) for space in floor.site_spaces)
-
-    classified_shapes = (
-        *room_shapes,
-        *site_space_shapes,
+    classified_polygons = (
+        *(room.polygon for room in floor.rooms),
+        *(space.polygon for space in floor.site_spaces),
     )
-
-    for shape in classified_shapes:
-        if not envelope_shape.covers(shape):
-            raise ValueError(
-                "Canonical classified geometry extends outside the confirmed buildable envelope."
-            )
-
-    if classified_shapes:
-        classified_union = unary_union(classified_shapes)
-        classified_union_area_mm2 = round(classified_union.area)
-        residual_geometry = envelope_shape.difference(classified_union)
-    else:
-        classified_union_area_mm2 = 0
-        residual_geometry = envelope_shape
+    measurement = measure_site_partition(envelope, classified_polygons)
+    room_areas = measurement.classified_item_areas_mm2[: len(floor.rooms)]
+    site_space_areas = measurement.classified_item_areas_mm2[len(floor.rooms) :]
 
     room_allocations = tuple(
         SpaceAllocation(
             category=_room_category(room.room_type.value),
             label=f"{room.room_type.value}:{room.id}",
-            area_mm2=round(shape.area),
+            area_mm2=area_mm2,
         )
-        for room, shape in zip(
+        for room, area_mm2 in zip(
             floor.rooms,
-            room_shapes,
+            room_areas,
             strict=True,
         )
     )
@@ -273,11 +189,11 @@ def analyze_floor_site_accounting(
         SpaceAllocation(
             category=_site_space_category(space.kind.value),
             label=f"{space.kind.value}:{space.id}",
-            area_mm2=round(shape.area),
+            area_mm2=area_mm2,
         )
-        for space, shape in zip(
+        for space, area_mm2 in zip(
             floor.site_spaces,
-            site_space_shapes,
+            site_space_areas,
             strict=True,
         )
     )
@@ -289,14 +205,14 @@ def analyze_floor_site_accounting(
 
     allocation_sum = sum(item.area_mm2 for item in allocations)
 
-    if allocation_sum != classified_union_area_mm2:
+    if allocation_sum != measurement.classified_union_area_mm2:
         raise ValueError(
             "Canonical classified polygons overlap; site accounting cannot "
             "double-count room or purposeful-site geometry."
         )
 
     accounting = close_site_accounting(
-        envelope_area_mm2=envelope_area_mm2,
+        envelope_area_mm2=measurement.envelope_area_mm2,
         allocations=allocations,
     )
 
@@ -307,7 +223,18 @@ def analyze_floor_site_accounting(
 
     return SiteAccountingAnalysis(
         accounting=accounting,
-        residual_regions=_residual_regions(residual_geometry),
+        residual_regions=tuple(
+            ResidualRegion(
+                area_mm2=region.area_mm2,
+                centroid_x_mm=region.centroid_x_mm,
+                centroid_y_mm=region.centroid_y_mm,
+                min_x_mm=region.min_x_mm,
+                min_y_mm=region.min_y_mm,
+                max_x_mm=region.max_x_mm,
+                max_y_mm=region.max_y_mm,
+            )
+            for region in measurement.residual_regions
+        ),
         numerical_tolerance_mm2=tolerance_mm2,
         unexplained_residual_area_mm2=max(
             0,

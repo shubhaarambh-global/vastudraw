@@ -8,15 +8,21 @@ def test_phase21_saas_navigation_has_real_routes_and_active_state() -> None:
     shell = (ROOT / "apps/web/src/components/shell/SaasShell.tsx").read_text(encoding="utf-8")
 
     for route in (
-        'href: "/"',
+        'href: "/dashboard"',
         'href: "/projects"',
+        'href: "/generation?mode=new"',
+        'href: "/generation?mode=existing"',
         'href: "/editor"',
-        'href: "/generation"',
         'href: "/reviews"',
         'href: "/exports"',
+        'href: "/pricing"',
+        'href: "/billing"',
         'href: "/settings"',
     ):
         assert route in navigation
+
+    for group in ('"workspace"', '"create"', '"design"', '"account"'):
+        assert group in navigation
 
     assert 'aria-current={active ? "page" : undefined}' in shell
 

@@ -9,5 +9,5 @@ def test_health() -> None:
     assert response.json() == {
         "status": "ok",
         "phase": "19",
-        "plan_schema_version": "1.0.0",
+        "plan_schema_version": "1.1.0",
     }

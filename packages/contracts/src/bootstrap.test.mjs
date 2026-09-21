@@ -7,9 +7,9 @@ const schemaUrl = new URL(
   import.meta.url,
 );
 
-test("phase 1 contract schema version is explicit and required", async () => {
+test("current contract schema version is explicit and required", async () => {
   const schema = JSON.parse(await readFile(schemaUrl, "utf8"));
-  assert.equal(schema.properties.schema_version.const, "1.0.0");
+  assert.equal(schema.properties.schema_version.const, "1.1.0");
   assert.ok(schema.required.includes("schema_version"));
   assert.ok(schema.required.includes("canonical_units"));
 });

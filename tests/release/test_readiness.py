@@ -1,5 +1,8 @@
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
+import ai_vastu.release.readiness as readiness_module
 from ai_vastu.release import (
     ReleaseDisposition,
     ReleaseGateStatus,
@@ -22,6 +25,17 @@ def test_readiness_report_is_deterministic_and_hashed() -> None:
     assert first == second
     assert first.report_hash is not None
     assert first.report_hash == first.compute_report_hash()
+
+
+def test_unknown_plan_schema_version_remains_a_release_blocker(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(readiness_module, "PLAN_SCHEMA_VERSION", "99.0.0")
+
+    report = evaluate_production_mvp_readiness(ROOT)
+
+    assert report.disposition is ReleaseDisposition.BLOCKED
+    assert "PLAN_SCHEMA_UNSUPPORTED" in report.blocker_codes
 
 
 def test_dwg_pathway_is_not_misrepresented_as_live_export() -> None:

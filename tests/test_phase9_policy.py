@@ -17,8 +17,8 @@ def test_phase9_governance_files_exist() -> None:
     assert all(path.is_file() for path in required)
 
 
-def test_phase9_contract_versions_are_explicit_and_plan_schema_stays_stable() -> None:
-    assert PLAN_SCHEMA_VERSION == "1.0.0"
+def test_current_validator_and_plan_contract_versions_are_explicit() -> None:
+    assert PLAN_SCHEMA_VERSION == "1.1.0"
     assert VALIDATOR_VERSION == "1.0.0"
 
 

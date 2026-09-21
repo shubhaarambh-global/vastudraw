@@ -96,10 +96,22 @@ export type RoomType =
   | "study"
   | "family_lounge";
 export type Rooms = RoomGeometry[];
+export type Id9 = string;
+export type SiteSpaceKind =
+  | "LIGHTWELL"
+  | "LANDSCAPE"
+  | "OPEN_SPACE"
+  | "UTILITY_YARD"
+  | "VEHICLE_ACCESS"
+  | "SHAFT"
+  | "PORCH";
+export type Label = string | null;
+export type SiteSpaceSource = "USER" | "SYSTEM_DERIVED" | "AI_SUGGESTED";
+export type SiteSpaces = PurposefulSiteSpace[];
 export type DirectionUdeg = number;
 export type FloorHeightMm = number;
 export type HeadroomMm = number | null;
-export type Id9 = string;
+export type Id10 = string;
 export type LandingDepthMm = number;
 export type NumberOfRisers = number;
 export type RiserMm = number;
@@ -111,7 +123,7 @@ export type Stairs = Stair[];
 export type WallCategory = "EXTERNAL" | "INTERNAL" | "SHAFT" | "PARAPET";
 export type ConstructionType = string | null;
 export type HeightMm1 = number;
-export type Id10 = string;
+export type Id11 = string;
 export type ThicknessMm = number;
 export type Walls = Wall[];
 export type Floors = Floor[];
@@ -136,13 +148,13 @@ export type ToleranceMm = number;
 export type ExactMmDecimal = string;
 export type LengthUnit = "mm" | "cm" | "m" | "in" | "ft";
 export type InputValue = string;
-export type Label = string;
+export type Label1 = string;
 export type QuantizedMm = number;
 export type RoundingDeltaMmDecimal = string;
 export type DeclaredMeasurements = DeclaredMeasurement[];
 export type EdgeIds = string[];
 export type PlotGeometryType = "RECTANGLE" | "POLYGON";
-export type Id11 = string;
+export type Id12 = string;
 export type PlotInputSource =
   "MANUAL" | "INTERACTIVE" | "SURVEY" | "DOCUMENT_EXTRACTION" | "IMPORT";
 export type VerificationStatus =
@@ -150,7 +162,7 @@ export type VerificationStatus =
 export type ProjectId = string;
 export type RegulationSpecVersion = string | null;
 export type RevisionId = string;
-export type Id12 = string;
+export type Id13 = string;
 export type Name2 = string | null;
 export type PlotEdgeIds = string[];
 export type PrimaryAccess = boolean;
@@ -166,7 +178,7 @@ export type MaxRatioMilli = number;
 export type MinRatioMilli = number;
 export type DaylightPriority = number;
 export type FloorPreference = number[];
-export type Id13 = string;
+export type Id14 = string;
 export type Locked1 = boolean;
 export type MaxAreaMm2 = number | null;
 export type MaxDepthMm = number | null;
@@ -183,7 +195,7 @@ export type UserPriority = number;
 export type VastuProfileRefs = string[];
 export type VentilationPriority = number;
 export type RoomRequirements = RoomRequirement[];
-export type SchemaVersion = "1.0.0";
+export type SchemaVersion = "1.1.0";
 export type Key1 = string;
 export type ScoreBasisPoints = number;
 export type WeightBasisPoints = number;
@@ -284,6 +296,7 @@ export interface Floor {
   name: Name;
   openings?: Openings;
   rooms?: Rooms;
+  site_spaces?: SiteSpaces;
   stairs?: Stairs;
   walls?: Walls;
 }
@@ -332,12 +345,22 @@ export interface RoomGeometry {
   requirement_id?: RequirementId;
   room_type: RoomType;
 }
+/**
+ * Explicit non-room site geometry with a declared architectural purpose.
+ */
+export interface PurposefulSiteSpace {
+  id: Id9;
+  kind: SiteSpaceKind;
+  label?: Label;
+  polygon: IntPolygon;
+  source?: SiteSpaceSource;
+}
 export interface Stair {
   direction_udeg: DirectionUdeg;
   floor_height_mm: FloorHeightMm;
   footprint: IntPolygon;
   headroom_mm?: HeadroomMm;
-  id: Id9;
+  id: Id10;
   landing_depth_mm: LandingDepthMm;
   number_of_risers: NumberOfRisers;
   riser_mm: RiserMm;
@@ -350,7 +373,7 @@ export interface Wall {
   category: WallCategory;
   construction_type?: ConstructionType;
   height_mm: HeightMm1;
-  id: Id10;
+  id: Id11;
   thickness_mm: ThicknessMm;
 }
 export interface AxisSegment {
@@ -383,7 +406,7 @@ export interface Plot {
   declared_measurements?: DeclaredMeasurements;
   edge_ids: EdgeIds;
   geometry_type: PlotGeometryType;
-  id: Id11;
+  id: Id12;
   input_source: PlotInputSource;
   verification_status: VerificationStatus;
 }
@@ -396,12 +419,12 @@ export interface DeclaredMeasurement {
   exact_mm_decimal: ExactMmDecimal;
   input_unit: LengthUnit;
   input_value: InputValue;
-  label: Label;
+  label: Label1;
   quantized_mm: QuantizedMm;
   rounding_delta_mm_decimal: RoundingDeltaMmDecimal;
 }
 export interface Road {
-  id: Id12;
+  id: Id13;
   name?: Name2;
   plot_edge_ids: PlotEdgeIds;
   primary_access?: PrimaryAccess;
@@ -413,7 +436,7 @@ export interface RoomRequirement {
   aspect_ratio?: AspectRatioRange | null;
   daylight_priority?: DaylightPriority;
   floor_preference?: FloorPreference;
-  id: Id13;
+  id: Id14;
   locked?: Locked1;
   max_area_mm2?: MaxAreaMm2;
   max_depth_mm?: MaxDepthMm;

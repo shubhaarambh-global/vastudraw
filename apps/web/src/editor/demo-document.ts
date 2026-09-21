@@ -11,7 +11,7 @@ const boundary: IntPolygon = {
 };
 
 export const demoDocument: PlanDocument = {
-  schema_version: "1.0.0",
+  schema_version: "1.1.0",
   project_id: "11111111-1111-1111-1111-111111111111",
   revision_id: "22222222-2222-2222-2222-222222222222",
   canonical_units: "mm",

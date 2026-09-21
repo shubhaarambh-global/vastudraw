@@ -14,7 +14,7 @@ from .models import (
     ReleaseGateStatus,
 )
 
-_EXPECTED_PLAN_SCHEMA_VERSION = "1.0.0"
+_SUPPORTED_PLAN_SCHEMA_VERSIONS = frozenset({"1.1.0"})
 
 
 def _gate(
@@ -58,13 +58,14 @@ def evaluate_production_mvp_readiness(repository_root: Path) -> ProductionReadin
 
     gates: list[ReleaseGateResult] = []
 
-    if PLAN_SCHEMA_VERSION == _EXPECTED_PLAN_SCHEMA_VERSION:
+    if PLAN_SCHEMA_VERSION in _SUPPORTED_PLAN_SCHEMA_VERSIONS:
         gates.append(
             _gate(
                 "PLAN_SCHEMA_SUPPORTED",
                 ReleaseGateStatus.PASS,
                 "Canonical PlanDocument schema version is supported by the MVP release gate.",
                 f"schema={PLAN_SCHEMA_VERSION}",
+                f"supported={','.join(sorted(_SUPPORTED_PLAN_SCHEMA_VERSIONS))}",
             )
         )
     else:
@@ -74,6 +75,7 @@ def evaluate_production_mvp_readiness(repository_root: Path) -> ProductionReadin
                 ReleaseGateStatus.BLOCKER,
                 "Canonical PlanDocument schema version is not supported by this release gate.",
                 f"schema={PLAN_SCHEMA_VERSION}",
+                f"supported={','.join(sorted(_SUPPORTED_PLAN_SCHEMA_VERSIONS))}",
             )
         )
 
@@ -153,7 +155,12 @@ def evaluate_production_mvp_readiness(repository_root: Path) -> ProductionReadin
             _gate(
                 "CORE_EXPORTS",
                 ReleaseGateStatus.PASS,
-                "JPG, vector PDF and DXF export pathways are implemented and deterministic.",
+                (
+                    "SVG, JPEG, vector PDF and DXF export pathways are implemented "
+                    "and deterministic, including multi-floor PDF sheets."
+                ),
+                "source=persisted-selected-revision",
+                "ownership=server-enforced",
             ),
         )
     )

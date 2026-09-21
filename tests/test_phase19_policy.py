@@ -33,10 +33,14 @@ def test_project_ownership_is_persisted_separately_from_plan_document() -> None:
     assert "owner_user_id" not in plan_source
 
 
-def test_dashboard_is_real_root_route_and_editor_remains_available() -> None:
+def test_public_landing_dashboard_and_editor_routes_remain_available() -> None:
     root_page = (ROOT / "apps/web/src/app/page.tsx").read_text(encoding="utf-8")
+    dashboard_page = (ROOT / "apps/web/src/app/dashboard/page.tsx").read_text(
+        encoding="utf-8"
+    )
     editor_page = (ROOT / "apps/web/src/app/editor/page.tsx").read_text(encoding="utf-8")
-    assert "DashboardPage" in root_page
+    assert "PublicLandingPage" in root_page
+    assert "DashboardPage" in dashboard_page
     assert "ProjectEditorPage" in editor_page
     assert "DemoEditorPage" not in editor_page
 
