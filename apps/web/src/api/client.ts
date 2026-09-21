@@ -331,7 +331,10 @@ function downloadFilename(response: Response): string {
     disposition,
   );
   if (!match?.[1]) {
-    throw new ApiRequestError("Export response did not include a safe filename.", 502);
+    throw new ApiRequestError(
+      "Export response did not include a safe filename.",
+      502,
+    );
   }
   return match[1];
 }
@@ -590,8 +593,7 @@ export class ProjectApiClient {
       mediaType:
         response.headers.get("Content-Type") ?? "application/octet-stream",
       sourcePlanHash: response.headers.get("X-Vastudraw-Source-Hash") ?? "",
-      artifactSha256:
-        response.headers.get("X-Vastudraw-Artifact-Sha256") ?? "",
+      artifactSha256: response.headers.get("X-Vastudraw-Artifact-Sha256") ?? "",
       candidateId: response.headers.get("X-Vastudraw-Candidate-Id") ?? "",
     };
   }

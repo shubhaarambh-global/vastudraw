@@ -41,10 +41,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "target_room_type",
-        "weight"
-      ],
+      "required": ["target_room_type", "weight"],
       "title": "AdjacencyPreference",
       "type": "object"
     },
@@ -60,9 +57,7 @@
           "$ref": "#/$defs/RoomType"
         }
       },
-      "required": [
-        "target_room_type"
-      ],
+      "required": ["target_room_type"],
       "title": "AdjacencyProhibition",
       "type": "object"
     },
@@ -86,12 +81,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "anchor",
-        "text",
-        "category"
-      ],
+      "required": ["id", "anchor", "text", "category"],
       "title": "Annotation",
       "type": "object"
     },
@@ -109,10 +99,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "min_ratio_milli",
-        "max_ratio_milli"
-      ],
+      "required": ["min_ratio_milli", "max_ratio_milli"],
       "title": "AspectRatioRange",
       "type": "object"
     },
@@ -149,23 +136,12 @@
           "$ref": "#/$defs/AssumptionSource"
         }
       },
-      "required": [
-        "id",
-        "code",
-        "description",
-        "source",
-        "confirmed_by_user"
-      ],
+      "required": ["id", "code", "description", "source", "confirmed_by_user"],
       "title": "Assumption",
       "type": "object"
     },
     "AssumptionSource": {
-      "enum": [
-        "USER",
-        "DOCUMENTED_DEFAULT",
-        "AI_SUGGESTED",
-        "SYSTEM_DERIVED"
-      ],
+      "enum": ["USER", "DOCUMENTED_DEFAULT", "AI_SUGGESTED", "SYSTEM_DERIVED"],
       "title": "AssumptionSource",
       "type": "string"
     },
@@ -179,10 +155,7 @@
           "$ref": "#/$defs/IntPoint"
         }
       },
-      "required": [
-        "start",
-        "end"
-      ],
+      "required": ["start", "end"],
       "title": "AxisSegment",
       "type": "object"
     },
@@ -201,9 +174,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "polygon"
-      ],
+      "required": ["polygon"],
       "title": "BuildableArea",
       "type": "object"
     },
@@ -227,11 +198,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "closure_error_mm",
-        "tolerance_mm",
-        "accepted"
-      ],
+      "required": ["closure_error_mm", "tolerance_mm", "accepted"],
       "title": "ClosureReport",
       "type": "object"
     },
@@ -309,29 +276,17 @@
           "$ref": "#/$defs/IntPoint"
         }
       },
-      "required": [
-        "id",
-        "start",
-        "end"
-      ],
+      "required": ["id", "start", "end"],
       "title": "Dimension",
       "type": "object"
     },
     "DoorHinge": {
-      "enum": [
-        "LEFT",
-        "RIGHT"
-      ],
+      "enum": ["LEFT", "RIGHT"],
       "title": "DoorHinge",
       "type": "string"
     },
     "DoorSwing": {
-      "enum": [
-        "IN",
-        "OUT",
-        "SLIDING",
-        "NONE"
-      ],
+      "enum": ["IN", "OUT", "SLIDING", "NONE"],
       "title": "DoorSwing",
       "type": "string"
     },
@@ -347,10 +302,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "key",
-        "value"
-      ],
+      "required": ["key", "value"],
       "title": "EvidenceItem",
       "type": "object"
     },
@@ -396,10 +348,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "id",
-        "fixture_type"
-      ],
+      "required": ["id", "fixture_type"],
       "title": "Fixture",
       "type": "object"
     },
@@ -516,13 +465,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "id",
-        "index",
-        "name",
-        "elevation_mm",
-        "floor_to_floor_mm"
-      ],
+      "required": ["id", "index", "name", "elevation_mm", "floor_to_floor_mm"],
       "title": "Floor",
       "type": "object"
     },
@@ -549,11 +492,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "id",
-        "furniture_type",
-        "footprint"
-      ],
+      "required": ["id", "furniture_type", "footprint"],
       "title": "Furniture",
       "type": "object"
     },
@@ -688,10 +627,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "x_mm",
-        "y_mm"
-      ],
+      "required": ["x_mm", "y_mm"],
       "title": "IntPoint",
       "type": "object"
     },
@@ -720,20 +656,12 @@
           "type": "array"
         }
       },
-      "required": [
-        "outer"
-      ],
+      "required": ["outer"],
       "title": "IntPolygon",
       "type": "object"
     },
     "LengthUnit": {
-      "enum": [
-        "mm",
-        "cm",
-        "m",
-        "in",
-        "ft"
-      ],
+      "enum": ["mm", "cm", "m", "in", "ft"],
       "title": "LengthUnit",
       "type": "string"
     },
@@ -749,10 +677,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "key",
-        "value"
-      ],
+      "required": ["key", "value"],
       "title": "MetadataItem",
       "type": "object"
     },
@@ -839,11 +764,7 @@
       "type": "object"
     },
     "OpeningKind": {
-      "enum": [
-        "DOOR",
-        "WINDOW",
-        "OPENING"
-      ],
+      "enum": ["DOOR", "WINDOW", "OPENING"],
       "title": "OpeningKind",
       "type": "string"
     },
@@ -864,21 +785,12 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "north_rotation_udeg",
-        "source",
-        "verified"
-      ],
+      "required": ["north_rotation_udeg", "source", "verified"],
       "title": "Orientation",
       "type": "object"
     },
     "OrientationSource": {
-      "enum": [
-        "USER",
-        "SURVEY",
-        "DOCUMENT_EXTRACTION",
-        "IMPORT"
-      ],
+      "enum": ["USER", "SURVEY", "DOCUMENT_EXTRACTION", "IMPORT"],
       "title": "OrientationSource",
       "type": "string"
     },
@@ -942,10 +854,7 @@
       "type": "object"
     },
     "PlotGeometryType": {
-      "enum": [
-        "RECTANGLE",
-        "POLYGON"
-      ],
+      "enum": ["RECTANGLE", "POLYGON"],
       "title": "PlotGeometryType",
       "type": "string"
     },
@@ -992,11 +901,7 @@
           "default": "SYSTEM_DERIVED"
         }
       },
-      "required": [
-        "id",
-        "kind",
-        "polygon"
-      ],
+      "required": ["id", "kind", "polygon"],
       "title": "PurposefulSiteSpace",
       "type": "object"
     },
@@ -1048,10 +953,7 @@
           "title": "Width Mm"
         }
       },
-      "required": [
-        "id",
-        "plot_edge_ids"
-      ],
+      "required": ["id", "plot_edge_ids"],
       "title": "Road",
       "type": "object"
     },
@@ -1100,11 +1002,7 @@
           "$ref": "#/$defs/RoomType"
         }
       },
-      "required": [
-        "id",
-        "room_type",
-        "polygon"
-      ],
+      "required": ["id", "room_type", "polygon"],
       "title": "RoomGeometry",
       "type": "object"
     },
@@ -1377,11 +1275,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "key",
-        "score_basis_points",
-        "weight_basis_points"
-      ],
+      "required": ["key", "score_basis_points", "weight_basis_points"],
       "title": "ScoreComponent",
       "type": "object"
     },
@@ -1407,10 +1301,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "mode",
-        "overall_basis_points"
-      ],
+      "required": ["mode", "overall_basis_points"],
       "title": "ScoringSummary",
       "type": "object"
     },
@@ -1458,11 +1349,7 @@
           "title": "Source Ref"
         }
       },
-      "required": [
-        "id",
-        "boundary_edge_id",
-        "distance_mm"
-      ],
+      "required": ["id", "boundary_edge_id", "distance_mm"],
       "title": "Setback",
       "type": "object"
     },
@@ -1480,11 +1367,7 @@
       "type": "string"
     },
     "SiteSpaceSource": {
-      "enum": [
-        "USER",
-        "SYSTEM_DERIVED",
-        "AI_SUGGESTED"
-      ],
+      "enum": ["USER", "SYSTEM_DERIVED", "AI_SUGGESTED"],
       "title": "SiteSpaceSource",
       "type": "string"
     },
@@ -1617,9 +1500,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "valid"
-      ],
+      "required": ["valid"],
       "title": "ValidationReport",
       "type": "object"
     },
@@ -1659,21 +1540,12 @@
           "type": "string"
         }
       },
-      "required": [
-        "check_id",
-        "severity",
-        "message_code",
-        "validator_version"
-      ],
+      "required": ["check_id", "severity", "message_code", "validator_version"],
       "title": "ValidationResult",
       "type": "object"
     },
     "ValidationSeverity": {
-      "enum": [
-        "ERROR",
-        "WARNING",
-        "INFO"
-      ],
+      "enum": ["ERROR", "WARNING", "INFO"],
       "title": "ValidationSeverity",
       "type": "string"
     },
@@ -1719,9 +1591,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "spec_version"
-      ],
+      "required": ["spec_version"],
       "title": "VastuAnalysis",
       "type": "object"
     },
@@ -1777,31 +1647,17 @@
           "$ref": "#/$defs/VastuStatus"
         }
       },
-      "required": [
-        "rule_id",
-        "rule_version",
-        "status"
-      ],
+      "required": ["rule_id", "rule_version", "status"],
       "title": "VastuResult",
       "type": "object"
     },
     "VastuStatus": {
-      "enum": [
-        "PASS",
-        "PARTIAL",
-        "COMPROMISE",
-        "FAIL",
-        "NOT_APPLICABLE"
-      ],
+      "enum": ["PASS", "PARTIAL", "COMPROMISE", "FAIL", "NOT_APPLICABLE"],
       "title": "VastuStatus",
       "type": "string"
     },
     "VerificationStatus": {
-      "enum": [
-        "UNVERIFIED",
-        "USER_VERIFIED",
-        "SURVEY_VERIFIED"
-      ],
+      "enum": ["UNVERIFIED", "USER_VERIFIED", "SURVEY_VERIFIED"],
       "title": "VerificationStatus",
       "type": "string"
     },
@@ -1844,23 +1700,12 @@
           "type": "integer"
         }
       },
-      "required": [
-        "id",
-        "axis",
-        "thickness_mm",
-        "height_mm",
-        "category"
-      ],
+      "required": ["id", "axis", "thickness_mm", "height_mm", "category"],
       "title": "Wall",
       "type": "object"
     },
     "WallCategory": {
-      "enum": [
-        "EXTERNAL",
-        "INTERNAL",
-        "SHAFT",
-        "PARAPET"
-      ],
+      "enum": ["EXTERNAL", "INTERNAL", "SHAFT", "PARAPET"],
       "title": "WallCategory",
       "type": "string"
     }

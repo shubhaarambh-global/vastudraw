@@ -38,11 +38,13 @@ for token in (
     "True North",
     "Road side",
     "Entrance facing",
-    "Practical",
+    "Architecture-first",
     "Balanced",
     "Vastu-forward",
-    "Structural planning is reserved for V2",
-    "Generate alternatives",
+    "Structural design",
+    "Not included in V1",
+    "Generate plan options",
+    "generateAlternatives",
 ):
     if token not in wizard:
         raise SystemExit(f"Phase 26C wizard missing required UX contract: {token}")

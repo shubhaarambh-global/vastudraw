@@ -250,3 +250,123 @@ qualification. The first recommended action is to checkpoint only the verified
 2D9J hunks, then run production build/route generation under Node 24+ on a host
 that permits Next.js workers. Do not reopen canonical generation or renderer
 contracts during that qualification unless a new evidence-backed defect appears.
+
+## Stage 2D9K - End-to-End V1 Production Qualification
+
+Status: **NOT QUALIFIED**
+
+### Repository validation
+
+The repository-wide validation gate is green after baseline reconciliation.
+
+Validated runtime:
+- Node v24.20.0
+- pnpm 10.17.1
+- Python 3.12.10
+
+Final `pnpm validate` result:
+- Ruff: passed
+- mypy: passed across 198 source files
+- Python tests: 487 passed
+- PlanDocument schema/contracts: generated and drift check passed
+- frozen Vastu specification/review/production gates: passed
+- deterministic constraints/planner/geometry/validation/scoring gates: passed
+- project revision gate: passed
+- web typecheck: passed
+- web tests: 26 passed
+- contracts tests: 1 passed
+- exports/DWG framework/generation/API/project-editor/intake/requirements gates: passed
+- billing/persistence/auth/MVP gates: passed
+- Phase 27 release gate: passed with bounded 1-4 floor generation contract
+- Phase 28 hybrid AI gate: passed
+- Prettier: passed
+- ESLint: passed
+- TypeScript: passed
+- Next.js production build: passed
+- Phase 26C.4A: passed
+- Phase 26 final: passed
+- Phase 26 OpenRouter deterministic-authority gate: passed
+
+Warnings observed were dependency deprecations only and were not validation failures.
+
+### Production qualification blocker
+
+The representative 30x50 residential production path is still not qualified.
+
+The base deterministic geometry solver can place the confirmed program, but the real production candidate pipeline does not produce an accepted candidate for the established qualification case.
+
+Across both tested plot orientations and all six deterministic candidate strategies, candidate generation is rejected by the production quality loop. Observed rejection causes include:
+
+- circulation disconnection;
+- unexplained/unclassified residual site area;
+- one-car parking expanding to approximately 30-38 m2 instead of remaining within the intended residential parking allocation.
+
+This is a production candidate-planning/site-allocation defect, not a fundamental CP-SAT feasibility failure.
+
+Renderer, persisted revision export, SVG/JPEG/PDF/DXF generation, multipage PDF generation, candidate identity checks, source-plan hashing, ownership checks and the broader repository validation gates are not the cause of this qualification failure.
+
+The qualification process did not weaken:
+- circulation validation;
+- site-accounting validation;
+- unexplained-residual rejection;
+- parking safeguards;
+- Vastu rules;
+- candidate deduplication;
+- canonical PlanDocument authority.
+
+A rejected candidate must remain rejected.
+
+### Qualification evidence
+
+Retained evidence:
+
+`.local/qa-2d9k/qualification-blocker-20260921`
+
+The retained ground-floor 30x50 artifact is renderer evidence for architecture rejected by the production critic. It must not be represented as an accepted production candidate.
+
+Multi-floor renderer/export evidence is retained separately in the same qualification evidence tree.
+
+The temporary repository-root pytest fixture used during Windows ACL investigation was removed. Focused affected regression tests subsequently passed with TEMP/TMP redirected under `.local/qa-2d9k`.
+
+### Baseline reconciliation performed during qualification
+
+The qualification run also exposed stale repository checks that were reconciled with already-established product contracts:
+
+- project smoke fixture updated from PlanDocument schema 1.0.0 to 1.1.0;
+- Phase 26C checker reconciled to the current Vastudraw wizard vocabulary while retaining generation-action validation;
+- SaaS UI checker reconciled to the current sidebar and frozen Vastu-status vocabulary;
+- Phase 27 release checker reconciled from the retired single-floor restriction to the established bounded 1-4 floor fail-closed generation contract;
+- formatting drift required by the repository-wide Prettier gate was normalized.
+
+These changes do not resolve the 30x50 production candidate blocker.
+
+### Architectural Brain experiment intentionally excluded from 2D9K closure
+
+The current working-tree experiment in:
+
+- `python/ai_vastu/architectural_brain/bridge.py`
+- `tests/architectural_brain/test_phase26_final.py`
+
+is not part of the 2D9K qualification closure.
+
+It explores the correct authority principle that AI/precedent concept sizing must not create new authoritative hard feasibility caps. However, parking must still be bounded independently by the deterministic residential planning/site-allocation layer.
+
+That work remains isolated for the corrective planning stage.
+
+### Next stage
+
+**2D9L - Production Candidate Repair & Site Allocation**
+
+Required scope:
+
+1. reproduce the established 30x50 failure through the real production candidate pipeline;
+2. preserve AI/precedent sizing as non-authoritative intent;
+3. enforce the authoritative one-car parking allocation independently of AI concept sizing;
+4. prevent parking from expanding to roughly 30-38 m2;
+5. provide bounded deterministic circulation/topology repair rather than weakening connectivity validation;
+6. classify/allocate purposeful residual site space instead of allowing unexplained residual geometry;
+7. preserve puja-sanitary, circulation, site-accounting, deduplication, Vastu, Canonical PlanDocument, renderer and export invariants;
+8. obtain at least one genuinely accepted production candidate for the established 30x50 case;
+9. rerun Stage 2D9K from the beginning after the repair.
+
+Only a successful rerun of 2D9K can qualify and freeze V1.

@@ -17,14 +17,25 @@ dashboard_source = DASHBOARD.read_text(encoding="utf-8")
 projects_source = PROJECTS.read_text(encoding="utf-8")
 css_source = CSS.read_text(encoding="utf-8")
 
-for label in ("Dashboard", "Projects", "Editor", "Generation", "Reviews", "Exports", "Settings"):
+for label in (
+    "Dashboard",
+    "Projects",
+    "New plan",
+    "Analyze plan",
+    "Editor",
+    "Vastu review",
+    "Exports",
+    "Pricing",
+    "Billing & usage",
+    "Settings",
+):
     if label not in navigation_source:
         raise SystemExit(f"Sidebar navigation missing: {label}")
 
 if 'aria-current={active ? "page" : undefined}' not in shell_source:
     raise SystemExit("Active sidebar page is not exposed with aria-current.")
 
-if "Production Vastu v1" not in shell_source:
+if "Vastu rules v1" not in shell_source or "frozen" not in shell_source:
     raise SystemExit("Frozen Vastu production status is missing from the SaaS shell.")
 
 if "82%" in dashboard_source or "Vastu Score" in dashboard_source:

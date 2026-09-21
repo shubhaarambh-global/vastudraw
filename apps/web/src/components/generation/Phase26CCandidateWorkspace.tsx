@@ -176,7 +176,9 @@ export function Phase26CCandidateWorkspace({
         result.candidateId !== currentCandidate.candidate_id ||
         result.sourcePlanHash !== currentCandidate.plan_document_hash
       ) {
-        throw new Error("Downloaded artifact identity did not match the selected plan.");
+        throw new Error(
+          "Downloaded artifact identity did not match the selected plan.",
+        );
       }
       setExportStatus(`Downloading ${result.filename}...`);
       const objectUrl = URL.createObjectURL(result.blob);
@@ -349,8 +351,8 @@ export function Phase26CCandidateWorkspace({
                     <div>
                       <strong>Download selected plan</strong>
                       <span>
-                        Exports use revision {String(selection.revision_number)}
-                        {" "}without regenerating geometry.
+                        Exports use revision {String(selection.revision_number)}{" "}
+                        without regenerating geometry.
                       </span>
                     </div>
                     {candidateFloors.length > 1 ? (

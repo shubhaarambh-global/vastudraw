@@ -17,6 +17,8 @@ REQUIRED_FILES = (
     "python/ai_vastu/openrouter_http.py",
     "python/ai_vastu/production/settings.py",
     "python/ai_vastu/requirements/candidate_orchestrator.py",
+    "python/ai_vastu/requirements/generation_adapter.py",
+    "python/ai_vastu/requirements/finalization.py",
     "python/ai_vastu/architectural_brain/candidate_engine.py",
     "python/ai_vastu/architectural_brain/revisions.py",
     "python/ai_vastu/plan_intake/service.py",
@@ -87,8 +89,29 @@ if "openrouter" not in settings or "openrouter_api_key" not in settings:
 orchestrator = (ROOT / "python/ai_vastu/requirements/candidate_orchestrator.py").read_text(
     encoding="utf-8"
 )
-if "Commercial V1 currently supports exactly one generated floor." not in orchestrator:
-    raise SystemExit("Single-floor V1 fail-closed guard is missing.")
+
+generation_adapter = (
+    ROOT / "python/ai_vastu/requirements/generation_adapter.py"
+).read_text(encoding="utf-8")
+
+finalization = (
+    ROOT / "python/ai_vastu/requirements/finalization.py"
+).read_text(encoding="utf-8")
+
+for token in (
+    "INVALID_FLOOR_COUNT: supported residential generation is limited to 1-4 floors.",
+    "confirmed.floor_count > 1",
+):
+    if token not in generation_adapter:
+        raise SystemExit(f"Bounded multi-floor generation contract is missing: {token}")
+
+for token in (
+    "BUILDING_PROGRAM_INCOMPLETE",
+    "BUILDING_CIRCULATION_DISCONNECTED",
+    "Accepted multi-floor generation is missing floor geometry.",
+):
+    if token not in finalization:
+        raise SystemExit(f"Multi-floor fail-closed validation contract is missing: {token}")
 if (
     "append_revision(command)" not in orchestrator
     or "record_successful_generation(" not in orchestrator
@@ -128,5 +151,5 @@ print(
     "openrouter_free_only=true, architectural_brain=true, "
     "deterministic_geometry_authority=true, hard_validation=true, "
     "frozen_vastu=true, immutable_revisions=true, editor=true, exports=true, "
-    "single_floor_v1=true, structural_v2=true"
+    "multifloor_v1=true, floors_1_to_4=true, structural_v2=true"
 )
