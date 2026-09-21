@@ -203,6 +203,7 @@ def select_confirmed_alternative(
         "billing_reason": selection.billing_reason,
         "revision_id": str(revision.revision_id),
         "revision_number": revision.revision_number,
+        "candidate_id": str(revision.source_candidate_id),
         "plan_document_hash": revision.plan_document_hash,
         "editor_path": f"/editor?project={project_id}",
     }

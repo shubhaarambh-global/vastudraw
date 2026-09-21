@@ -258,6 +258,13 @@ class CandidateGenerationOrchestrator:
             existing = None
 
         if existing is not None:
+            if (
+                existing.source_candidate_id != options.candidate_id
+                or existing.plan_document_hash != document.content_hash
+            ):
+                raise CandidateSelectionError(
+                    "Selected candidate identity does not match the persisted revision."
+                )
             return CandidateSelectionRun(
                 revision=existing,
                 billing_reason="already_persisted",

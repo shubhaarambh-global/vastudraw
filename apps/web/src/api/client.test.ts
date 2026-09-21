@@ -161,3 +161,83 @@ void test("generation intake uploads prompt and reference files as multipart for
     null,
   );
 });
+
+void test("selected candidate export downloads the exact binary revision artifact", async () => {
+  let requestBody: unknown;
+  let authorization: string | null = null;
+  const fetchImpl: typeof fetch = (_input, init) => {
+    authorization = new Headers(init?.headers).get("Authorization");
+    const rawBody = init?.body;
+    if (typeof rawBody !== "string") {
+      throw new TypeError("Expected export request body to be JSON.");
+    }
+    requestBody = JSON.parse(rawBody) as unknown;
+    return Promise.resolve(
+      new Response("<svg data-candidate='candidate-a'/>", {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Content-Disposition":
+            'attachment; filename="vastudraw-house-ground-floor.svg"',
+          "X-Vastudraw-Source-Hash": "a".repeat(64),
+          "X-Vastudraw-Artifact-Sha256": "b".repeat(64),
+          "X-Vastudraw-Candidate-Id": "candidate-a",
+        },
+      }),
+    );
+  };
+  const client = new ProjectApiClient(
+    "http://api.example.test",
+    fetchImpl,
+    () => Promise.resolve("signed-access-token"),
+  );
+
+  const result = await client.downloadSelectedExport("project-a", {
+    revision_id: "revision-a",
+    candidate_id: "candidate-a",
+    format: "SVG",
+    scope: "FLOOR",
+    floor_index: 0,
+  });
+
+  assert.equal(authorization, "Bearer signed-access-token");
+  assert.deepEqual(requestBody, {
+    revision_id: "revision-a",
+    candidate_id: "candidate-a",
+    format: "SVG",
+    scope: "FLOOR",
+    floor_index: 0,
+  });
+  assert.equal(result.filename, "vastudraw-house-ground-floor.svg");
+  assert.equal(result.mediaType, "image/svg+xml");
+  assert.equal(result.sourcePlanHash, "a".repeat(64));
+  assert.equal(result.artifactSha256, "b".repeat(64));
+  assert.equal(result.candidateId, "candidate-a");
+  assert.equal(await result.blob.text(), "<svg data-candidate='candidate-a'/>");
+});
+
+void test("export download rejects a response with an unsafe filename", async () => {
+  const client = new ProjectApiClient("http://api.example.test", () =>
+    Promise.resolve(
+      new Response("payload", {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": 'attachment; filename="../../secret.pdf"',
+        },
+      }),
+    ),
+  );
+
+  await assert.rejects(
+    client.downloadSelectedExport("project-a", {
+      revision_id: "revision-a",
+      candidate_id: "candidate-a",
+      format: "PDF",
+      scope: "FLOOR",
+      floor_index: 0,
+    }),
+    (error: unknown) =>
+      error instanceof ApiRequestError && error.status === 502,
+  );
+});

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from io import BytesIO
 from math import cos, hypot, radians, sin
 
@@ -71,20 +72,18 @@ def _draw_polygon(
     canvas.drawPath(path, stroke=1, fill=0)
 
 
-def render_pdf(scene: DrawingScene, config: PdfExportConfig) -> ExportArtifact:
-    if scene.scene_hash is None:
-        scene = scene.with_scene_hash()
-    page = landscape(A3 if config.page_size == "A3_LANDSCAPE" else A4)
-    page_width, page_height = page
+def _draw_pdf_page(
+    canvas: Canvas,
+    scene: DrawingScene,
+    config: PdfExportConfig,
+    page_width: float,
+    page_height: float,
+) -> None:
     transform = _PdfTransform(scene, config, page_width, page_height)
     presentation = build_professional_presentation(
         scene,
         dimension_unit=config.dimension_unit,
     )
-    buffer = BytesIO()
-    canvas = Canvas(buffer, pagesize=page, invariant=1, pageCompression=0)
-    canvas.setTitle(f"AI Vastu Architect - {scene.floor_name}")
-    canvas.setCreator("AI Vastu Architect")
 
     canvas.setStrokeGray(0.65)
     _draw_polygon(canvas, scene.plot_boundary.outer, transform, line_width=0.6)
@@ -348,6 +347,16 @@ def render_pdf(scene: DrawingScene, config: PdfExportConfig) -> ExportArtifact:
     canvas.setFont("Helvetica", 5.5)
     canvas.drawCentredString((scale_start + scale_end) / 2, scale_y + 3, "5 m")
 
+def render_pdf(scene: DrawingScene, config: PdfExportConfig) -> ExportArtifact:
+    if scene.scene_hash is None:
+        scene = scene.with_scene_hash()
+    page = landscape(A3 if config.page_size == "A3_LANDSCAPE" else A4)
+    page_width, page_height = page
+    buffer = BytesIO()
+    canvas = Canvas(buffer, pagesize=page, invariant=1, pageCompression=0)
+    canvas.setTitle(f"Vastudraw - {scene.floor_name}")
+    canvas.setCreator("Vastudraw")
+    _draw_pdf_page(canvas, scene, config, page_width, page_height)
     canvas.showPage()
     canvas.save()
     assert scene.scene_hash is not None
@@ -358,4 +367,45 @@ def render_pdf(scene: DrawingScene, config: PdfExportConfig) -> ExportArtifact:
         media_type="application/pdf",
         content=buffer.getvalue(),
         scene_hash=scene.scene_hash,
+    )
+
+
+def render_combined_pdf(
+    scenes: tuple[DrawingScene, ...],
+    config: PdfExportConfig,
+) -> ExportArtifact:
+    if not scenes:
+        raise ValueError("Combined PDF requires at least one floor scene.")
+    ordered = tuple(sorted(scenes, key=lambda item: item.floor_index))
+    indexes = [scene.floor_index for scene in ordered]
+    if len(indexes) != len(set(indexes)):
+        raise ValueError("Combined PDF floor indexes must be unique.")
+    source_hashes = {scene.source_plan_hash for scene in ordered}
+    revision_ids = {scene.revision_id for scene in ordered}
+    if len(source_hashes) != 1 or len(revision_ids) != 1:
+        raise ValueError("Combined PDF scenes must come from one canonical revision.")
+
+    hashed_scenes = tuple(
+        scene if scene.scene_hash is not None else scene.with_scene_hash() for scene in ordered
+    )
+    page = landscape(A3 if config.page_size == "A3_LANDSCAPE" else A4)
+    page_width, page_height = page
+    buffer = BytesIO()
+    canvas = Canvas(buffer, pagesize=page, invariant=1, pageCompression=0)
+    canvas.setTitle("Vastudraw - All Floors")
+    canvas.setCreator("Vastudraw")
+    for scene in hashed_scenes:
+        _draw_pdf_page(canvas, scene, config, page_width, page_height)
+        canvas.showPage()
+    canvas.save()
+
+    combined_scene_hash = hashlib.sha256(
+        ":".join(scene.scene_hash or "" for scene in hashed_scenes).encode("ascii")
+    ).hexdigest()
+    return ExportArtifact.create(
+        format="PDF",
+        filename=f"all-floors-{ordered[0].revision_id}.pdf",
+        media_type="application/pdf",
+        content=buffer.getvalue(),
+        scene_hash=combined_scene_hash,
     )

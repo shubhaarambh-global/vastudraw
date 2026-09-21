@@ -610,6 +610,75 @@
   margin-top: 3px;
 }
 
+.phase26c3-export-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 13px;
+  border-top: 1px solid #d6e8df;
+}
+
+.phase26c3-export-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.phase26c3-export-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.phase26c3-export-heading select {
+  max-width: 150px;
+  min-height: 34px;
+  border: 1px solid #cbded6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 9px;
+  color: #34564b;
+  font: inherit;
+  font-size: 11px;
+}
+
+.phase26c3-export-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.phase26c3-export-actions button,
+.phase26c3-export-combined {
+  min-height: 36px;
+  border: 1px solid #bcd8cd;
+  border-radius: 8px;
+  background: #fff;
+  color: #285d4d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.phase26c3-export-combined {
+  width: 100%;
+  background: #f7fbf9;
+}
+
+.phase26c3-export-actions button:disabled,
+.phase26c3-export-combined:disabled,
+.phase26c3-export-heading select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.phase26c3-export-status {
+  margin: 0;
+  color: #44685c;
+  font-size: 11px;
+}
+
 .phase26c3-workspace-footer {
   display: flex;
   gap: 18px;
@@ -662,5 +731,18 @@
 
   .phase26c3-revision-preview {
     grid-template-columns: 1fr;
+  }
+
+  .phase26c3-export-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .phase26c3-export-heading select {
+    max-width: none;
+  }
+
+  .phase26c3-export-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

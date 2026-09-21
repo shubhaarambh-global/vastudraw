@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from base64 import urlsafe_b64encode
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,6 +11,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,6 +20,11 @@ from ai_vastu.auth import (
     AuthenticatedUser,
     AuthenticationError,
     create_access_token_verifier_from_environment,
+)
+from ai_vastu.exporting import (
+    ProductionExportError,
+    ProductionExportRequest,
+    export_selected_document,
 )
 from ai_vastu.generation import (
     ArchitecturalGenerationRequest,
@@ -190,6 +197,16 @@ def create_app(
         allow_credentials=False,
         allow_methods=["GET", "POST"],
         allow_headers=["Authorization", "Content-Type"],
+        expose_headers=[
+            "Content-Disposition",
+            "ETag",
+            "X-Vastudraw-Artifact-Sha256",
+            "X-Vastudraw-Candidate-Id",
+            "X-Vastudraw-Combined",
+            "X-Vastudraw-Export-Manifest",
+            "X-Vastudraw-Floor-Index",
+            "X-Vastudraw-Source-Hash",
+        ],
     )
 
     @app.get("/health", tags=["system"])
@@ -576,6 +593,70 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
+
+    @app.post(
+        "/projects/{project_id}/exports",
+        response_class=Response,
+        tags=["exports"],
+    )
+    def export_selected_revision(
+        project_id: UUID,
+        payload: ProductionExportRequest,
+        service: ProjectServiceDependency,
+        user: CurrentUserDependency,
+    ) -> Response:
+        _require_project_owner(service, project_id, user)
+        try:
+            project = service.get_project(project_id)
+            revision = service.get_revision(project_id, payload.revision_id)
+        except (ProjectNotFoundError, RevisionNotFoundError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The selected project revision does not exist.",
+            ) from exc
+
+        if revision.source_candidate_id != payload.candidate_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The selected candidate revision does not exist.",
+            )
+
+        try:
+            result = export_selected_document(
+                revision.document,
+                project_name=project.name,
+                expected_plan_hash=revision.plan_document_hash,
+                request=payload,
+            )
+        except ProductionExportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+
+        artifact = result.artifact
+        entry = result.manifest.artifacts[0]
+        manifest_header = urlsafe_b64encode(
+            result.manifest.model_dump_json().encode("utf-8")
+        ).decode("ascii")
+        headers = {
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "Content-Disposition": f'attachment; filename="{artifact.filename}"',
+            "ETag": f'"{artifact.sha256}"',
+            "X-Vastudraw-Artifact-Sha256": artifact.sha256,
+            "X-Vastudraw-Candidate-Id": str(payload.candidate_id),
+            "X-Vastudraw-Combined": "true" if entry.combined else "false",
+            "X-Vastudraw-Export-Manifest": manifest_header,
+            "X-Vastudraw-Floor-Index": (
+                "all" if entry.floor_index is None else str(entry.floor_index)
+            ),
+            "X-Vastudraw-Source-Hash": revision.plan_document_hash,
+        }
+        return Response(
+            content=artifact.content,
+            media_type=artifact.media_type,
+            headers=headers,
+        )
 
     return app
 

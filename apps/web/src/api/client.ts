@@ -273,8 +273,28 @@ export interface SelectAlternativeResponse {
   readonly billing_reason: string;
   readonly revision_id: string;
   readonly revision_number: number;
+  readonly candidate_id: string;
   readonly plan_document_hash: string;
   readonly editor_path: string;
+}
+
+export type ProductionExportFormat = "SVG" | "JPEG" | "PDF" | "DXF";
+
+export interface ProductionExportInput {
+  readonly revision_id: string;
+  readonly candidate_id: string;
+  readonly format: ProductionExportFormat;
+  readonly scope: "FLOOR" | "ALL_FLOORS";
+  readonly floor_index: number | null;
+}
+
+export interface DownloadedExport {
+  readonly blob: Blob;
+  readonly filename: string;
+  readonly mediaType: string;
+  readonly sourcePlanHash: string;
+  readonly artifactSha256: string;
+  readonly candidateId: string;
 }
 
 export interface GenerationResultSummary {
@@ -303,6 +323,17 @@ export class ApiRequestError extends Error {
 
 function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function downloadFilename(response: Response): string {
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /^attachment; filename="([a-z0-9][a-z0-9.-]*)"$/i.exec(
+    disposition,
+  );
+  if (!match?.[1]) {
+    throw new ApiRequestError("Export response did not include a safe filename.", 502);
+  }
+  return match[1];
 }
 
 async function responseDetail(response: Response): Promise<string> {
@@ -528,6 +559,41 @@ export class ProjectApiClient {
         body: JSON.stringify(input),
       },
     );
+  }
+
+  async downloadSelectedExport(
+    projectId: string,
+    input: ProductionExportInput,
+  ): Promise<DownloadedExport> {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const token = await this.accessTokenProvider?.();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/exports`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      throw new ApiRequestError(
+        await responseDetail(response),
+        response.status,
+      );
+    }
+    return {
+      blob: await response.blob(),
+      filename: downloadFilename(response),
+      mediaType:
+        response.headers.get("Content-Type") ?? "application/octet-stream",
+      sourcePlanHash: response.headers.get("X-Vastudraw-Source-Hash") ?? "",
+      artifactSha256:
+        response.headers.get("X-Vastudraw-Artifact-Sha256") ?? "",
+      candidateId: response.headers.get("X-Vastudraw-Candidate-Id") ?? "",
+    };
   }
 
   async generateArchitectural(

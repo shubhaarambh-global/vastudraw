@@ -33,6 +33,7 @@ JpegQuality = Annotated[int, Field(ge=1, le=100)]
 
 
 class ExportFormat(StrEnum):
+    SVG = "SVG"
     JPEG = "JPEG"
     PDF = "PDF"
     DXF = "DXF"
@@ -112,6 +113,17 @@ class RasterExportConfig(FrozenModel):
     dimension_unit: DimensionDisplayUnit = DimensionDisplayUnit.FEET_INCHES
 
 
+class SvgExportConfig(FrozenModel):
+    width_px: Annotated[int, Field(ge=512, le=16_384)] = 1_600
+    height_px: Annotated[int, Field(ge=512, le=16_384)] = 1_200
+    margin_px: Annotated[int, Field(ge=0, le=2_048)] = 70
+    show_room_labels: bool = True
+    show_dimensions: bool = True
+    show_annotations: bool = True
+    show_north_arrow: bool = True
+    dimension_unit: DimensionDisplayUnit = DimensionDisplayUnit.FEET_INCHES
+
+
 class PdfExportConfig(FrozenModel):
     page_size: Literal["A4_LANDSCAPE", "A3_LANDSCAPE"] = "A3_LANDSCAPE"
     margin_mm: Annotated[int, Field(ge=5, le=50)] = 15
@@ -169,6 +181,7 @@ class ExportArtifact:
 @dataclass(frozen=True, slots=True)
 class ExportBundle:
     scene: DrawingScene
+    svg: ExportArtifact
     jpeg: ExportArtifact
     pdf: ExportArtifact
     dxf: ExportArtifact
