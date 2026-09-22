@@ -12,7 +12,7 @@ function SetupState() {
   return (
     <main className="dashboard-shell dashboard-auth-shell">
       <section className="setup-card">
-        <p className="eyebrow">AI Vastu Architect</p>
+        <p className="eyebrow">Vastudraw</p>
         <h2>Secure workspace setup</h2>
         <p className="dashboard-muted">
           Choose development bearer mode for local work or Supabase Auth for

@@ -2111,3 +2111,757 @@ code {
   margin-top: 5px;
   color: #72817b;
 }
+
+/* Public landing page */
+
+.public-home {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(
+      circle at 50% 24%,
+      rgba(231, 248, 241, 0.8),
+      transparent 36%
+    ),
+    #fbfcfb;
+  color: var(--saas-ink);
+}
+
+.public-home-header {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid #e8eeeb;
+}
+
+.public-home-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.public-home-brand img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+
+.public-home-brand > span {
+  display: grid;
+  gap: 2px;
+}
+
+.public-home-brand strong {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.public-home-brand small {
+  font-size: 11px;
+  color: #7c8e88;
+}
+
+.public-home-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.public-home-auth-actions button {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.public-home-login {
+  border: 1px solid #d7e1dd;
+  background: #fff;
+  color: var(--saas-ink);
+}
+
+.public-home-signup {
+  border: 1px solid #0d8369;
+  background: #0d8369;
+  color: white;
+}
+
+.public-home-main {
+  flex: 1;
+  width: min(920px, calc(100% - 48px));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 84px 0 110px;
+}
+
+.public-home-copy {
+  max-width: 720px;
+  margin-bottom: 42px;
+}
+
+.public-home-copy h1 {
+  margin: 8px 0 12px;
+  font-size: clamp(42px, 6vw, 68px);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.public-home-copy > p:last-child {
+  margin: 0;
+  max-width: 650px;
+  color: #677973;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.public-home-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.public-home-action-card {
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 28px;
+  border-radius: 20px;
+  border: 1px solid #dce6e2;
+  background: rgba(255, 255, 255, 0.94);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 16px 40px rgba(32, 72, 61, 0.06);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.public-home-action-card:hover {
+  transform: translateY(-3px);
+  border-color: #9fd0c0;
+  box-shadow: 0 20px 48px rgba(32, 72, 61, 0.1);
+}
+
+.public-home-action-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #eaf7f2;
+  color: #0d8369;
+  font-size: 22px;
+}
+
+.public-home-action-card strong {
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.public-home-action-card small {
+  max-width: 330px;
+  color: #70817c;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.public-home-auth {
+  width: min(520px, 100%);
+  margin: 36px auto 0;
+}
+
+.public-home-auth-close {
+  display: block;
+  margin: 12px auto 0;
+  border: 0;
+  background: transparent;
+  color: #63756f;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.public-home-footer {
+  width: min(1180px, calc(100% - 48px));
+  min-height: 72px;
+  margin: 0 auto;
+  border-top: 1px solid #e8eeeb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  color: #85958f;
+  font-size: 11px;
+}
+
+@media (max-width: 700px) {
+  .public-home-header {
+    width: min(100% - 28px, 1180px);
+  }
+
+  .public-home-brand small {
+    display: none;
+  }
+
+  .public-home-auth-actions button {
+    padding: 0 12px;
+  }
+
+  .public-home-main {
+    width: min(100% - 28px, 920px);
+    padding: 64px 0 80px;
+  }
+
+  .public-home-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .public-home-copy h1 {
+    font-size: 44px;
+  }
+
+  .public-home-footer {
+    width: min(100% - 28px, 1180px);
+    padding: 18px 0;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* Public authentication drawer */
+
+.public-auth-open {
+  overflow: hidden;
+}
+
+.public-auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(13, 31, 26, 0.28);
+  backdrop-filter: blur(5px);
+  animation: public-auth-fade-in 160ms ease;
+}
+
+.public-auth-drawer {
+  width: min(460px, 100%);
+  height: 100%;
+  padding: 38px 36px 30px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #ffffff;
+  border-left: 1px solid #dfe8e4;
+  box-shadow: -24px 0 70px rgba(23, 54, 45, 0.16);
+  animation: public-auth-slide-in 220ms ease;
+}
+
+.public-auth-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.public-auth-drawer-header h2 {
+  margin: 7px 0 0;
+  font-size: 32px;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.public-auth-close {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  border: 1px solid #dce6e2;
+  border-radius: 12px;
+  background: #fff;
+  color: #4f625c;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.public-auth-close:hover {
+  background: #f5faf8;
+}
+
+.public-auth-intro {
+  margin: 18px 0 28px;
+  color: #687b74;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.public-auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 28px;
+  border-radius: 12px;
+  background: #f1f6f4;
+}
+
+.public-auth-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #71827c;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.public-auth-tabs button.is-active {
+  background: #fff;
+  color: #123c31;
+  box-shadow: 0 2px 10px rgba(35, 68, 59, 0.08);
+}
+
+.public-auth-form {
+  display: grid;
+  gap: 18px;
+}
+
+.public-auth-form label {
+  display: grid;
+  gap: 8px;
+  color: #283a35;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.public-auth-form input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid #d8e2de;
+  border-radius: 11px;
+  outline: none;
+  background: #fff;
+  color: #152b25;
+  font: inherit;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.public-auth-form input:focus {
+  border-color: #62b29a;
+  box-shadow: 0 0 0 4px rgba(62, 159, 130, 0.1);
+}
+
+.public-auth-submit {
+  min-height: 50px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 11px;
+  background: #0d8369;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.public-auth-submit:hover:not(:disabled) {
+  background: #0a715b;
+}
+
+.public-auth-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.public-auth-status {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f4f8f6;
+  color: #536861;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.public-auth-trust {
+  margin-top: auto;
+  padding-top: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  color: #8a9994;
+  font-size: 11px;
+}
+
+@keyframes public-auth-slide-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes public-auth-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .public-auth-drawer {
+    width: 100%;
+    padding: 28px 22px;
+    border-left: 0;
+  }
+}
+
+/* Development authentication helper */
+
+.public-auth-dev-card {
+  margin: 0 0 22px;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid #cce8de;
+  border-radius: 14px;
+  background: #f1faf6;
+}
+
+.public-auth-dev-card > div {
+  display: grid;
+  gap: 4px;
+}
+
+.public-auth-dev-card strong {
+  color: #164f40;
+  font-size: 13px;
+}
+
+.public-auth-dev-card span {
+  color: #668078;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.public-auth-dev-card button {
+  min-height: 44px;
+  border: 1px solid #9bcfbe;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0d745e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.public-auth-dev-card button:hover {
+  background: #e9f7f2;
+}
+
+.public-auth-divider {
+  position: relative;
+  margin: 4px 0 22px;
+  display: flex;
+  justify-content: center;
+  color: #95a39e;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.public-auth-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #e4ebe8;
+}
+
+.public-auth-divider span {
+  position: relative;
+  padding: 0 10px;
+  background: #ffffff;
+}
+
+.public-auth-dev-note {
+  margin: 2px 0 0;
+  color: #81918c;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.public-home-action-card {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.public-home-action-card:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+/* ==========================================================
+   VASTUDRAW ? production sidebar / brand system
+   ========================================================== */
+
+.vastudraw-mark-frame {
+  fill: #ffffff;
+  stroke: #d9dfdc;
+  stroke-width: 1;
+}
+
+.vastudraw-mark-v {
+  stroke: #182c26;
+  stroke-width: 2.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vastudraw-mark-guide {
+  stroke: #85948f;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.vastudraw-mark-node {
+  fill: #0d8469;
+}
+
+.saas-shell {
+  grid-template-columns: 248px minmax(0, 1fr);
+}
+
+.saas-sidebar {
+  width: 248px;
+  padding: 20px 14px 16px;
+  background: #fbfaf7;
+  border-right: 1px solid #e7e6e1;
+}
+
+.saas-brand {
+  min-height: auto;
+  gap: 11px;
+  padding: 4px 7px 21px;
+}
+
+.saas-brand .vastudraw-sidebar-mark {
+  flex: 0 0 auto;
+}
+
+.saas-brand > span:last-child {
+  gap: 1px;
+}
+
+.saas-brand strong {
+  color: #172923;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.saas-brand small {
+  color: #89938f;
+  font-size: 9px;
+  letter-spacing: 0.005em;
+}
+
+.saas-nav-grouped {
+  display: grid;
+  gap: 21px;
+  margin-top: 5px;
+}
+
+.saas-nav-section {
+  display: grid;
+  gap: 7px;
+}
+
+.saas-nav-section-label {
+  margin: 0;
+  padding: 0 10px;
+  color: #a0a7a4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.saas-nav-section-items {
+  display: grid;
+  gap: 2px;
+}
+
+.saas-nav-item {
+  position: relative;
+  min-height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border-radius: 8px;
+  color: #64716d;
+  background: transparent;
+  text-decoration: none;
+  transition:
+    color 130ms ease,
+    background 130ms ease;
+}
+
+.saas-nav-item svg {
+  flex: 0 0 18px;
+  color: #7c8985;
+}
+
+.saas-nav-item > span {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.saas-nav-item:hover {
+  color: #20352e;
+  background: #f3f2ee;
+}
+
+.saas-nav-item:hover svg {
+  color: #50635c;
+}
+
+.saas-nav-item[data-active="true"] {
+  color: #153d32;
+  background: #f0f2ee;
+}
+
+.saas-nav-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #0d8469;
+}
+
+.saas-nav-item[data-active="true"] svg {
+  color: #0d8469;
+}
+
+.saas-release-card {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e1e4e1;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.saas-release-card-main {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 11px;
+}
+
+.saas-release-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #f0f4f1;
+  color: #36564c;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.saas-release-card-main > div {
+  display: grid;
+  gap: 2px;
+}
+
+.saas-release-card-main strong {
+  color: #31423d;
+  font-size: 10px;
+}
+
+.saas-release-card-main > div > span {
+  color: #8b9893;
+  font-size: 8px;
+}
+
+.saas-ready-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1ea97c;
+  box-shadow: none;
+}
+
+.saas-release-pricing-link {
+  min-height: 34px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #eceeec;
+  color: #60716b;
+  font-size: 9px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.saas-release-pricing-link:hover {
+  color: #0d765f;
+  background: #fafbf9;
+}
+
+.saas-topbar {
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom-color: #e8ebe8;
+}
+
+@media (max-width: 900px) {
+  .saas-shell {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .saas-sidebar {
+    width: 210px;
+  }
+}

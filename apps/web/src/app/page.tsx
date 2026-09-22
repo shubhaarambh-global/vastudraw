@@ -1,5 +1,5 @@
-import { DashboardPage } from "../components/dashboard/DashboardPage.tsx";
+﻿import { PublicLandingPage } from "../components/PublicLandingPage.tsx";
 
 export default function Page() {
-  return <DashboardPage />;
+  return <PublicLandingPage />;
 }

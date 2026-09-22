@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Vastu Architect",
+  title: "Vastudraw",
   description:
-    "Deterministic millimetre-resolution architectural planning editor",
+    "AI-assisted architectural planning with deterministic geometry and Vastu intelligence",
 };
 
 export default function RootLayout({

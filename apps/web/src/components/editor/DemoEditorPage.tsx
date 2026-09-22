@@ -16,7 +16,7 @@ export function DemoEditorPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Phase 19 · authenticated project workspace</p>
-          <h1>AI Vastu Architect</h1>
+          <h1>Vastudraw</h1>
           <p>
             Millimetre-native review and exact edit staging over the canonical
             PlanDocument.

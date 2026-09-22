@@ -38,7 +38,7 @@ export function AuthCard() {
   return (
     <section className="auth-card">
       <p className="eyebrow">Secure workspace</p>
-      <h2>Sign in to AI Vastu Architect</h2>
+      <h2>Sign in to Vastudraw</h2>
       <p className="dashboard-muted">
         Projects are isolated by authenticated user ownership.
       </p>

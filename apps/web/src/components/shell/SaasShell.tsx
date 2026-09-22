@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   activeNavigationKey,
+  navigationGroups,
   navigationItems,
   type NavigationItem,
 } from "./navigation.ts";
+import { VastudrawBrandMark } from "./VastudrawBrandMark.tsx";
 
 interface SaasShellProps {
   readonly children: ReactNode;
@@ -19,8 +21,8 @@ interface SaasShellProps {
 
 function NavGlyph({ item }: { readonly item: NavigationItem }) {
   const common = {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -34,11 +36,13 @@ function NavGlyph({ item }: { readonly item: NavigationItem }) {
     case "dashboard":
       return (
         <svg {...common}>
-          <path d="M3 10.5 12 3l9 7.5" />
-          <path d="M5.5 9.5V21h13V9.5" />
-          <path d="M9.5 21v-6h5v6" />
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
         </svg>
       );
+
     case "projects":
       return (
         <svg {...common}>
@@ -46,6 +50,25 @@ function NavGlyph({ item }: { readonly item: NavigationItem }) {
           <path d="M3.5 8.5h17" />
         </svg>
       );
+
+    case "new-plan":
+      return (
+        <svg {...common}>
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M12 8v8M8 12h8" />
+        </svg>
+      );
+
+    case "analyze-plan":
+      return (
+        <svg {...common}>
+          <path d="M4 19V5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
+          <path d="M14 3v6h6" />
+          <circle cx="10" cy="14" r="2.5" />
+          <path d="m12 16 2 2" />
+        </svg>
+      );
+
     case "editor":
       return (
         <svg {...common}>
@@ -54,12 +77,7 @@ function NavGlyph({ item }: { readonly item: NavigationItem }) {
           <path d="M4 4h6" />
         </svg>
       );
-    case "generation":
-      return (
-        <svg {...common}>
-          <path d="m13 2-7 12h6l-1 8 7-12h-6Z" />
-        </svg>
-      );
+
     case "reviews":
       return (
         <svg {...common}>
@@ -67,6 +85,7 @@ function NavGlyph({ item }: { readonly item: NavigationItem }) {
           <path d="m8.5 12 2.2 2.2 4.8-5" />
         </svg>
       );
+
     case "exports":
       return (
         <svg {...common}>
@@ -75,11 +94,29 @@ function NavGlyph({ item }: { readonly item: NavigationItem }) {
           <path d="M5 13v7h14v-7" />
         </svg>
       );
+
+    case "pricing":
+      return (
+        <svg {...common}>
+          <path d="M20 12 12 20l-8-8V4h8Z" />
+          <circle cx="9" cy="9" r="1" />
+        </svg>
+      );
+
+    case "billing":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M7 15h4" />
+        </svg>
+      );
+
     case "settings":
       return (
         <svg {...common}>
           <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1-2.8 2.8-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.6V21h-4v-.1A1.8 1.8 0 0 0 8.8 19a1.8 1.8 0 0 0-2 .4l-.1.1-2.8-2.8.1-.1a1.8 1.8 0 0 0 .4-2A1.8 1.8 0 0 0 2.9 13H3v-4h-.1A1.8 1.8 0 0 0 4.4 8a1.8 1.8 0 0 0-.4-2l-.1-.1 2.8-2.8.1.1a1.8 1.8 0 0 0 2 .4A1.8 1.8 0 0 0 9.9 2H10v4h4V2h.1a1.8 1.8 0 0 0 1.1 1.6 1.8 1.8 0 0 0 2-.4l.1-.1 2.8 2.8-.1.1a1.8 1.8 0 0 0-.4 2A1.8 1.8 0 0 0 21.1 9H21v4h.1a1.8 1.8 0 0 0-1.7 2Z" />
+          <path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" />
         </svg>
       );
   }
@@ -90,9 +127,11 @@ function initials(label: string): string {
     .trim()
     .split(/\s+/)
     .filter((word) => word.length > 0);
+
   if (words.length === 0) {
-    return "AI";
+    return "VD";
   }
+
   return words
     .slice(0, 2)
     .map((word) => word[0]?.toUpperCase() ?? "")
@@ -106,59 +145,86 @@ export function SaasShell({
   contentClassName,
 }: SaasShellProps) {
   const pathname = usePathname();
-  const activeKey = activeNavigationKey(pathname);
+  const [generationMode, setGenerationMode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pathname.startsWith("/generation")) {
+      setGenerationMode(null);
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    setGenerationMode(params.get("mode"));
+  }, [pathname]);
+
+  const activeKey = activeNavigationKey(pathname, generationMode);
 
   return (
     <div className="saas-shell">
       <aside className="saas-sidebar">
         <Link
           className="saas-brand"
-          href="/"
-          aria-label="AI Vastu Architect dashboard"
+          href="/dashboard"
+          aria-label="Vastudraw dashboard"
         >
-          <span className="saas-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none">
-              <path d="M5 14.5 16 5l11 9.5V27H5Z" />
-              <path d="M11 27V16h10v11" />
-              <path d="M16 9c5 2 6 6 3 10-4 0-7-2-7-5 0-2 1-4 4-5Z" />
-            </svg>
-          </span>
+          <VastudrawBrandMark size={42} className="vastudraw-sidebar-mark" />
+
           <span>
-            <strong>AI Vastu Architect</strong>
-            <small>Deterministic space planning</small>
+            <strong>Vastudraw</strong>
+            <small>AI architectural planning</small>
           </span>
         </Link>
 
-        <nav className="saas-nav" aria-label="Primary navigation">
-          {navigationItems.map((item) => {
-            const active = activeKey === item.key;
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                className="saas-nav-item"
-                data-active={active}
-                aria-current={active ? "page" : undefined}
-              >
-                <NavGlyph item={item} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav
+          className="saas-nav saas-nav-grouped"
+          aria-label="Primary navigation"
+        >
+          {navigationGroups.map((group) => (
+            <section className="saas-nav-section" key={group.key}>
+              <p className="saas-nav-section-label">{group.label}</p>
+
+              <div className="saas-nav-section-items">
+                {navigationItems
+                  .filter((item) => item.group === group.key)
+                  .map((item) => {
+                    const active = activeKey === item.key;
+
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        className="saas-nav-item"
+                        data-active={active}
+                        aria-current={active ? "page" : undefined}
+                      >
+                        <NavGlyph item={item} />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+              </div>
+            </section>
+          ))}
         </nav>
 
         <div className="saas-sidebar-spacer" />
 
-        <section
-          className="saas-release-card"
-          aria-label="Production Vastu bundle status"
-        >
-          <span className="saas-release-icon">V1</span>
-          <div>
-            <strong>Production Vastu v1</strong>
-            <span>4 reviewed rules · frozen</span>
+        <section className="saas-release-card" aria-label="Vastu rules status">
+          <div className="saas-release-card-main">
+            <span className="saas-release-icon">V1</span>
+
+            <div>
+              <strong>Vastu rules v1</strong>
+              <span>4 reviewed rules ? frozen</span>
+            </div>
+
+            <span className="saas-ready-dot" aria-label="Ready" />
           </div>
-          <span className="saas-ready-dot" aria-label="Ready" />
+
+          <Link className="saas-release-pricing-link" href="/pricing">
+            View plans
+            <span aria-hidden="true">?</span>
+          </Link>
         </section>
       </aside>
 
@@ -168,9 +234,12 @@ export function SaasShell({
             <span className="saas-workspace-dot" />
             <span>{environmentLabel}</span>
           </div>
+
           <div className="saas-topbar-spacer" />
+
           <div className="saas-user">
             <span className="saas-avatar">{initials(userLabel)}</span>
+
             <span className="saas-user-copy">
               <strong>{userLabel}</strong>
               <small>Workspace member</small>
