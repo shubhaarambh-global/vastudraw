@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+import logging
 import os
+from typing import cast
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 
 from ai_vastu.architectural_intelligence import (
     ArchitecturalIntelligenceConfigurationError,
     ArchitecturalIntelligenceProviderError,
 )
 from ai_vastu.billing import BillingService, create_billing_repository
+from ai_vastu.billing.service import development_billing_bypass_enabled
 from ai_vastu.multi_candidate import MultiCandidateGenerationError
 from ai_vastu.projects.errors import ProjectNotFoundError, RevisionConflictError
-from ai_vastu.projects.factory import create_project_repository_from_environment
 from ai_vastu.projects.service import ProjectRevisionService
 from ai_vastu.requirements.candidate_orchestrator import (
     CandidateGenerationOrchestrator,
@@ -36,7 +38,13 @@ from ai_vastu.vastu_reasoning import (
     VastuReasoningProviderError,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/confirmed-generation", tags=["confirmed-generation"])
+
+
+def _project_service(request: Request) -> ProjectRevisionService:
+    return cast(ProjectRevisionService, request.app.state.project_service)
 
 
 def _bearer_token(authorization: str | None) -> str:
@@ -91,17 +99,21 @@ def _resolve_user_id(authorization: str | None) -> UUID:
 @router.post("/projects/{project_id}/alternatives")
 def generate_confirmed_alternatives(
     project_id: UUID,
+    request: Request,
     options: GenerateAlternativesOptions,
     authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
     user_id = _resolve_user_id(authorization)
     billing_repository = create_billing_repository()
-    project_repository = create_project_repository_from_environment()
+    project_service = _project_service(request)
     try:
         orchestrator = CandidateGenerationOrchestrator(
             requirements_store=RequirementsStore.from_environment(),
-            billing_service=BillingService(billing_repository),
-            project_service=ProjectRevisionService(project_repository),
+            billing_service=BillingService(
+                billing_repository,
+                development_bypass=development_billing_bypass_enabled(),
+            ),
+            project_service=project_service,
         )
         preview = orchestrator.preview(
             authenticated_user_id=user_id,
@@ -128,16 +140,26 @@ def generate_confirmed_alternatives(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except VastuReasoningProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except MultiCandidateGenerationError as exc:
+        logger.warning(
+            "Confirmed candidate generation rejected:\n%s",
+            exc,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
     except (
-        MultiCandidateGenerationError,
         UnsupportedConfirmedRequirement,
         Phase24FinalizationError,
         ValueError,
     ) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
     finally:
         billing_repository.close()
-        project_repository.close()
 
     return {
         "candidate_run": preview.outcome.run.model_dump(mode="json"),
@@ -160,17 +182,21 @@ def generate_confirmed_alternatives(
 @router.post("/projects/{project_id}/alternatives/select")
 def select_confirmed_alternative(
     project_id: UUID,
+    request: Request,
     options: SelectAlternativeOptions,
     authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
     user_id = _resolve_user_id(authorization)
     billing_repository = create_billing_repository()
-    project_repository = create_project_repository_from_environment()
+    project_service = _project_service(request)
     try:
         orchestrator = CandidateGenerationOrchestrator(
             requirements_store=RequirementsStore.from_environment(),
-            billing_service=BillingService(billing_repository),
-            project_service=ProjectRevisionService(project_repository),
+            billing_service=BillingService(
+                billing_repository,
+                development_bypass=development_billing_bypass_enabled(),
+            ),
+            project_service=project_service,
         )
         selection = orchestrator.select(
             authenticated_user_id=user_id,
@@ -194,7 +220,6 @@ def select_confirmed_alternative(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     finally:
         billing_repository.close()
-        project_repository.close()
 
     revision = selection.revision
     return {
@@ -212,17 +237,21 @@ def select_confirmed_alternative(
 @router.post("/projects/{project_id}")
 def generate_from_confirmed_requirements(
     project_id: UUID,
+    request: Request,
     options: GenerateConfirmedOptions,
     authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
     user_id = _resolve_user_id(authorization)
     billing_repository = create_billing_repository()
-    project_repository = create_project_repository_from_environment()
+    project_service = _project_service(request)
     try:
         orchestrator = FinalGenerationOrchestrator(
             requirements_store=RequirementsStore.from_environment(),
-            billing_service=BillingService(billing_repository),
-            project_service=ProjectRevisionService(project_repository),
+            billing_service=BillingService(
+                billing_repository,
+                development_bypass=development_billing_bypass_enabled(),
+            ),
+            project_service=project_service,
         )
         run = orchestrator.run(
             authenticated_user_id=user_id,
@@ -254,7 +283,6 @@ def generate_from_confirmed_requirements(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     finally:
         billing_repository.close()
-        project_repository.close()
 
     generation_result = run.generation_result
     if run.revision is None or run.canonical is None:

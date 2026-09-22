@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 from .catalog import ProductKind, get_product
@@ -7,9 +8,27 @@ from .models import EntitlementSnapshot, GenerationAuthorization, SubscriptionSt
 from .repository import BillingRepository
 
 
+def development_billing_bypass_enabled() -> bool:
+    """Allow unrestricted generation only in an explicitly opted-in dev environment."""
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    requested = (
+        os.getenv("AI_VASTU_DEV_BILLING_BYPASS", "")
+        .strip()
+        .lower()
+        in {"1", "true", "yes", "on"}
+    )
+    return app_env == "development" and requested
+
+
 class BillingService:
-    def __init__(self, repository: BillingRepository) -> None:
+    def __init__(
+        self,
+        repository: BillingRepository,
+        *,
+        development_bypass: bool = False,
+    ) -> None:
         self._repository = repository
+        self._development_bypass = development_bypass
 
     def snapshot(self, user_id: str) -> EntitlementSnapshot:
         return self._repository.get_snapshot(user_id)
@@ -35,6 +54,13 @@ class BillingService:
         return source
 
     def authorize_generation(self, user_id: str, project_id: str) -> GenerationAuthorization:
+        if self._development_bypass:
+            return GenerationAuthorization(
+                allowed=True,
+                reason="development_bypass",
+                consumption=None,
+            )
+
         snapshot = self._repository.get_snapshot(user_id)
         if snapshot.has_active_subscription:
             return GenerationAuthorization(

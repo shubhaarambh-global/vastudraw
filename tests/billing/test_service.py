@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from ai_vastu.billing.models import SubscriptionStatus
-from ai_vastu.billing.service import BillingService
+from ai_vastu.billing.service import BillingService, development_billing_bypass_enabled
 from ai_vastu.billing.sqlite_repository import SqliteBillingRepository
 
 USER = "11111111-1111-1111-1111-111111111111"
@@ -104,3 +104,53 @@ def test_second_free_project_is_denied(tmp_path: Path) -> None:
             service.register_project(USER, PROJECT_B)
     finally:
         repository.close()
+
+
+
+def test_explicit_development_bypass_allows_generation_without_consuming_free_trial(
+    tmp_path: Path,
+) -> None:
+    _, repository = make_service(tmp_path)
+
+    try:
+        service = BillingService(
+            repository,
+            development_bypass=True,
+        )
+
+        authorization = service.authorize_generation(
+            "development-user",
+            "development-project",
+        )
+
+        assert authorization.allowed
+        assert authorization.reason == "development_bypass"
+        assert authorization.consumption is None
+
+        service.record_successful_generation(
+            "development-user",
+            "development-project",
+        )
+
+        assert service.snapshot(
+            "development-user"
+        ).free_generation_available
+    finally:
+        repository.close()
+
+
+def test_development_bypass_environment_is_allowed_only_in_development(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("AI_VASTU_DEV_BILLING_BYPASS", "1")
+
+    assert development_billing_bypass_enabled()
+
+    monkeypatch.setenv("APP_ENV", "production")
+
+    assert not development_billing_bypass_enabled()
+
+    monkeypatch.setenv("APP_ENV", "staging")
+
+    assert not development_billing_bypass_enabled()
