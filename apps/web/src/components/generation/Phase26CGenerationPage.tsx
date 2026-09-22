@@ -9,9 +9,15 @@ import { Phase26CProjectWizard } from "./Phase26CProjectWizard.tsx";
 
 type EntryMode = "choose" | "new" | "existing";
 
-export function Phase26CGenerationPage() {
+type Phase26CGenerationPageProps = {
+  readonly initialMode?: EntryMode;
+};
+
+export function Phase26CGenerationPage({
+  initialMode = "choose",
+}: Phase26CGenerationPageProps) {
   const workspace = useWorkspaceProjects();
-  const [mode, setMode] = useState<EntryMode>("choose");
+  const [mode, setMode] = useState<EntryMode>(initialMode);
 
   if (mode === "existing") {
     return (
@@ -38,7 +44,7 @@ export function Phase26CGenerationPage() {
       {mode === "choose" ? (
         <section className="phase26c-entry">
           <div className="phase26c-entry-heading">
-            <p className="saas-kicker">Vastu-AI studio</p>
+            <p className="saas-kicker">Vastudraw studio</p>
             <h1>Start a project</h1>
             <p className="saas-muted">
               Generate a new residential plan or analyze an existing plan in the

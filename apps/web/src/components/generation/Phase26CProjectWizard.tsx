@@ -62,6 +62,51 @@ const CUSTOM_ROOM_OPTIONS = [
   ["laundry", "Laundry"],
 ] as const;
 
+const ARCHITECTURAL_STYLES = [
+  {
+    label: "Modern minimal",
+    intent:
+      "Architectural style: Modern minimal with clean circulation, simple geometry and efficient space use.",
+  },
+  {
+    label: "Contemporary Indian",
+    intent:
+      "Architectural style: Contemporary Indian with practical family planning, privacy and climate-responsive spaces.",
+  },
+  {
+    label: "Traditional Indian",
+    intent:
+      "Architectural style: Traditional Indian with clear public-private zoning and culturally appropriate spatial relationships.",
+  },
+  {
+    label: "Luxury modern",
+    intent:
+      "Architectural style: Luxury modern with generous arrival, strong privacy hierarchy and spacious principal rooms.",
+  },
+  {
+    label: "Compact practical",
+    intent:
+      "Architectural style: Compact practical with maximum usable space, short circulation and minimal wasted area.",
+  },
+  {
+    label: "Courtyard-led",
+    intent:
+      "Architectural style: Courtyard-led with daylight, ventilation and internal open-space relationships where feasible.",
+  },
+] as const;
+
+const DESIGN_INTENT_SUGGESTIONS = [
+  "Maximize natural daylight.",
+  "Prioritize cross ventilation.",
+  "Keep bedrooms private from living areas.",
+  "Parents bedroom should be near the entrance.",
+  "Keep kitchen directly connected to dining.",
+  "Avoid toilet doors directly visible from living or dining.",
+  "Provide practical wardrobe niches in bedrooms.",
+  "Keep circulation compact with minimal passage waste.",
+  "Reserve a logical location for a future staircase.",
+] as const;
+
 function dimensionToMm(value: string, unit: UnitMode): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -172,6 +217,39 @@ function buildPrompt(state: WizardState): string {
       : "Use practical circulation, privacy, daylight and ventilation judgement.",
     "Do not sacrifice hard architectural validity for Vastu preferences.",
   ].join("\n");
+}
+
+function selectedArchitecturalStyle(state: WizardState): string {
+  return (
+    ARCHITECTURAL_STYLES.find((style) => state.notes.includes(style.intent))
+      ?.label ?? "Not specified"
+  );
+}
+
+function selectedQuickPreferences(state: WizardState): string[] {
+  return DESIGN_INTENT_SUGGESTIONS.filter((suggestion) =>
+    state.notes.includes(suggestion),
+  ).map((suggestion) => suggestion.replace(/\.$/, ""));
+}
+
+function freeformProjectBrief(state: WizardState): string {
+  let brief = state.notes;
+
+  for (const style of ARCHITECTURAL_STYLES) {
+    brief = brief.replace(style.intent, " ");
+  }
+
+  for (const suggestion of DESIGN_INTENT_SUGGESTIONS) {
+    brief = brief.replace(suggestion, " ");
+  }
+
+  return brief.replace(/\s+/g, " ").trim();
+}
+
+function planningModeLabel(mode: PlanningMode): string {
+  if (mode === "practical") return "Architecture-first";
+  if (mode === "vastu_forward") return "Vastu-forward";
+  return "Balanced";
 }
 
 function StepBar({
@@ -452,7 +530,7 @@ export function Phase26CProjectWizard() {
     <section className="phase26c-wizard-shell">
       <div className="phase26c-wizard-head">
         <div>
-          <p className="saas-kicker">Vastu-AI project setup</p>
+          <p className="saas-kicker">Vastudraw project setup</p>
           <h1>New residential plan</h1>
           <p className="saas-muted">
             Architecture first, contextual Vastu guidance second. Structural
@@ -719,34 +797,144 @@ export function Phase26CProjectWizard() {
         ) : null}
 
         {step === 4 ? (
-          <div className="phase26c-step-card">
+          <div className="phase26c-step-card phase26c-design-intent-step">
             <p className="saas-kicker">Step 5 of 6</p>
             <h2>Design intent</h2>
             <p className="saas-muted">
-              Describe adjacency, privacy, wardrobes, daylight, ventilation and
-              lifestyle needs. Phase 26A interprets these as soft architectural
-              intent.
+              Shape the architectural character, privacy, circulation, daylight,
+              ventilation and lifestyle priorities. These choices become soft
+              architectural intent for the AI planning layer.
             </p>
 
-            <textarea
-              className="phase26c-intent"
-              value={state.notes}
-              onChange={(event) => {
-                update({ notes: event.target.value });
-              }}
-              placeholder="Example: Kitchen directly connected to dining. Parents bedroom near entrance. No toilet door visible from living. Wardrobes in bedrooms. Keep good cross ventilation."
-            />
+            <fieldset className="phase26c-fieldset">
+              <legend>Architectural character</legend>
+
+              <p className="phase26c-field-help">
+                Choose the direction closest to the project. You can still
+                describe anything more specific below.
+              </p>
+
+              <div className="phase26c-style-grid">
+                {ARCHITECTURAL_STYLES.map((style) => {
+                  const selected = state.notes.includes(style.intent);
+
+                  return (
+                    <button
+                      key={style.label}
+                      type="button"
+                      data-active={selected}
+                      onClick={() => {
+                        const withoutStyles = ARCHITECTURAL_STYLES.reduce(
+                          (current, item) =>
+                            current.replace(item.intent, "").trim(),
+                          state.notes,
+                        );
+
+                        update({
+                          notes: [style.intent, withoutStyles]
+                            .filter(Boolean)
+                            .join(" "),
+                        });
+                      }}
+                    >
+                      <strong>{style.label}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
 
             <fieldset className="phase26c-fieldset">
-              <legend>Planning balance</legend>
+              <legend>Quick preferences</legend>
+
+              <p className="phase26c-field-help">
+                Add common architectural priorities to the brief.
+              </p>
+
+              <div className="phase26c-suggestion-grid">
+                {DESIGN_INTENT_SUGGESTIONS.map((suggestion) => {
+                  const selected = state.notes.includes(suggestion);
+
+                  return (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      data-active={selected}
+                      onClick={() => {
+                        const nextNotes = selected
+                          ? state.notes.replace(suggestion, "").trim()
+                          : [state.notes.trim(), suggestion]
+                              .filter(Boolean)
+                              .join(" ");
+
+                        update({
+                          notes: nextNotes.replace(/\s+/g, " ").trim(),
+                        });
+                      }}
+                    >
+                      <span>{selected ? "\u2713" : "+"}</span>
+                      {suggestion.replace(/\.$/, "")}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <label className="phase26c-intent-field">
+              <span>
+                <strong>Project brief</strong>
+                <small>
+                  Add anything unique about adjacency, privacy, lifestyle,
+                  storage or circulation.
+                </small>
+              </span>
+
+              <textarea
+                className="phase26c-intent"
+                value={freeformProjectBrief(state)}
+                onChange={(event) => {
+                  const styleIntent =
+                    ARCHITECTURAL_STYLES.find((style) =>
+                      state.notes.includes(style.intent),
+                    )?.intent ?? "";
+
+                  const quickPreferences = DESIGN_INTENT_SUGGESTIONS.filter(
+                    (suggestion) => state.notes.includes(suggestion),
+                  );
+
+                  update({
+                    notes: [
+                      styleIntent,
+                      ...quickPreferences,
+                      event.target.value.trim(),
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                  });
+                }}
+                placeholder="Example: Kitchen directly connected to dining. Parents bedroom near entrance. No toilet door visible from living. Wardrobes in bedrooms. Keep good cross ventilation."
+              />
+            </label>
+
+            <fieldset className="phase26c-fieldset">
+              <legend>Planning priority</legend>
+
               <div className="phase26c-mode-grid">
                 {[
-                  ["practical", "Practical", "Architecture 70% · Vastu 30%"],
-                  ["balanced", "Balanced", "Architecture 50% · Vastu 50%"],
+                  [
+                    "practical",
+                    "Architecture-first",
+                    "Prioritize planning quality while respecting contextual Vastu",
+                  ],
+                  [
+                    "balanced",
+                    "Balanced",
+                    "Balance architectural planning and Vastu preferences",
+                  ],
                   [
                     "vastu_forward",
                     "Vastu-forward",
-                    "Architecture 30% · Vastu 70%",
+                    "Prioritize Vastu preferences within valid architecture",
                   ],
                 ].map(([value, label, detail]) => (
                   <button
@@ -778,46 +966,228 @@ export function Phase26CProjectWizard() {
               deterministic candidate engine.
             </p>
 
-            <dl className="phase26c-review-grid">
+            <div className="phase26c-review-sections">
+              <section className="phase26c-review-section">
+                <div className="phase26c-review-section-heading">
+                  <div>
+                    <span>01</span>
+                    <strong>Project & plot</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(0);
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                <dl className="phase26c-review-grid">
+                  <div>
+                    <dt>Project</dt>
+                    <dd>{state.projectName || "Not named"}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Plot</dt>
+                    <dd>
+                      {state.breadth || "?"} x {state.length || "?"}{" "}
+                      {state.unit}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Floor scope</dt>
+                    <dd>Ground floor</dd>
+                  </div>
+
+                  <div>
+                    <dt>Structural design</dt>
+                    <dd>Not included in V1</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="phase26c-review-section">
+                <div className="phase26c-review-section-heading">
+                  <div>
+                    <span>02</span>
+                    <strong>Orientation & access</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(1);
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                <dl className="phase26c-review-grid">
+                  <div>
+                    <dt>True North</dt>
+                    <dd>{state.north}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Road side</dt>
+                    <dd>{state.road}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Entrance facing</dt>
+                    <dd>{state.entrance || "Not specified"}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="phase26c-review-section">
+                <div className="phase26c-review-section-heading">
+                  <div>
+                    <span>03</span>
+                    <strong>Spaces & program</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(3);
+                    }}
+                  >
+                    Edit spaces
+                  </button>
+                </div>
+
+                <dl className="phase26c-review-grid">
+                  <div>
+                    <dt>Bedrooms</dt>
+                    <dd>{String(state.bedrooms)}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Bathrooms</dt>
+                    <dd>{String(state.bathrooms)}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Kitchen</dt>
+                    <dd>
+                      {state.kitchen === "open"
+                        ? "Open kitchen"
+                        : "Closed kitchen"}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Dining</dt>
+                    <dd>
+                      {state.dining === "combined"
+                        ? "Living + dining"
+                        : state.dining === "separate"
+                          ? "Separate dining"
+                          : "No dedicated dining"}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Parking</dt>
+                    <dd>
+                      {state.parking === 0
+                        ? "None"
+                        : `${String(state.parking)} car${
+                            state.parking === 1 ? "" : "s"
+                          }`}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Puja</dt>
+                    <dd>{state.puja === 0 ? "None" : String(state.puja)}</dd>
+                  </div>
+                </dl>
+
+                {state.customRooms.length > 0 ? (
+                  <div className="phase26c-review-detail">
+                    <span>Additional rooms</span>
+
+                    <div className="phase26c-review-tags">
+                      {state.customRooms.map((room) => (
+                        <span key={room.id}>
+                          {String(room.quantity)} x {room.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="phase26c-review-section">
+                <div className="phase26c-review-section-heading">
+                  <div>
+                    <span>04</span>
+                    <strong>Design intent</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(4);
+                    }}
+                  >
+                    Edit intent
+                  </button>
+                </div>
+
+                <dl className="phase26c-review-grid">
+                  <div>
+                    <dt>Architectural character</dt>
+                    <dd>{selectedArchitecturalStyle(state)}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Planning priority</dt>
+                    <dd>{planningModeLabel(state.planningMode)}</dd>
+                  </div>
+                </dl>
+
+                <div className="phase26c-review-detail">
+                  <span>Quick preferences</span>
+
+                  {selectedQuickPreferences(state).length > 0 ? (
+                    <div className="phase26c-review-tags">
+                      {selectedQuickPreferences(state).map((preference) => (
+                        <span key={preference}>{preference}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>No quick preferences selected.</p>
+                  )}
+                </div>
+
+                <div className="phase26c-review-detail">
+                  <span>Additional project brief</span>
+                  <p>
+                    {freeformProjectBrief(state) ||
+                      "No additional custom notes."}
+                  </p>
+                </div>
+              </section>
+            </div>
+
+            <div className="phase26c-generation-callout">
               <div>
-                <dt>Project</dt>
-                <dd>{state.projectName || "—"}</dd>
+                <strong>Ready to generate plan options</strong>
+                <span>
+                  Vastudraw will interpret the confirmed brief, evaluate
+                  architectural intent and Vastu preferences, then construct
+                  deterministic candidate geometry.
+                </span>
               </div>
-              <div>
-                <dt>Plot</dt>
-                <dd>
-                  {state.breadth || "—"} × {state.length || "—"} {state.unit}
-                </dd>
-              </div>
-              <div>
-                <dt>True North</dt>
-                <dd>{state.north}</dd>
-              </div>
-              <div>
-                <dt>Road side</dt>
-                <dd>{state.road}</dd>
-              </div>
-              <div>
-                <dt>Entrance</dt>
-                <dd>{state.entrance || "Not set"}</dd>
-              </div>
-              <div>
-                <dt>Bedrooms</dt>
-                <dd>{String(state.bedrooms)}</dd>
-              </div>
-              <div>
-                <dt>Bathrooms</dt>
-                <dd>{String(state.bathrooms)}</dd>
-              </div>
-              <div>
-                <dt>Planning mode</dt>
-                <dd>{state.planningMode.replace("_", " ")}</dd>
-              </div>
-              <div>
-                <dt>Structural</dt>
-                <dd>V2 — not included</dd>
-              </div>
-            </dl>
+            </div>
 
             <div className="phase26c-candidate-preview">
               <strong>Candidate exploration</strong>
@@ -837,7 +1207,7 @@ export function Phase26CProjectWizard() {
                 void generateAlternatives();
               }}
             >
-              {busy ? "Generating alternatives…" : "Generate alternatives"}
+              {busy ? "Generating plan options…" : "Generate plan options"}
             </button>
 
             {status ? (
