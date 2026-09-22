@@ -370,3 +370,140 @@ Required scope:
 9. rerun Stage 2D9K from the beginning after the repair.
 
 Only a successful rerun of 2D9K can qualify and freeze V1.
+
+## Stage 2D9L-C - Bounded Circulation Topology Repair
+
+Status: **IMPLEMENTED IN SNAPSHOT; LOCAL VALIDATION REQUIRED**
+
+### Context
+
+2D9L-A and 2D9L-B were validated locally before this snapshot handoff:
+- residential occupied-area target remains a soft objective rather than a hard room-coverage floor;
+- canonical residual polygon measurement and purposeful boundary-connected open-space classification are in place;
+- focused Ruff/mypy and broader geometry/architectural-brain/solver regressions were reported green.
+
+The single-floor production defect remained that CP-SAT could return a geometrically feasible room placement whose door-capable adjacency graph was disconnected. Auto-opening synthesis then failed after the solve.
+
+### 2D9L-C implementation
+
+- Added pinned `networkx==3.6.1` as a non-authoritative graph-analysis dependency.
+- Added `CirculationTopologyAnalysis` and `analyze_room_access_graph()`.
+- Existing canonical wall/opening geometry remains authoritative; NetworkX only analyzes already-proven graph edges.
+- Sanitary rooms remain reachable leaves and cannot become transit nodes.
+- Existing `build_circulation_graph()` now uses the shared topology-analysis layer instead of maintaining a separate hand-written reachability traversal.
+- Added `CirculationRepairPair` to residential planner configuration.
+- Added system-derived hard repair-pair constraints to CP-SAT. These constraints are not universal architectural defaults: they are introduced only after a solved layout proves circulation-disconnected.
+- Auto-circulation now performs at most four deterministic repair attempts.
+- Repair candidates connect a reachable non-sanitary room to a disconnected room, ranked first by current geometric separation and then deterministic architectural/access priority.
+- Candidate repair pairs that conflict with compiled hard adjacency prohibitions are skipped.
+- Infeasible repair pairs are discarded rather than weakening any existing invariant.
+- After each feasible repair solve, canonical geometry is rebuilt and circulation is re-evaluated from scratch.
+- Existing circulation validation remains the final authority after opening synthesis.
+- Single-floor `require_horizontal_circulation` was deliberately **not** globally flipped to `True`; the existing heuristic topology targets therefore do not become arbitrary universal hard rules.
+- Restored irregular purposeful-site-space UUID hardening so non-rectangular spaces with the same bounding box cannot collide.
+
+### Tests added/updated
+
+- `tests/architectural_geometry/test_circulation.py`
+  - NetworkX articulation/reachability regression;
+  - sanitary-room transit remains prohibited.
+- `tests/solver/test_models.py`
+  - repair pair must reference two distinct rooms.
+- `tests/solver/test_circulation_repair.py`
+  - system-derived repair pair enforces a door-capable shared wall and emits `CIRCULATION_REPAIR_ENFORCED`.
+- `tests/generation/test_circulation_repair_selection.py`
+  - disconnected solved geometry produces the expected deterministic repair pair and exact minimum door-capable shared length.
+
+### Dependency register
+
+`THIRD_PARTY.md` records NetworkX 3.6.1 / BSD-3-Clause and explicitly limits it to graph computation. It has no geometry or Canonical PlanDocument authority.
+
+### Validation available in this snapshot environment
+
+The snapshot sandbox does not contain OR-Tools, pyclipr, Ruff or mypy and has no package-network access. Therefore full repository validation cannot be truthfully claimed here.
+
+Completed here:
+- Python compile validation for all modified Python/test files;
+- direct execution of the isolated NetworkX topology-analysis logic, including sanitary-leaf and unknown-room fail-closed cases.
+
+Required local validation after applying the 2D9L-C package:
+
+```powershell
+$env:Path = "$(Resolve-Path '.\.venv\Scripts');$env:Path"
+$repoRoot = (Resolve-Path ".").Path
+$pythonRoot = (Resolve-Path ".\python").Path
+$env:PYTHONPATH = "$repoRoot;$pythonRoot"
+
+.\.venv\Scripts\python.exe -m ruff check `
+  python/ai_vastu/architectural_geometry `
+  python/ai_vastu/generation `
+  python/ai_vastu/solver `
+  tests/architectural_geometry/test_circulation.py `
+  tests/generation/test_circulation_repair_selection.py `
+  tests/solver/test_circulation_repair.py `
+  tests/solver/test_models.py
+
+.\.venv\Scripts\python.exe -m mypy `
+  python/ai_vastu/architectural_geometry `
+  python/ai_vastu/generation `
+  python/ai_vastu/solver
+
+.\.venv\Scripts\python.exe -m pytest `
+  tests/architectural_geometry/test_circulation.py `
+  tests/generation/test_auto_circulation.py `
+  tests/generation/test_circulation_repair_selection.py `
+  tests/solver/test_circulation_repair.py `
+  tests/solver/test_models.py -q
+```
+
+If those focused gates are green, run the broader affected suite before returning to the 30x50 production qualification path:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  tests/geometry `
+  tests/architectural_geometry `
+  tests/generation `
+  tests/architectural_brain `
+  tests/solver `
+  tests/multi_candidate `
+  tests/requirements -q
+```
+
+### Next action
+
+Apply the 2D9L-C package, run the focused local validation once, then rerun the real 30x50 multi-candidate production path. If circulation is repaired but the production critic still rejects every candidate, diagnose the remaining rejection evidence without weakening site accounting, Vastu, deduplication, geometry validation or Canonical PlanDocument authority.
+
+---
+
+## Stage 2D9L / 2D9K final qualification closure
+
+Status: **V1 QUALIFIED**
+
+2D9L production-candidate repair is checkpointed at commit `cf6f389b7d9537b8711413bb737f7dea6dd341a6`
+and tagged `phase2d9l-green`.
+
+The final Stage 2D9K end-to-end qualification passed from the verified working
+state represented by the local qualification evidence directory:
+
+`D:\shubhaarambh\Vastu-AI\ai-vastu-architect-phase25\.local\qa-2d9k\final-20260922-183955`
+
+Qualification covered the full repository gate, the real 50 ft x 30 ft
+East-road production candidate path, deterministic repeatability, bounded
+circulation repair, purposeful site allocation, architectural critic acceptance,
+cross-floor soft wet-stack coordination, persisted exact revision identity,
+ownership isolation, and SVG/JPEG/PDF/DXF exports from the reopened canonical
+PlanDocument.
+
+Architecture decisions retained:
+
+- Canonical PlanDocument remains authoritative.
+- OR-Tools remains the deterministic placement/constraint solver.
+- NetworkX is used for circulation/topology computation, not as an authority layer.
+- Shapely/GEOS remains confined to the approved geometry adapter boundary.
+- Wet-stack coordination is a soft cross-floor quality objective, not a universal hard rule.
+- Parking has no arbitrary universal hard maximum; sizing is contextual and quality-driven.
+- Unexplained buildable-envelope residuals continue to fail closed.
+- Existing Vastu, overlap, circulation, site-accounting, deduplication, and export-integrity gates were not weakened.
+
+The historical `phase2d9k-not-qualified` tag remains untouched as evidence of
+the earlier failed qualification.
