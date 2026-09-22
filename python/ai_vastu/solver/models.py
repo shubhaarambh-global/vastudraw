@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import json
@@ -48,6 +48,18 @@ class PlannerBoundarySide(StrEnum):
     WEST = "WEST"
 
 
+class CirculationRepairPair(FrozenModel):
+    first_room_id: EntityId
+    second_room_id: EntityId
+    min_shared_length_mm: PositiveMM
+
+    @model_validator(mode="after")
+    def validate_distinct_rooms(self) -> CirculationRepairPair:
+        if self.first_room_id == self.second_room_id:
+            raise ValueError("Circulation repair must connect two distinct rooms.")
+        return self
+
+
 class ResidentialPlanningConfig(FrozenModel):
     enabled: bool = False
     target_occupied_area_basis_points: BasisPointsInt = 7_000
@@ -61,9 +73,11 @@ class ResidentialPlanningConfig(FrozenModel):
     parking_min_depth_mm: PositiveMM = 5_500
     require_entrance_boundary_access: bool = False
     require_horizontal_circulation: bool = False
+    circulation_repair_pairs: tuple[CirculationRepairPair, ...] = ()
     vertical_core_footprint: IntPolygon | None = None
     wet_stack_anchor: IntPoint | None = None
-    wet_stack_weight: NonNegativeInt = 35
+    wet_stack_targets: tuple[tuple[RoomType, IntPoint], ...] = ()
+    wet_stack_weight: NonNegativeInt = 100
 
 
 class PlannerConfig(FrozenModel):

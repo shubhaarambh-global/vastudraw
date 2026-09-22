@@ -60,6 +60,20 @@ _WET_ROOM_TYPES = frozenset(
 )
 
 
+_SANITARY_WET_ROOM_TYPES = frozenset(
+    {
+        RoomType.ATTACHED_TOILET,
+        RoomType.COMMON_TOILET,
+        RoomType.POWDER_ROOM,
+        RoomType.BATH,
+        RoomType.SERVANT_TOILET,
+    }
+)
+
+
+def _wet_stack_group(room_type: RoomType) -> str:
+    return "SANITARY" if room_type in _SANITARY_WET_ROOM_TYPES else "SERVICE"
+
 @dataclass(frozen=True)
 class _RectangleBounds:
     min_x_mm: int
@@ -328,39 +342,127 @@ def _append_wet_stack_objectives(
     penalty_terms: list[_PenaltyTerm],
 ) -> None:
     planning = config.residential_planning
-    anchor = planning.wet_stack_anchor
-    if anchor is None or planning.wet_stack_weight == 0:
+    fallback_anchor = planning.wet_stack_anchor
+    stack_targets = planning.wet_stack_targets
+    if (
+        fallback_anchor is None
+        and not stack_targets
+    ) or planning.wet_stack_weight == 0:
         return
 
     step = config.solver_step_mm
-    target_x2 = 2 * ((anchor.x_mm - bounds.min_x_mm) // step)
-    target_y2 = 2 * ((anchor.y_mm - bounds.min_y_mm) // step)
+    max_distance2_cells = (width_cells + depth_cells) * 2
     added = 0
+    used_cross_floor_targets = 0
+
+    def target_center2(anchor: Any) -> tuple[int, int]:
+        return (
+            ((anchor.x_mm - bounds.min_x_mm) * 2) // step,
+            ((anchor.y_mm - bounds.min_y_mm) * 2) // step,
+        )
+
+    def distance_to_anchor(
+        *,
+        room_id: Any,
+        values: _RoomVars,
+        anchor: Any,
+        suffix: str,
+    ) -> Any:
+        target_x2, target_y2 = target_center2(anchor)
+        dx = model.new_int_var(
+            0,
+            width_cells * 2,
+            f"wet_stack_dx_{room_id.hex}_{suffix}",
+        )
+        dy = model.new_int_var(
+            0,
+            depth_cells * 2,
+            f"wet_stack_dy_{room_id.hex}_{suffix}",
+        )
+        model.add_abs_equality(dx, values.x * 2 + values.width - target_x2)
+        model.add_abs_equality(dy, values.y * 2 + values.depth - target_y2)
+        distance2 = model.new_int_var(
+            0,
+            max_distance2_cells,
+            f"wet_stack_distance2_{room_id.hex}_{suffix}",
+        )
+        model.add(distance2 == dx + dy)
+        return distance2
+
     for room in sorted(problem.room_instances, key=lambda item: str(item.id)):
         if room.room_type not in _WET_ROOM_TYPES:
             continue
+
         values = room_vars[room.id]
-        dx = model.new_int_var(0, width_cells * 2, f"wet_stack_dx_{room.id.hex}")
-        dy = model.new_int_var(0, depth_cells * 2, f"wet_stack_dy_{room.id.hex}")
-        model.add_abs_equality(dx, values.x * 2 + values.width - target_x2)
-        model.add_abs_equality(dy, values.y * 2 + values.depth - target_y2)
+        compatible_targets = tuple(
+            anchor
+            for target_room_type, anchor in stack_targets
+            if _wet_stack_group(target_room_type) == _wet_stack_group(room.room_type)
+        )
+
+        if compatible_targets:
+            candidate_distances = tuple(
+                distance_to_anchor(
+                    room_id=room.id,
+                    values=values,
+                    anchor=anchor,
+                    suffix=f"lower_{index}",
+                )
+                for index, anchor in enumerate(compatible_targets)
+            )
+            if len(candidate_distances) == 1:
+                minimum_distance2 = candidate_distances[0]
+            else:
+                minimum_distance2 = model.new_int_var(
+                    0,
+                    max_distance2_cells,
+                    f"wet_stack_min_distance2_{room.id.hex}",
+                )
+                model.add_min_equality(minimum_distance2, candidate_distances)
+
+            physical_distance2_mm = model.new_int_var(
+                0,
+                max_distance2_cells * step,
+                f"wet_stack_distance2_mm_{room.id.hex}",
+            )
+            model.add(physical_distance2_mm == minimum_distance2 * step)
+            penalty = physical_distance2_mm
+            used_cross_floor_targets += 1
+        elif fallback_anchor is not None:
+            penalty = distance_to_anchor(
+                room_id=room.id,
+                values=values,
+                anchor=fallback_anchor,
+                suffix="core",
+            )
+        else:
+            continue
+
         penalty_terms.append(
             _PenaltyTerm(
                 _system_objective_id(problem, f"wet-stack:{room.id}"),
                 "WET_STACK_PROXIMITY",
                 planning.wet_stack_weight,
-                dx + dy,
+                penalty,
             )
         )
         added += 1
 
     if added:
+        detail = (
+            f"{used_cross_floor_targets} room(s) used nearest compatible "
+            "lower-floor canonical wet/service geometry; remaining rooms used "
+            "the building-core plumbing-zone fallback."
+            if used_cross_floor_targets
+            else "The building-core plumbing-zone fallback was used."
+        )
         _append_notice(
             notices,
             code="WET_STACK_PROXIMITY_ACTIVE",
             message=(
-                f"{added} wet/service room(s) received a soft building-level plumbing-zone "
-                "proximity objective; exact cross-floor replication was not required."
+                f"{added} wet/service room(s) received a soft plumbing-zone "
+                f"proximity objective. {detail} Exact cross-floor replication "
+                "was not required."
             ),
         )
 
@@ -608,6 +710,60 @@ def _append_hard_residential_circulation(
         )
 
 
+def _append_circulation_repair_constraints(
+    model: Any,
+    problem: CompiledConstraintProblem,
+    room_vars: dict[Any, _RoomVars],
+    *,
+    config: PlannerConfig,
+    width_cells: int,
+    depth_cells: int,
+    notices: list[PlannerNotice],
+) -> None:
+    pairs = config.residential_planning.circulation_repair_pairs
+    if not pairs:
+        return
+
+    room_ids = {room.id for room in problem.room_instances}
+    added = 0
+    for pair in sorted(
+        pairs,
+        key=lambda item: (str(item.first_room_id), str(item.second_room_id)),
+    ):
+        if pair.first_room_id not in room_ids or pair.second_room_id not in room_ids:
+            raise SolverModelError(
+                "Circulation repair references a room outside the compiled problem."
+            )
+
+        penalty = _adjacency_pair_penalty(
+            model,
+            room_vars[pair.first_room_id],
+            room_vars[pair.second_room_id],
+            config=config,
+            buildable_width_cells=width_cells,
+            buildable_depth_cells=depth_cells,
+            objective=_AdjacencyTargetSpec(
+                max_gap_mm=0,
+                min_shared_length_mm=pair.min_shared_length_mm,
+            ),
+            name=(
+                "circulation_repair_"
+                f"{pair.first_room_id.hex}_{pair.second_room_id.hex}"
+            ),
+        )
+        model.add(penalty == 0)
+        added += 1
+
+    _append_notice(
+        notices,
+        code="CIRCULATION_REPAIR_ENFORCED",
+        message=(
+            f"{added} system-derived circulation repair adjacency constraint(s) "
+            "were enforced after a prior solved layout proved disconnected."
+        ),
+    )
+
+
 def _append_residential_quality_objectives(
     model: Any,
     problem: CompiledConstraintProblem,
@@ -656,32 +812,6 @@ def _append_residential_quality_objectives(
         "residential_total_area_mm2",
     )
     model.add(total_area_mm2 == total_area_cells2 * step2)
-
-    # Residential plans whose requested occupied-area target is at least the
-    # architectural quality floor must satisfy that floor as a feasibility
-    # condition. It must not be traded away against topology or other soft
-    # objective terms.
-    #
-    # The floor is capped by the allocator's effective target so a small
-    # confirmed program is never artificially inflated beyond its legitimate
-    # room-role expansion capacity.
-    residential_quality_floor_bp = 8_500
-    if planning.target_occupied_area_basis_points >= residential_quality_floor_bp:
-        requested_floor_mm2 = buildable_area_mm2 * residential_quality_floor_bp // 10_000
-        effective_floor_mm2 = min(
-            requested_floor_mm2,
-            effective_target_mm2,
-        )
-        model.add(total_area_mm2 >= effective_floor_mm2)
-        _append_notice(
-            notices,
-            code="RESIDENTIAL_OCCUPANCY_FLOOR_ENFORCED",
-            message=(
-                "Residential occupied-room area must satisfy at least "
-                f"{effective_floor_mm2 * 10_000 // buildable_area_mm2 / 100:.1f}% "
-                "of the buildable rectangle before soft objectives are optimized."
-            ),
-        )
 
     if planning.occupied_area_weight > 0:
         deviation = model.new_int_var(
@@ -1438,6 +1568,16 @@ def solve_rectangular_problem(
         notices=notices,
     )
 
+    _append_circulation_repair_constraints(
+        model,
+        problem,
+        room_vars,
+        config=config,
+        width_cells=width_cells,
+        depth_cells=depth_cells,
+        notices=notices,
+    )
+
     _append_wet_stack_objectives(
         model,
         problem,
@@ -1502,7 +1642,21 @@ def solve_rectangular_problem(
     )
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = config.max_time_ms / 1000.0
+    wall_budget_seconds = config.max_time_ms / 1000.0
+    if config.residential_planning.enabled:
+        # Residential production quality must not depend on host load at a
+        # short wall-clock cutoff. The primary search-work limits are
+        # deterministic (single worker, fixed seed, deterministic time and
+        # conflict budget). A much larger wall-clock cap remains only as an
+        # emergency operational failsafe.
+        deterministic_budget = max(20.0, wall_budget_seconds * 4.0)
+        solver.parameters.max_deterministic_time = deterministic_budget
+        solver.parameters.max_time_in_seconds = max(
+            60.0,
+            deterministic_budget * 3.0,
+        )
+    else:
+        solver.parameters.max_time_in_seconds = wall_budget_seconds
     solver.parameters.max_number_of_conflicts = config.max_conflicts
     solver.parameters.random_seed = config.random_seed
     solver.parameters.num_search_workers = 1

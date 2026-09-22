@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from ai_vastu.architectural_geometry import validate_circulation
+from ai_vastu.architectural_geometry import analyze_room_access_graph, validate_circulation
 from ai_vastu.plan_schema import (
     AxisSegment,
     Floor,
@@ -162,3 +162,44 @@ def test_multiple_floors_keep_independent_graphs() -> None:
     disconnected = _floor((living, kitchen), (entry,), (_door(1, entry, 900),))
     assert validate_circulation(connected).accepted
     assert not validate_circulation(disconnected).accepted
+
+def test_networkx_access_analysis_reports_articulation_and_sanitary_leaf() -> None:
+    living_id = UUID(int=1)
+    lobby_id = UUID(int=2)
+    bedroom_id = UUID(int=3)
+    toilet_id = UUID(int=4)
+
+    analysis = analyze_room_access_graph(
+        room_ids=(living_id, lobby_id, bedroom_id, toilet_id),
+        edges=(
+            (living_id, lobby_id),
+            (lobby_id, bedroom_id),
+            (lobby_id, toilet_id),
+        ),
+        root_room_ids=(living_id,),
+        required_room_ids=(living_id, lobby_id, bedroom_id, toilet_id),
+        sanitary_room_ids=(toilet_id,),
+    )
+
+    assert analysis.disconnected_room_ids == ()
+    assert analysis.reachable_room_ids == (living_id, lobby_id, bedroom_id, toilet_id)
+    assert analysis.connected_components == ((living_id, lobby_id, bedroom_id),)
+    assert analysis.articulation_room_ids == (lobby_id,)
+
+
+def test_networkx_access_analysis_does_not_use_sanitary_room_as_bridge() -> None:
+    living_id = UUID(int=1)
+    toilet_id = UUID(int=2)
+    bedroom_id = UUID(int=3)
+
+    analysis = analyze_room_access_graph(
+        room_ids=(living_id, toilet_id, bedroom_id),
+        edges=((living_id, toilet_id), (toilet_id, bedroom_id)),
+        root_room_ids=(living_id,),
+        required_room_ids=(living_id, toilet_id, bedroom_id),
+        sanitary_room_ids=(toilet_id,),
+    )
+
+    assert analysis.reachable_room_ids == (living_id, toilet_id)
+    assert analysis.disconnected_room_ids == (bedroom_id,)
+    assert analysis.connected_components == ((living_id,), (bedroom_id,))

@@ -4,7 +4,9 @@ from .builder import build_architectural_geometry
 from .circulation import (
     CirculationDoor,
     CirculationGraph,
+    CirculationTopologyAnalysis,
     CirculationValidation,
+    analyze_room_access_graph,
     build_circulation_graph,
     validate_circulation,
 )
@@ -53,6 +55,7 @@ __all__ = [
     "BuildingRoomNode",
     "CirculationDoor",
     "CirculationGraph",
+    "CirculationTopologyAnalysis",
     "CirculationValidation",
     "GeometryNotice",
     "GeometryNoticeSeverity",
@@ -69,6 +72,7 @@ __all__ = [
     "WetStackRelationship",
     "WholeBuildingCirculationGraph",
     "WholeBuildingValidation",
+    "analyze_room_access_graph",
     "build_architectural_geometry",
     "build_circulation_graph",
     "derive_purposeful_site_spaces",

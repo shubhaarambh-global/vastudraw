@@ -13,13 +13,16 @@ from .shapely_validator import (
     measure_site_partition,
     measure_site_residual_rectangles,
 )
+from .site_residuals import measure_site_residual_polygons, polygon_has_usable_core
 from .types import (
     BooleanOperation,
     GeometryResult,
     MeasuredGeometryRegion,
+    ResidualPolygonMeasurement,
     ResidualRectangleMeasurement,
     SitePartitionMeasurement,
     SiteResidualMeasurement,
+    SiteResidualPolygonMeasurement,
 )
 from .verified_kernel import VerifiedGeometryKernel
 
@@ -32,13 +35,17 @@ __all__ = [
     "InvalidGeometryError",
     "MeasuredGeometryRegion",
     "NonIntegralGeometryError",
+    "ResidualPolygonMeasurement",
     "ResidualRectangleMeasurement",
     "ShapelyGeometryValidator",
     "SitePartitionMeasurement",
     "SiteResidualMeasurement",
+    "SiteResidualPolygonMeasurement",
     "VerifiedGeometryKernel",
     "area2_polygon",
     "measure_site_partition",
+    "measure_site_residual_polygons",
     "measure_site_residual_rectangles",
+    "polygon_has_usable_core",
     "signed_area2_ring",
 ]

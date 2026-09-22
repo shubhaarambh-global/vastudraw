@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+import networkx as nx  # type: ignore[import-untyped]
+
 from ai_vastu.plan_schema import (
     Floor,
     OpeningKind,
@@ -50,6 +52,85 @@ class CirculationValidation:
     reason_code: str | None
     message: str
     graph: CirculationGraph
+
+
+@dataclass(frozen=True, slots=True)
+class CirculationTopologyAnalysis:
+    root_room_ids: tuple[UUID, ...]
+    reachable_room_ids: tuple[UUID, ...]
+    disconnected_room_ids: tuple[UUID, ...]
+    connected_components: tuple[tuple[UUID, ...], ...]
+    articulation_room_ids: tuple[UUID, ...]
+
+
+def analyze_room_access_graph(
+    *,
+    room_ids: tuple[UUID, ...],
+    edges: tuple[tuple[UUID, UUID], ...],
+    root_room_ids: tuple[UUID, ...],
+    required_room_ids: tuple[UUID, ...],
+    sanitary_room_ids: tuple[UUID, ...] = (),
+) -> CirculationTopologyAnalysis:
+    """Analyze circulation topology without asserting geometric validity.
+
+    Callers remain responsible for proving that every supplied edge represents a
+    physically door-capable relationship. Sanitary rooms may be reachable leaves,
+    but are removed from the transit graph so they cannot bridge unrelated rooms.
+    """
+
+    known_room_ids = set(room_ids)
+    referenced_room_ids = (
+        set(root_room_ids)
+        | set(required_room_ids)
+        | set(sanitary_room_ids)
+        | {room_id for edge in edges for room_id in edge}
+    )
+    unknown_room_ids = referenced_room_ids - known_room_ids
+    if unknown_room_ids:
+        listed = ", ".join(str(room_id) for room_id in sorted(unknown_room_ids, key=str))
+        raise ValueError(f"Circulation graph references unknown room IDs: {listed}.")
+
+    graph = nx.Graph()
+    graph.add_nodes_from(room_ids)
+    graph.add_edges_from(edges)
+
+    sanitary = set(sanitary_room_ids)
+    roots = tuple(sorted(set(root_room_ids), key=str))
+    required = tuple(sorted(set(required_room_ids), key=str))
+
+    transit_graph = graph.copy()
+    transit_graph.remove_nodes_from(sanitary)
+
+    reachable_non_sanitary: set[UUID] = set()
+    for root in roots:
+        if root in sanitary or root not in transit_graph:
+            continue
+        reachable_non_sanitary.update(nx.node_connected_component(transit_graph, root))
+
+    reachable = set(reachable_non_sanitary) | (set(roots) & sanitary)
+    for room_id in sorted(sanitary, key=str):
+        if room_id not in graph:
+            continue
+        if any(neighbor in reachable_non_sanitary for neighbor in graph.neighbors(room_id)):
+            reachable.add(room_id)
+
+    disconnected = tuple(room_id for room_id in required if room_id not in reachable)
+    components = tuple(
+        tuple(sorted(component, key=str))
+        for component in sorted(
+            nx.connected_components(transit_graph),
+            key=lambda component: tuple(str(item) for item in sorted(component, key=str)),
+        )
+    )
+    articulation = tuple(sorted(nx.articulation_points(transit_graph), key=str))
+
+    return CirculationTopologyAnalysis(
+        root_room_ids=roots,
+        reachable_room_ids=tuple(sorted(reachable, key=str)),
+        disconnected_room_ids=disconnected,
+        connected_components=components,
+        articulation_room_ids=articulation,
+    )
 
 
 def _edge_signature(
@@ -160,21 +241,28 @@ def build_circulation_graph(
             key=str,
         )
     )
-    reachable: set[UUID] = set(entries) | set(anchor_room_ids)
-    frontier = list(entries) + list(anchor_room_ids)
-    while frontier:
-        current = frontier.pop()
-        if room_by_id[current].room_type in _SANITARY_ROOM_TYPES:
-            continue
-        for door in doors:
-            if current not in door.room_ids:
-                continue
-            other = door.room_ids[0] if door.room_ids[1] == current else door.room_ids[1]
-            if other not in reachable:
-                reachable.add(other)
-                frontier.append(other)
-
-    disconnected = tuple(room_id for room_id in required if room_id not in reachable)
+    analysis = analyze_room_access_graph(
+        room_ids=tuple(sorted(room_by_id, key=str)),
+        edges=tuple(
+            (door.room_ids[0], door.room_ids[1])
+            for door in doors
+            if len(door.room_ids) == 2
+        ),
+        root_room_ids=tuple(entries) + tuple(anchor_room_ids),
+        required_room_ids=required,
+        sanitary_room_ids=tuple(
+            sorted(
+                (
+                    room_id
+                    for room_id, room in room_by_id.items()
+                    if room.room_type in _SANITARY_ROOM_TYPES
+                ),
+                key=str,
+            )
+        ),
+    )
+    reachable = set(analysis.reachable_room_ids)
+    disconnected = analysis.disconnected_room_ids
     if invalid and not disconnected:
         disconnected = required
     return CirculationGraph(

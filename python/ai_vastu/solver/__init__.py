@@ -3,6 +3,7 @@
 from .errors import PlannerError, SolverModelError, UnsupportedSolverProblemError
 from .models import (
     SOLVER_MODEL_VERSION,
+    CirculationRepairPair,
     ObjectiveContribution,
     PlannerBoundarySide,
     PlannerConfig,
@@ -19,6 +20,7 @@ from .rectangular_cp_sat import solve_rectangular_problem
 
 __all__ = [
     "SOLVER_MODEL_VERSION",
+    "CirculationRepairPair",
     "ObjectiveContribution",
     "PlannerBoundarySide",
     "PlannerConfig",

@@ -7,16 +7,22 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 from shapely.validation import explain_validity
 
-from ai_vastu.plan_schema import AxisSegment, IntPolygon
+from ai_vastu.plan_schema import AxisSegment, IntPoint, IntPolygon
 
-from .errors import GeometryKernelDisagreementError, InvalidGeometryError
-from .ring_math import total_area2
+from .errors import (
+    GeometryKernelDisagreementError,
+    InvalidGeometryError,
+    NonIntegralGeometryError,
+)
+from .ring_math import canonicalize_polygon, polygon_sort_key, total_area2
 from .types import (
     BooleanOperation,
     MeasuredGeometryRegion,
+    ResidualPolygonMeasurement,
     ResidualRectangleMeasurement,
     SitePartitionMeasurement,
     SiteResidualMeasurement,
+    SiteResidualPolygonMeasurement,
 )
 
 
@@ -208,6 +214,183 @@ def measure_site_residual_rectangles(
     return SiteResidualMeasurement(
         envelope_area_mm2=round(envelope_shape.area),
         rectangles=tuple(rectangles),
+        road_adjacent_polygon_indexes=road_adjacent,
+    )
+
+
+def _integral_coordinate(value: float) -> int:
+    rounded = round(value)
+    if abs(value - rounded) > 1e-9:
+        raise NonIntegralGeometryError(
+            "Residual-site measurement produced a non-integral millimetre coordinate "
+            f"{value!r}."
+        )
+    return int(rounded)
+
+
+def _int_ring(
+    coordinates: Iterable[tuple[float, ...]],
+) -> tuple[IntPoint, ...]:
+    raw = list(coordinates)
+    if len(raw) >= 2 and raw[0] == raw[-1]:
+        raw = raw[:-1]
+
+    points: list[IntPoint] = []
+    for coordinate in raw:
+        if len(coordinate) < 2:
+            raise NonIntegralGeometryError(
+                "Residual-site measurement produced an incomplete polygon coordinate."
+            )
+        x, y = coordinate[0], coordinate[1]
+        point = IntPoint(
+            x_mm=_integral_coordinate(float(x)),
+            y_mm=_integral_coordinate(float(y)),
+        )
+        if points and point == points[-1]:
+            continue
+        points.append(point)
+
+    if len(points) >= 2 and points[0] == points[-1]:
+        points.pop()
+
+    if len(points) < 3:
+        raise NonIntegralGeometryError(
+            "Residual-site measurement produced a degenerate polygon ring."
+        )
+
+    return tuple(points)
+
+
+def _int_polygon(polygon: Polygon) -> IntPolygon:
+    result = canonicalize_polygon(
+        IntPolygon(
+            outer=_int_ring(polygon.exterior.coords),
+            holes=tuple(_int_ring(interior.coords) for interior in polygon.interiors),
+        )
+    )
+
+    rebuilt = to_shapely(result)
+    if not rebuilt.is_valid:
+        raise ValueError("Residual-site measurement produced invalid canonical geometry.")
+
+    disagreement_area = rebuilt.symmetric_difference(polygon).area
+    if disagreement_area > 1e-7:
+        raise NonIntegralGeometryError(
+            "Residual-site geometry cannot be represented exactly on the integer-mm lattice; "
+            f"disagreement area={disagreement_area:.9f} mm2."
+        )
+
+    return result
+
+
+def polygon_has_usable_core_shapely(
+    polygon: IntPolygon,
+    *,
+    minimum_width_mm: int,
+) -> bool:
+    """Vendor-adapter implementation of the purposeful-space core predicate."""
+
+    if minimum_width_mm <= 0:
+        raise ValueError("minimum_width_mm must be positive.")
+
+    shape = to_shapely(polygon)
+    inset_mm = max(1, minimum_width_mm // 2 - 1)
+    core = shape.buffer(-inset_mm, join_style="mitre")
+    return not core.is_empty and core.area > 0
+
+
+def measure_site_residual_polygons_shapely(
+    envelope: IntPolygon,
+    occupied_polygons: tuple[IntPolygon, ...],
+    *,
+    road_boundary_side: str | None,
+    solver_step_mm: int,
+) -> SiteResidualPolygonMeasurement:
+    """Measure exact residual components inside the Shapely/GEOS adapter boundary.
+
+    Purposeful-site derivation uses the same residual construction as site
+    accounting. Result coordinates must remain exactly representable on the
+    integer-mm lattice; otherwise the adapter fails closed.
+    """
+
+    envelope_shape = to_shapely(envelope)
+    occupied_shapes = tuple(to_shapely(polygon) for polygon in occupied_polygons)
+
+    for shape in (envelope_shape, *occupied_shapes):
+        if shape.is_empty or not shape.is_valid:
+            raise ValueError("Residual-site measurement requires valid non-empty polygons.")
+
+    for shape in occupied_shapes:
+        if not envelope_shape.covers(shape):
+            raise ValueError(
+                "Canonical occupied geometry extends outside the confirmed buildable envelope."
+            )
+
+    occupied = unary_union(occupied_shapes) if occupied_shapes else None
+    residual = envelope_shape.difference(occupied) if occupied is not None else envelope_shape
+
+    road = (
+        _road_segment(
+            envelope_shape,
+            side=road_boundary_side,
+            solver_step_mm=solver_step_mm,
+        )
+        if road_boundary_side is not None
+        else None
+    )
+
+    road_adjacent = (
+        tuple(
+            index
+            for index, shape in enumerate(occupied_shapes)
+            if shape.boundary.intersection(road).length > 0
+        )
+        if road is not None
+        else ()
+    )
+
+    measurements: list[ResidualPolygonMeasurement] = []
+
+    for residual_shape in _polygon_components(residual):
+        if residual_shape.area <= 0:
+            continue
+
+        polygon = _int_polygon(residual_shape)
+        shape = to_shapely(polygon)
+        min_x, min_y, max_x, max_y = (round(value) for value in shape.bounds)
+
+        measurements.append(
+            ResidualPolygonMeasurement(
+                polygon=polygon,
+                bounds=(min_x, min_y, max_x, max_y),
+                rectangle_bounds=_rectangle_bounds(shape),
+                area_mm2=round(shape.area),
+                touches_envelope_boundary=(
+                    shape.boundary.intersection(envelope_shape.boundary).length > 0
+                ),
+                road_boundary_shared_length_mm=(
+                    round(shape.boundary.intersection(road).length)
+                    if road is not None
+                    else 0
+                ),
+                adjacent_polygon_indexes=tuple(
+                    index
+                    for index, occupied_shape in enumerate(occupied_shapes)
+                    if shape.boundary.intersection(occupied_shape.boundary).length > 0
+                ),
+            )
+        )
+
+    measurements.sort(
+        key=lambda item: (
+            polygon_sort_key(item.polygon),
+            item.area_mm2,
+        )
+    )
+
+    return SiteResidualPolygonMeasurement(
+        envelope_area_mm2=round(envelope_shape.area),
+        polygons=tuple(measurements),
         road_adjacent_polygon_indexes=road_adjacent,
     )
 

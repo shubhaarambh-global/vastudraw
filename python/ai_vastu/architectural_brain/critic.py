@@ -267,26 +267,12 @@ def critique_plan(
             )
         )
 
-    parking_rooms = [room for room in floor.rooms if room.room_type.value in {"parking", "garage"}]
-
-    for room in parking_rooms:
-        xs = [point.x_mm for point in room.polygon.outer]
-        ys = [point.y_mm for point in room.polygon.outer]
-
-        area = (max(xs) - min(xs)) * (max(ys) - min(ys))
-
-        if area > 20_000_000:
-            findings.append(
-                CritiqueFinding(
-                    code="OVERSIZED_PARKING",
-                    severity=CritiqueSeverity.REJECT,
-                    message=("Parking is oversized and appears to absorb residual site area."),
-                    repair_hint=(
-                        "Keep one-car parking near a practical residential "
-                        "footprint unless the client explicitly requests more."
-                    ),
-                )
-            )
+    # Parking size has no universal architectural maximum. Confirmed user/site
+    # constraints remain hard; automatic parking sizing is handled by the
+    # solver's role-sensitive soft area targets. The critic therefore must not
+    # reject a plan solely because a parking polygon crosses an arbitrary area
+    # threshold. Site-accounting and circulation checks still reject filler or
+    # unusable geometry through their own evidence-based rules.
 
     for candidate_floor in document.floors:
         puja_rooms = [

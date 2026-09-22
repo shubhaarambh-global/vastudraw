@@ -14,6 +14,7 @@ Phase 0 records intended and bootstrap dependencies. Exact production versions a
 | ESLint | TypeScript linting | MIT | development dependency | acceptable |
 | Prettier | formatting | MIT | development dependency | acceptable |
 | Google OR-Tools | CP-SAT optimization | Apache-2.0 | Phase 7: 9.15.6755 | accepted behind solver adapter |
+| NetworkX | circulation/access graph analysis | BSD-3-Clause | 2D9L: 3.6.1 | accepted as non-authoritative graph-analysis layer |
 | Clipper2 | integer polygon geometry | BSL-1.0 | Phase 3 via pyclipr 0.1.8 | accepted behind adapter |
 | Shapely / GEOS | independent topology validation | BSD-3-Clause / LGPL-2.1-or-later | Phase 3: Shapely 2.1.2 | accepted as verification layer; retain license obligations |
 | Konva / react-konva | browser CAD-like interaction | MIT | Phase 12: Konva 10.5.0 / react-konva 19.2.7 | accepted behind non-authoritative renderer boundary |
@@ -170,3 +171,12 @@ gate.
 - PyJWT — JWT signature/claim verification at the FastAPI authentication boundary.
 - `@supabase/supabase-js` — browser-side Supabase Auth session management only; API
   authorization remains independent and server-enforced.
+
+## Stage 2D9L additions
+
+### NetworkX 3.6.1
+- Purpose: deterministic circulation/access graph analysis, connected-component diagnostics and articulation-point analysis.
+- License: BSD-3-Clause.
+- Architecture boundary: graph computation only. NetworkX does not author room geometry, walls, doors or Canonical PlanDocument data.
+- Authority: canonical wall/opening geometry and the existing circulation validators remain authoritative; graph edges are supplied only after deterministic geometry proves a door-capable relationship.
+- Upgrade policy: retain deterministic topology regressions and rerun circulation/generation qualification before changing the pinned version.

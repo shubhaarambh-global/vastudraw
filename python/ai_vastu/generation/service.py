@@ -8,22 +8,27 @@ from ai_vastu.architectural_geometry import (
     ArchitecturalGeometryError,
     ArchitecturalGeometryRequest,
     ArchitecturalGeometryResult,
+    CirculationTopologyAnalysis,
     OpeningBuildRequest,
     StairBuildRequest,
     VerticalArchitecturePlanningError,
     VerticalCorePlan,
+    analyze_room_access_graph,
     build_architectural_geometry,
     plan_vertical_architecture,
     validate_circulation,
     validate_whole_building,
 )
 from ai_vastu.constraints import (
+    AdjacencyProhibitionConstraint,
+    CompiledConstraintProblem,
     ConstraintCompilerError,
     ConstraintCompilerInput,
     compile_constraints,
 )
 from ai_vastu.plan_schema import (
     DoorSwing,
+    IntPoint,
     OpeningKind,
     RoomGeometry,
     RoomRequirement,
@@ -32,6 +37,7 @@ from ai_vastu.plan_schema import (
     WallCategory,
 )
 from ai_vastu.solver import (
+    CirculationRepairPair,
     PlannerBoundarySide,
     PlannerError,
     PlannerStatus,
@@ -196,6 +202,53 @@ _SANITARY_ROOM_TYPES = frozenset(
     }
 )
 
+_MAX_CIRCULATION_REPAIR_ATTEMPTS = 4
+
+
+
+_WET_STACK_ROOM_TYPES = frozenset(
+    {
+        RoomType.KITCHEN,
+        RoomType.UTILITY,
+        RoomType.LAUNDRY,
+        RoomType.ATTACHED_TOILET,
+        RoomType.COMMON_TOILET,
+        RoomType.POWDER_ROOM,
+        RoomType.BATH,
+        RoomType.SERVANT_TOILET,
+    }
+)
+
+
+def _room_center_point(room: RoomGeometry) -> IntPoint:
+    xs = tuple(point.x_mm for point in room.polygon.outer)
+    ys = tuple(point.y_mm for point in room.polygon.outer)
+    return IntPoint(
+        x_mm=(min(xs) + max(xs)) // 2,
+        y_mm=(min(ys) + max(ys)) // 2,
+    )
+
+
+def _previous_floor_wet_stack_targets(
+    floor_results: list[FloorGenerationResult],
+) -> tuple[tuple[RoomType, IntPoint], ...]:
+    if not floor_results:
+        return ()
+    geometry = floor_results[-1].geometry_result
+    if geometry is None:
+        return ()
+    wet_rooms = tuple(
+        room
+        for room in geometry.floor.rooms
+        if room.room_type in _WET_STACK_ROOM_TYPES
+    )
+    return tuple(
+        (room.room_type, _room_center_point(room))
+        for room in sorted(
+            wet_rooms,
+            key=lambda item: (item.room_type.value, str(item.id)),
+        )
+    )
 
 def _interior_circulation_anchor(
     rooms: tuple[RoomGeometry, ...],
@@ -237,10 +290,21 @@ def _centered_opening(
     )
 
 
-def _synthesize_circulation_openings(
+@dataclass(frozen=True, slots=True)
+class _CirculationContext:
+    rooms: tuple[RoomGeometry, ...]
+    room_index: dict[UUID, RoomGeometry]
+    exterior: _CirculationWall | None
+    root_room_id: UUID
+    internal_candidates: tuple[_CirculationWall, ...]
+    required_room_ids: frozenset[UUID]
+    sanitary_room_ids: frozenset[UUID]
+
+
+def _build_circulation_context(
     geometry: ArchitecturalGeometryResult,
     request: ArchitecturalGenerationRequest,
-) -> tuple[OpeningBuildRequest, ...]:
+) -> _CirculationContext:
     floor = geometry.floor
     rooms = tuple(floor.rooms)
     if not rooms:
@@ -288,59 +352,121 @@ def _synthesize_circulation_openings(
         priority = _ACCESS_PRIORITY.get(room.room_type.value, 50)
         return (priority, _wall_sort_key(candidate.wall))
 
-    openings: list[OpeningBuildRequest] = []
+    exterior: _CirculationWall | None = None
     if config.require_external_entry and external_candidates:
         exterior = min(external_candidates, key=external_key)
         root_room_id = exterior.adjacent_room_ids[0]
-        openings.append(
-            _centered_opening(
-                exterior.wall,
-                width_mm=config.external_door_width_mm,
-                height_mm=config.door_height_mm,
-            )
-        )
     else:
         root_room_id = _interior_circulation_anchor(
             rooms,
             core_plan=request.vertical_core_plan,
         )
 
-    internal_candidates = [
-        candidate
-        for candidate in walls
-        if candidate.wall.category is WallCategory.INTERNAL
-        and len(candidate.adjacent_room_ids) == 2
-        and _wall_length_mm(candidate.wall)
-        >= config.internal_door_width_mm + 2 * config.edge_margin_mm
-    ]
-    internal_candidates.sort(
-        key=lambda candidate: (
-            _wall_sort_key(candidate.wall),
-            tuple(str(room_id) for room_id in candidate.adjacent_room_ids),
+    internal_candidates = tuple(
+        sorted(
+            (
+                candidate
+                for candidate in walls
+                if candidate.wall.category is WallCategory.INTERNAL
+                and len(candidate.adjacent_room_ids) == 2
+                and _wall_length_mm(candidate.wall)
+                >= config.internal_door_width_mm + 2 * config.edge_margin_mm
+            ),
+            key=lambda candidate: (
+                _wall_sort_key(candidate.wall),
+                tuple(str(room_id) for room_id in candidate.adjacent_room_ids),
+            ),
         )
     )
 
-    required_room_ids = {
+    required_room_ids = frozenset(
         room_id
         for room_id, room in room_index.items()
         if room.room_type.value not in {"parking", "garage"}
-    }
-    sanitary_room_ids = {
+    )
+    sanitary_room_ids = frozenset(
         room_id
         for room_id, room in room_index.items()
         if room.room_type.value in _SANITARY_ROOM_TYPES
-    }
-    visited: set[UUID] = {root_room_id}
+    )
 
-    def add_crossing(candidates: list[_CirculationWall]) -> bool:
-        crossing = [
+    return _CirculationContext(
+        rooms=rooms,
+        room_index=room_index,
+        exterior=exterior,
+        root_room_id=root_room_id,
+        internal_candidates=internal_candidates,
+        required_room_ids=required_room_ids,
+        sanitary_room_ids=sanitary_room_ids,
+    )
+
+
+def _candidate_topology_analysis(context: _CirculationContext) -> CirculationTopologyAnalysis:
+    return analyze_room_access_graph(
+        room_ids=tuple(sorted(context.room_index, key=str)),
+        edges=tuple(
+            (candidate.adjacent_room_ids[0], candidate.adjacent_room_ids[1])
+            for candidate in context.internal_candidates
+        ),
+        root_room_ids=(context.root_room_id,),
+        required_room_ids=tuple(sorted(context.required_room_ids, key=str)),
+        sanitary_room_ids=tuple(sorted(context.sanitary_room_ids, key=str)),
+    )
+
+
+def _synthesize_circulation_openings(
+    geometry: ArchitecturalGeometryResult,
+    request: ArchitecturalGenerationRequest,
+) -> tuple[OpeningBuildRequest, ...]:
+    context = _build_circulation_context(geometry, request)
+    config = request.circulation_config
+    analysis = _candidate_topology_analysis(context)
+
+    if analysis.disconnected_room_ids:
+        non_sanitary_missing = tuple(
+            room_id
+            for room_id in analysis.disconnected_room_ids
+            if room_id not in context.sanitary_room_ids
+        )
+        sanitary_missing = tuple(
+            room_id
+            for room_id in analysis.disconnected_room_ids
+            if room_id in context.sanitary_room_ids
+        )
+        if non_sanitary_missing:
+            missing = ", ".join(str(room_id) for room_id in non_sanitary_missing)
+            raise CirculationGenerationError(
+                "[CIRCULATION_DISCONNECTED] Door-capable room adjacency has "
+                f"{len(analysis.connected_components)} non-sanitary component(s); "
+                f"unreachable room IDs: {missing}."
+            )
+        missing = ", ".join(str(room_id) for room_id in sanitary_missing)
+        raise CirculationGenerationError(
+            "[CIRCULATION_DISCONNECTED] Sanitary rooms must be reachable as "
+            f"leaves, not transit rooms. Unreachable room IDs: {missing}."
+        )
+
+    openings: list[OpeningBuildRequest] = []
+    if context.exterior is not None:
+        openings.append(
+            _centered_opening(
+                context.exterior.wall,
+                width_mm=config.external_door_width_mm,
+                height_mm=config.door_height_mm,
+            )
+        )
+
+    visited: set[UUID] = {context.root_room_id}
+
+    def add_crossing(candidates: tuple[_CirculationWall, ...]) -> bool:
+        crossing = tuple(
             candidate
             for candidate in candidates
             if (
                 (candidate.adjacent_room_ids[0] in visited)
                 != (candidate.adjacent_room_ids[1] in visited)
             )
-        ]
+        )
         if not crossing:
             return False
         chosen = crossing[0]
@@ -354,50 +480,174 @@ def _synthesize_circulation_openings(
         visited.update(chosen.adjacent_room_ids)
         return True
 
-    # Establish the public/private/service spine without using a sanitary
-    # room as a shortcut between otherwise unrelated rooms.
-    non_sanitary = [
+    non_sanitary = tuple(
         candidate
-        for candidate in internal_candidates
-        if all(room_id not in sanitary_room_ids for room_id in candidate.adjacent_room_ids)
-    ]
-    while required_room_ids - visited - sanitary_room_ids:
+        for candidate in context.internal_candidates
+        if all(
+            room_id not in context.sanitary_room_ids
+            for room_id in candidate.adjacent_room_ids
+        )
+    )
+    while context.required_room_ids - visited - context.sanitary_room_ids:
         if not add_crossing(non_sanitary):
             missing = ", ".join(
-                sorted(str(room_id) for room_id in required_room_ids - visited - sanitary_room_ids)
+                sorted(
+                    str(room_id)
+                    for room_id in context.required_room_ids
+                    - visited
+                    - context.sanitary_room_ids
+                )
             )
             raise CirculationGenerationError(
                 "[CIRCULATION_DISCONNECTED] Auto circulation could not connect "
                 f"required non-sanitary rooms. Unreachable room IDs: {missing}."
             )
 
-    # Sanitary rooms may be leaves on the circulation graph, but never transit
-    # nodes. This also prevents a toilet door from becoming the only route to a
-    # bedroom, kitchen, or passage.
-    sanitary_leaves = [
+    sanitary_leaves = tuple(
         candidate
-        for candidate in internal_candidates
+        for candidate in context.internal_candidates
         if (
-            (candidate.adjacent_room_ids[0] in sanitary_room_ids)
-            != (candidate.adjacent_room_ids[1] in sanitary_room_ids)
+            (candidate.adjacent_room_ids[0] in context.sanitary_room_ids)
+            != (candidate.adjacent_room_ids[1] in context.sanitary_room_ids)
         )
-    ]
-    while sanitary_room_ids - visited:
+    )
+    while context.sanitary_room_ids - visited:
         if not add_crossing(sanitary_leaves):
-            missing = ", ".join(sorted(str(room_id) for room_id in sanitary_room_ids - visited))
+            missing = ", ".join(
+                sorted(str(room_id) for room_id in context.sanitary_room_ids - visited)
+            )
             raise CirculationGenerationError(
                 "[CIRCULATION_DISCONNECTED] Sanitary rooms must be reachable as "
                 f"leaves, not transit rooms. Unreachable room IDs: {missing}."
             )
 
-    if required_room_ids - visited:
-        missing = ", ".join(sorted(str(room_id) for room_id in required_room_ids - visited))
+    if context.required_room_ids - visited:
+        missing = ", ".join(
+            sorted(str(room_id) for room_id in context.required_room_ids - visited)
+        )
         raise CirculationGenerationError(
             "[CIRCULATION_DISCONNECTED] Auto circulation left required rooms "
             f"unreachable. Unreachable room IDs: {missing}."
         )
 
     return tuple(openings)
+
+
+def _room_bounds(room: RoomGeometry) -> tuple[int, int, int, int]:
+    xs = tuple(point.x_mm for point in room.polygon.outer)
+    ys = tuple(point.y_mm for point in room.polygon.outer)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _room_gap_mm(first: RoomGeometry, second: RoomGeometry) -> int:
+    first_min_x, first_min_y, first_max_x, first_max_y = _room_bounds(first)
+    second_min_x, second_min_y, second_max_x, second_max_y = _room_bounds(second)
+    gap_x = max(0, first_min_x - second_max_x, second_min_x - first_max_x)
+    gap_y = max(0, first_min_y - second_max_y, second_min_y - first_max_y)
+    return gap_x + gap_y
+
+
+def _circulation_pair_key(first_room_id: UUID, second_room_id: UUID) -> tuple[UUID, UUID]:
+    if str(first_room_id) <= str(second_room_id):
+        return first_room_id, second_room_id
+    return second_room_id, first_room_id
+
+
+def _repair_pair_is_prohibited(
+    problem: CompiledConstraintProblem,
+    first_room_id: UUID,
+    second_room_id: UUID,
+) -> bool:
+    room_types = {room.id: room.room_type for room in problem.room_instances}
+    first_type = room_types[first_room_id]
+    second_type = room_types[second_room_id]
+    for constraint in problem.hard_constraints:
+        if not isinstance(constraint, AdjacencyProhibitionConstraint):
+            continue
+        if (
+            constraint.room_instance_id == first_room_id
+            and constraint.target_room_type is second_type
+        ) or (
+            constraint.room_instance_id == second_room_id
+            and constraint.target_room_type is first_type
+        ):
+            return True
+    return False
+
+
+def _circulation_repair_candidates(
+    geometry: ArchitecturalGeometryResult,
+    request: ArchitecturalGenerationRequest,
+    problem: CompiledConstraintProblem,
+    *,
+    attempted_pairs: frozenset[tuple[UUID, UUID]],
+) -> tuple[CirculationRepairPair, ...]:
+    context = _build_circulation_context(geometry, request)
+    analysis = _candidate_topology_analysis(context)
+    if not analysis.disconnected_room_ids:
+        return ()
+
+    reachable = set(analysis.reachable_room_ids)
+    disconnected = set(analysis.disconnected_room_ids)
+    reachable_connectors = tuple(
+        room_id
+        for room_id in sorted(reachable & context.required_room_ids, key=str)
+        if room_id not in context.sanitary_room_ids
+    )
+    disconnected_non_sanitary = tuple(
+        room_id
+        for room_id in sorted(disconnected, key=str)
+        if room_id not in context.sanitary_room_ids
+    )
+    targets = disconnected_non_sanitary or tuple(
+        room_id
+        for room_id in sorted(disconnected, key=str)
+        if room_id in context.sanitary_room_ids
+    )
+    if not reachable_connectors or not targets:
+        return ()
+
+    minimum_shared_length_mm = (
+        request.circulation_config.internal_door_width_mm
+        + 2 * request.circulation_config.edge_margin_mm
+    )
+    ranked: list[tuple[tuple[int, int, int, str, str], CirculationRepairPair]] = []
+    for source_id in reachable_connectors:
+        source = context.room_index[source_id]
+        source_priority = _ACCESS_PRIORITY.get(source.room_type.value, 50)
+        for target_id in targets:
+            pair_key = _circulation_pair_key(source_id, target_id)
+            if pair_key in attempted_pairs:
+                continue
+            if _repair_pair_is_prohibited(problem, source_id, target_id):
+                continue
+            target = context.room_index[target_id]
+            target_priority = _ACCESS_PRIORITY.get(target.room_type.value, 50)
+            first_id, second_id = pair_key
+            pair = CirculationRepairPair(
+                first_room_id=first_id,
+                second_room_id=second_id,
+                min_shared_length_mm=minimum_shared_length_mm,
+            )
+            ranked.append(
+                (
+                    (
+                        _room_gap_mm(source, target),
+                        source_priority,
+                        target_priority,
+                        str(first_id),
+                        str(second_id),
+                    ),
+                    pair,
+                )
+            )
+
+    ranked.sort(key=lambda item: item[0])
+    return tuple(pair for _rank, pair in ranked)
+
+
+def _repair_pair_identity(pair: CirculationRepairPair) -> tuple[UUID, UUID]:
+    return _circulation_pair_key(pair.first_room_id, pair.second_room_id)
 
 
 def _generate_single_floor_plan(
@@ -487,10 +737,89 @@ def _generate_single_floor_plan(
         geometry_result = build_architectural_geometry(geometry_request)
 
         if request.circulation_config.auto_generate:
-            generated_openings = _synthesize_circulation_openings(
-                geometry_result,
-                request,
+            active_request = request
+            successful_pairs = list(
+                request.planner_config.residential_planning.circulation_repair_pairs
             )
+            attempted_pairs = {
+                _repair_pair_identity(pair) for pair in successful_pairs
+            }
+            repair_attempts = 0
+
+            while True:
+                try:
+                    generated_openings = _synthesize_circulation_openings(
+                        geometry_result,
+                        active_request,
+                    )
+                    break
+                except CirculationGenerationError as circulation_error:
+                    planning = active_request.planner_config.residential_planning
+                    if (
+                        not planning.enabled
+                        or repair_attempts >= _MAX_CIRCULATION_REPAIR_ATTEMPTS
+                    ):
+                        raise
+
+                    candidates = _circulation_repair_candidates(
+                        geometry_result,
+                        active_request,
+                        problem,
+                        attempted_pairs=frozenset(attempted_pairs),
+                    )
+                    if not candidates:
+                        raise CirculationGenerationError(
+                            f"{circulation_error} No authority-safe deterministic "
+                            "circulation repair pair is available."
+                        ) from circulation_error
+
+                    repaired = False
+                    for pair in candidates:
+                        if repair_attempts >= _MAX_CIRCULATION_REPAIR_ATTEMPTS:
+                            break
+                        repair_attempts += 1
+                        attempted_pairs.add(_repair_pair_identity(pair))
+
+                        trial_pairs = (*successful_pairs, pair)
+                        trial_planning = planning.model_copy(
+                            update={"circulation_repair_pairs": trial_pairs}
+                        )
+                        trial_planner_config = active_request.planner_config.model_copy(
+                            update={"residential_planning": trial_planning}
+                        )
+                        trial_result = solve_rectangular_problem(
+                            problem,
+                            config=trial_planner_config,
+                        )
+                        if trial_result.status not in (
+                            PlannerStatus.OPTIMAL,
+                            PlannerStatus.FEASIBLE,
+                        ):
+                            continue
+
+                        trial_geometry_request = geometry_request.model_copy(
+                            update={"planner_result": trial_result}
+                        )
+                        trial_geometry = build_architectural_geometry(
+                            trial_geometry_request
+                        )
+
+                        successful_pairs.append(pair)
+                        planner_result = trial_result
+                        geometry_request = trial_geometry_request
+                        geometry_result = trial_geometry
+                        active_request = active_request.model_copy(
+                            update={"planner_config": trial_planner_config}
+                        )
+                        repaired = True
+                        break
+
+                    if not repaired:
+                        raise CirculationGenerationError(
+                            f"{circulation_error} Bounded deterministic circulation "
+                            "repair exhausted without a feasible re-solve."
+                        ) from circulation_error
+
             geometry_result = build_architectural_geometry(
                 geometry_request.model_copy(update={"openings": generated_openings})
             )
@@ -580,6 +909,7 @@ def generate_architectural_plan(
     floor_results: list[FloorGenerationResult] = []
     for floor_index, requirements in enumerate(request.floor_requirements):
         localized_requirements = _localize_floor_requirements(requirements)
+        wet_stack_targets = _previous_floor_wet_stack_targets(floor_results)
         floor_request = request.model_copy(
             update={
                 "room_requirements": localized_requirements,
@@ -610,6 +940,7 @@ def generate_architectural_plan(
                                 "require_horizontal_circulation": request.floor_count > 1,
                                 "vertical_core_footprint": core_plan.footprint,
                                 "wet_stack_anchor": core_plan.wet_stack_anchor,
+                                "wet_stack_targets": wet_stack_targets,
                             }
                             )
                         ),

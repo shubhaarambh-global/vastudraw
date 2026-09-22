@@ -3,8 +3,9 @@ from __future__ import annotations
 from uuid import UUID, uuid5
 
 from ai_vastu.geometry import (
-    ResidualRectangleMeasurement,
-    measure_site_residual_rectangles,
+    ResidualPolygonMeasurement,
+    measure_site_residual_polygons,
+    polygon_has_usable_core,
 )
 from ai_vastu.plan_schema import (
     IntPoint,
@@ -33,13 +34,28 @@ _MAX_LIGHTWELL_ASPECT_RATIO = 2.5
 
 _MIN_OPEN_SPACE_AREA_MM2 = 4_000_000
 _MIN_OPEN_SPACE_WIDTH_MM = 1_200
-_MAX_AUTOMATIC_OPEN_SPACE_BASIS_POINTS = 2_500
+
+_MIN_LANDSCAPE_AREA_MM2 = 500_000
+_MIN_LANDSCAPE_WIDTH_MM = 600
+
+_MIN_SHAFT_AREA_MM2 = 250_000
+_MAX_SHAFT_AREA_MM2 = 4_000_000
+_MIN_SHAFT_WIDTH_MM = 450
+_MAX_SHAFT_DIMENSION_MM = 3_000
 
 _SERVICE_ROOM_TYPES = {
     "kitchen",
     "utility",
     "laundry",
 }
+_SANITARY_ROOM_TYPES = {
+    "attached_toilet",
+    "common_toilet",
+    "powder_room",
+    "bath",
+    "servant_toilet",
+}
+_SHAFT_ADJACENT_ROOM_TYPES = _SERVICE_ROOM_TYPES | _SANITARY_ROOM_TYPES
 _PARKING_ROOM_TYPES = {
     "parking",
     "garage",
@@ -75,11 +91,14 @@ def _int_rectangle(
 
 def _vehicle_access_eligible(
     *,
-    candidate: ResidualRectangleMeasurement,
+    candidate: ResidualPolygonMeasurement,
     road_side: PlannerBoundarySide | None,
     rooms: tuple[RoomGeometry, ...],
     direct_parking_access: bool,
 ) -> bool:
+    if candidate.rectangle_bounds is None:
+        return False
+
     if road_side is None or direct_parking_access:
         return False
 
@@ -110,9 +129,12 @@ def _vehicle_access_eligible(
 
 def _utility_yard_eligible(
     *,
-    candidate: ResidualRectangleMeasurement,
+    candidate: ResidualPolygonMeasurement,
     rooms: tuple[RoomGeometry, ...],
 ) -> bool:
+    if candidate.rectangle_bounds is None:
+        return False
+
     if not candidate.touches_envelope_boundary:
         return False
 
@@ -138,7 +160,7 @@ def _utility_yard_eligible(
 
 def _lightwell_eligible(
     *,
-    candidate: ResidualRectangleMeasurement,
+    candidate: ResidualPolygonMeasurement,
 ) -> bool:
     if candidate.touches_envelope_boundary:
         return False
@@ -167,30 +189,73 @@ def _lightwell_eligible(
         and minimum_dimension >= _MIN_LIGHTWELL_WIDTH_MM
         and maximum_dimension <= _MAX_LIGHTWELL_DIMENSION_MM
         and aspect_ratio <= _MAX_LIGHTWELL_ASPECT_RATIO
+        and polygon_has_usable_core(
+            candidate.polygon,
+            minimum_width_mm=_MIN_LIGHTWELL_WIDTH_MM,
+        )
+    )
+
+
+def _shaft_eligible(
+    *,
+    candidate: ResidualPolygonMeasurement,
+    rooms: tuple[RoomGeometry, ...],
+) -> bool:
+    if candidate.touches_envelope_boundary:
+        return False
+
+    if not (
+        _MIN_SHAFT_AREA_MM2
+        <= candidate.area_mm2
+        <= _MAX_SHAFT_AREA_MM2
+    ):
+        return False
+
+    min_x, min_y, max_x, max_y = candidate.bounds
+    if max(max_x - min_x, max_y - min_y) > _MAX_SHAFT_DIMENSION_MM:
+        return False
+
+    if not any(
+        rooms[index].room_type.value in _SHAFT_ADJACENT_ROOM_TYPES
+        for index in candidate.adjacent_polygon_indexes
+    ):
+        return False
+
+    return polygon_has_usable_core(
+        candidate.polygon,
+        minimum_width_mm=_MIN_SHAFT_WIDTH_MM,
     )
 
 
 def _open_space_eligible(
     *,
-    candidate: ResidualRectangleMeasurement,
-    envelope_area_mm2: int,
+    candidate: ResidualPolygonMeasurement,
 ) -> bool:
     if not candidate.touches_envelope_boundary:
         return False
 
-    min_x, min_y, max_x, max_y = candidate.bounds
-    minimum_dimension = min(
-        max_x - min_x,
-        max_y - min_y,
-    )
-    area = candidate.area_mm2
-    envelope_area = max(1, envelope_area_mm2)
-    basis_points = round(area * 10_000 / envelope_area)
+    if candidate.area_mm2 < _MIN_OPEN_SPACE_AREA_MM2:
+        return False
 
-    return (
-        minimum_dimension >= _MIN_OPEN_SPACE_WIDTH_MM
-        and area >= _MIN_OPEN_SPACE_AREA_MM2
-        and basis_points <= _MAX_AUTOMATIC_OPEN_SPACE_BASIS_POINTS
+    return polygon_has_usable_core(
+        candidate.polygon,
+        minimum_width_mm=_MIN_OPEN_SPACE_WIDTH_MM,
+    )
+
+
+def _landscape_eligible(
+    *,
+    candidate: ResidualPolygonMeasurement,
+) -> bool:
+    if not candidate.touches_envelope_boundary:
+        return False
+
+    if candidate.area_mm2 < _MIN_LANDSCAPE_AREA_MM2:
+        return False
+
+    return polygon_has_usable_core(
+        candidate.polygon,
+        minimum_width_mm=_MIN_LANDSCAPE_WIDTH_MM,
     )
 
 
@@ -199,16 +264,30 @@ def _space_id(
     floor_id: UUID,
     kind: SiteSpaceKind,
     bounds: tuple[int, int, int, int],
+    polygon: IntPolygon | None = None,
 ) -> UUID:
+    identity_parts = [
+        str(floor_id),
+        kind.value,
+        *(str(value) for value in bounds),
+    ]
+
+    if polygon is not None:
+        identity_parts.append("outer")
+        identity_parts.extend(
+            f"{point.x_mm},{point.y_mm}"
+            for point in polygon.outer
+        )
+        for hole_index, hole in enumerate(polygon.holes):
+            identity_parts.append(f"hole:{hole_index}")
+            identity_parts.extend(
+                f"{point.x_mm},{point.y_mm}"
+                for point in hole
+            )
+
     return uuid5(
         _SITE_SPACE_NAMESPACE,
-        "|".join(
-            (
-                str(floor_id),
-                kind.value,
-                *(str(value) for value in bounds),
-            )
-        ),
+        "|".join(identity_parts),
     )
 
 
@@ -220,14 +299,16 @@ def derive_purposeful_site_spaces(
     road_boundary_side: PlannerBoundarySide | None,
     solver_step_mm: int,
 ) -> tuple[PurposefulSiteSpace, ...]:
-    """Classify only architecturally eligible residual rectangles.
+    """Classify architecturally supported residual site geometry.
 
-    This function deliberately fails to classify arbitrary residual geometry.
-    Any irregular, oversized or otherwise unsupported residual remains
-    unexplained and is rejected later by Architectural Brain site accounting.
+    Residual construction is canonical and deterministic. Specialized vehicle,
+    utility and lightwell classifications remain conservative, while legitimate
+    boundary-connected polygonal open space may be represented explicitly.
+    Unsupported residual geometry remains unexplained and therefore fail-closed
+    in Architectural Brain site accounting.
     """
 
-    measurement = measure_site_residual_rectangles(
+    measurement = measure_site_residual_polygons(
         envelope,
         tuple(room.polygon for room in rooms),
         road_boundary_side=(
@@ -243,7 +324,7 @@ def derive_purposeful_site_spaces(
 
     spaces: list[PurposefulSiteSpace] = []
 
-    for candidate in measurement.rectangles:
+    for candidate in measurement.polygons:
         bounds = candidate.bounds
         kind: SiteSpaceKind | None = None
         label: str | None = None
@@ -270,12 +351,24 @@ def derive_purposeful_site_spaces(
             kind = SiteSpaceKind.LIGHTWELL
             label = "Internal lightwell"
 
+        elif _shaft_eligible(
+            candidate=candidate,
+            rooms=rooms,
+        ):
+            kind = SiteSpaceKind.SHAFT
+            label = "Internal service shaft"
+
         elif _open_space_eligible(
             candidate=candidate,
-            envelope_area_mm2=measurement.envelope_area_mm2,
         ):
             kind = SiteSpaceKind.OPEN_SPACE
             label = "Boundary-connected open space"
+
+        elif _landscape_eligible(
+            candidate=candidate,
+        ):
+            kind = SiteSpaceKind.LANDSCAPE
+            label = "Boundary-connected landscape strip"
 
         if kind is None:
             continue
@@ -286,9 +379,18 @@ def derive_purposeful_site_spaces(
                     floor_id=floor_id,
                     kind=kind,
                     bounds=bounds,
+                    polygon=(
+                        candidate.polygon
+                        if candidate.rectangle_bounds is None
+                        else None
+                    ),
                 ),
                 kind=kind,
-                polygon=_int_rectangle(bounds),
+                polygon=(
+                    _int_rectangle(bounds)
+                    if candidate.rectangle_bounds is not None
+                    else candidate.polygon
+                ),
                 label=label,
                 source=SiteSpaceSource.SYSTEM_DERIVED,
             )

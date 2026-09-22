@@ -234,7 +234,7 @@ def test_direct_road_parking_does_not_invent_vehicle_access() -> None:
     assert all(space.kind is not SiteSpaceKind.VEHICLE_ACCESS for space in spaces)
 
 
-def test_irregular_residual_is_not_disguised_as_open_space() -> None:
+def test_boundary_connected_l_shaped_residual_becomes_open_space() -> None:
     spaces = derive_purposeful_site_spaces(
         floor_id=FLOOR_ID,
         envelope=rectangle(
@@ -257,7 +257,115 @@ def test_irregular_residual_is_not_disguised_as_open_space() -> None:
         solver_step_mm=10,
     )
 
-    # Residual is an L-shaped region. It must remain unexplained
-    # for Architectural Brain to reject rather than silently
-    # calling it useful open space.
+    assert len(spaces) == 1
+    assert spaces[0].kind is SiteSpaceKind.OPEN_SPACE
+    assert len(spaces[0].polygon.outer) > 4
+
+
+def test_narrow_l_shaped_boundary_residual_remains_unclassified() -> None:
+    spaces = derive_purposeful_site_spaces(
+        floor_id=FLOOR_ID,
+        envelope=rectangle(
+            0,
+            0,
+            10_000,
+            8_000,
+        ),
+        rooms=(
+            _room(
+                1,
+                RoomType.LIVING,
+                x0=500,
+                y0=500,
+                x1=10_000,
+                y1=8_000,
+            ),
+        ),
+        road_boundary_side=None,
+        solver_step_mm=10,
+    )
+
+    # The residual wraps around two plot edges but is only 500 mm wide.
+    # Boundary connectivity alone is not sufficient evidence of purposeful
+    # usable open space.
     assert spaces == ()
+
+
+def test_boundary_landscape_strip_is_classified_without_becoming_open_space() -> None:
+    spaces = derive_purposeful_site_spaces(
+        floor_id=FLOOR_ID,
+        envelope=rectangle(
+            0,
+            0,
+            10_000,
+            8_000,
+        ),
+        rooms=(
+            _room(
+                1,
+                RoomType.LIVING,
+                x0=0,
+                y0=0,
+                x1=9_400,
+                y1=8_000,
+            ),
+        ),
+        road_boundary_side=None,
+        solver_step_mm=10,
+    )
+
+    assert len(spaces) == 1
+    assert spaces[0].kind is SiteSpaceKind.LANDSCAPE
+
+
+def test_compact_internal_service_residual_becomes_shaft() -> None:
+    rooms = (
+        _room(
+            1,
+            RoomType.KITCHEN,
+            x0=0,
+            y0=0,
+            x1=4_500,
+            y1=8_000,
+        ),
+        _room(
+            2,
+            RoomType.BEDROOM,
+            x0=5_500,
+            y0=0,
+            x1=10_000,
+            y1=8_000,
+        ),
+        _room(
+            3,
+            RoomType.LIVING,
+            x0=4_500,
+            y0=0,
+            x1=5_500,
+            y1=4_500,
+        ),
+        _room(
+            4,
+            RoomType.BEDROOM,
+            x0=4_500,
+            y0=5_500,
+            x1=5_500,
+            y1=8_000,
+        ),
+    )
+
+    spaces = derive_purposeful_site_spaces(
+        floor_id=FLOOR_ID,
+        envelope=rectangle(
+            0,
+            0,
+            10_000,
+            8_000,
+        ),
+        rooms=rooms,
+        road_boundary_side=None,
+        solver_step_mm=10,
+    )
+
+    assert len(spaces) == 1
+    assert spaces[0].kind is SiteSpaceKind.SHAFT
