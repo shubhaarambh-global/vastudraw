@@ -54,6 +54,7 @@ def apply_architectural_concept(
 
     skipped_conflicts = 0
     applied_topology = 0
+    ignored_hard_size_caps = 0
 
     for requirement in compiled.request.room_requirements:
         changes: dict[
@@ -100,14 +101,14 @@ def apply_architectural_concept(
                     )
                 changes["preferred_depth_mm"] = target
 
+            # Concept sizing is lower-authority AI intent. A concept maximum
+            # must not become a new hard feasibility cap: on compact sites it
+            # can conflict with the deterministic residential occupancy floor
+            # and reject an otherwise valid confirmed program. Preserve any
+            # earlier authoritative maximum already carried by the requirement
+            # and express the concept only through preferred dimensions/area.
             if room.max_area_mm2 is not None:
-                maximum = room.max_area_mm2
-                if requirement.max_area_mm2 is not None:
-                    maximum = min(
-                        maximum,
-                        requirement.max_area_mm2,
-                    )
-                changes["max_area_mm2"] = maximum
+                ignored_hard_size_caps += 1
 
         preferences = list(requirement.adjacency_preferences)
         prohibitions = list(requirement.adjacency_prohibitions)
@@ -211,6 +212,7 @@ def apply_architectural_concept(
         f"precedent_ids={','.join(concept.precedent_ids) or 'none'}; "
         f"applied_edges={applied_topology}; "
         f"authority_conflicts_skipped={skipped_conflicts}; "
+        f"non_authoritative_hard_size_caps_ignored={ignored_hard_size_caps}; "
         f"topology={topology_pairs}; "
         "authoritative_geometry=false."
     )

@@ -1,6 +1,7 @@
 from uuid import UUID
 
 import pytest
+from tests.requirements.test_phase26c4a_residential_planning import _confirmed
 
 from ai_vastu.architectural_brain import (
     SpaceAllocation,
@@ -10,6 +11,8 @@ from ai_vastu.architectural_brain import (
     deterministic_revision_interpretation,
     require_no_unexplained_residual,
 )
+from ai_vastu.architectural_brain.bridge import apply_architectural_concept
+from ai_vastu.requirements.generation_adapter import compile_confirmed_requirements
 
 
 def test_source_registry_separates_commercial_and_research_only() -> None:
@@ -49,6 +52,31 @@ def test_brain_concept_is_topology_first_and_non_authoritative() -> None:
     parking = next(room for room in concept.rooms if room.room_type == "parking")
     assert parking.max_area_mm2 == 18_000_000
     assert any(edge.source_room_type == "living" for edge in concept.topology)
+
+
+def test_brain_concept_size_caps_remain_non_authoritative_preferences() -> None:
+    compiled = compile_confirmed_requirements(_confirmed())
+    concept = build_fallback_concept(
+        project_id=compiled.request.floor_id,
+        room_types=tuple(
+            requirement.room_type.value
+            for requirement in compiled.request.room_requirements
+        ),
+    )
+
+    updated = apply_architectural_concept(compiled, concept)
+    parking = next(
+        requirement
+        for requirement in updated.request.room_requirements
+        if requirement.room_type.value == "parking"
+    )
+
+    assert parking.preferred_area_mm2 == 16_500_000
+    assert parking.max_area_mm2 is None
+    assert any(
+        "non_authoritative_hard_size_caps_ignored=" in notice
+        for notice in updated.notices
+    )
 
 
 def test_revision_interpreter_understands_one_foot_wider() -> None:
