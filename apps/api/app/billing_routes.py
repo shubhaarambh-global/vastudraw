@@ -4,11 +4,10 @@ import hashlib
 import json
 import os
 import time
-import uuid
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
-import jwt
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
@@ -20,6 +19,8 @@ from ai_vastu.billing import (
     public_catalog,
 )
 from ai_vastu.billing.repository import BillingRepository
+from ai_vastu.production.settings import load_production_settings
+from app.auth_dependencies import CurrentUserDependency, project_service, require_project_owner
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -29,52 +30,17 @@ class CheckoutRequest(BaseModel):
     callback_url: str | None = None
 
 
-def _bearer_token(authorization: str | None) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Bearer authentication required.")
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
-        raise HTTPException(status_code=401, detail="Bearer authentication required.")
-    return token
-
-
-def _resolve_user_id(authorization: str | None) -> str:
-    token = _bearer_token(authorization)
-    mode = os.getenv("AI_VASTU_AUTH_MODE", "production").strip().lower()
-
-    if mode == "development":
-        expected = os.getenv("AI_VASTU_DEV_BEARER_TOKEN", "")
-        user_id = os.getenv("AI_VASTU_DEV_USER_ID", "")
-        if not expected or not user_id or token != expected:
-            raise HTTPException(status_code=401, detail="Invalid development token.")
-        return user_id
-
-    supabase_url = os.getenv("AI_VASTU_SUPABASE_URL", "").rstrip("/")
-    if not supabase_url:
+def _require_razorpay_gateway() -> None:
+    gateway = (
+        load_production_settings().payment_gateway
+        if os.getenv("APP_ENV", "development").strip().lower() == "production"
+        else os.getenv("AI_VASTU_PAYMENT_GATEWAY", "disabled").strip().lower()
+    )
+    if gateway != "razorpay":
         raise HTTPException(
             status_code=503,
-            detail="Supabase authentication is not configured.",
+            detail="Razorpay payments are unavailable for the selected gateway.",
         )
-
-    try:
-        unverified_header = jwt.get_unverified_header(token)
-        algorithm = str(unverified_header.get("alg", ""))
-        if algorithm not in {"RS256", "ES256"}:
-            raise ValueError("Unsupported JWT algorithm.")
-        jwks = jwt.PyJWKClient(f"{supabase_url}/auth/v1/.well-known/jwks.json")
-        signing_key = jwks.get_signing_key_from_jwt(token)
-        claims = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=[algorithm],
-            audience=os.getenv("AI_VASTU_SUPABASE_JWT_AUDIENCE", "authenticated"),
-            issuer=f"{supabase_url}/auth/v1",
-        )
-        subject = str(claims["sub"])
-        uuid.UUID(subject)
-        return subject
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail="Invalid access token.") from exc
 
 
 def _service() -> tuple[BillingService, BillingRepository]:
@@ -89,9 +55,9 @@ def catalog() -> dict[str, object]:
 
 @router.get("/me")
 def billing_me(
-    authorization: str | None = Header(default=None),
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    user_id = str(user.user_id)
     service, repository = _service()
     try:
         snapshot = service.snapshot(user_id)
@@ -113,19 +79,17 @@ def billing_me(
 
 @router.post("/projects/{project_id}/register")
 def register_project_entitlement(
-    project_id: str,
-    authorization: str | None = Header(default=None),
+    project_id: UUID,
+    request: Request,
+    user: CurrentUserDependency,
 ) -> dict[str, str]:
-    user_id = _resolve_user_id(authorization)
-    try:
-        uuid.UUID(project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="Invalid project id.") from exc
-
+    require_project_owner(project_service(request), project_id, user)
+    user_id = str(user.user_id)
+    project_id_str = str(project_id)
     service, repository = _service()
     try:
-        source = service.register_project(user_id, project_id)
-        return {"project_id": project_id, "source": source}
+        source = service.register_project(user_id, project_id_str)
+        return {"project_id": project_id_str, "source": source}
     except PermissionError as exc:
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     finally:
@@ -134,15 +98,18 @@ def register_project_entitlement(
 
 @router.get("/projects/{project_id}/generation-authorization")
 def generation_authorization(
-    project_id: str,
-    authorization: str | None = Header(default=None),
+    project_id: UUID,
+    request: Request,
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    require_project_owner(project_service(request), project_id, user)
+    user_id = str(user.user_id)
+    project_id_str = str(project_id)
     service, repository = _service()
     try:
-        decision = service.authorize_generation(user_id, project_id)
+        decision = service.authorize_generation(user_id, project_id_str)
         return {
-            "project_id": project_id,
+            "project_id": project_id_str,
             "allowed": decision.allowed,
             "reason": decision.reason,
             "consumption": decision.consumption,
@@ -153,16 +120,19 @@ def generation_authorization(
 
 @router.post("/projects/{project_id}/generation-succeeded")
 def generation_succeeded(
-    project_id: str,
-    authorization: str | None = Header(default=None),
+    project_id: UUID,
+    request: Request,
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    require_project_owner(project_service(request), project_id, user)
+    user_id = str(user.user_id)
+    project_id_str = str(project_id)
     service, repository = _service()
     try:
-        service.record_successful_generation(user_id, project_id)
+        service.record_successful_generation(user_id, project_id_str)
         snapshot = service.snapshot(user_id)
         return {
-            "project_id": project_id,
+            "project_id": project_id_str,
             "recorded": True,
             "free_generation_available": snapshot.free_generation_available,
             "project_credits": snapshot.project_credits,
@@ -176,9 +146,10 @@ def generation_succeeded(
 @router.post("/checkout")
 def create_checkout(
     request: CheckoutRequest,
-    authorization: str | None = Header(default=None),
+    user: CurrentUserDependency,
 ) -> dict[str, str]:
-    user_id = _resolve_user_id(authorization)
+    user_id = str(user.user_id)
+    _require_razorpay_gateway()
     reference_id = f"{request.sku}-{user_id[:8]}-{int(time.time())}"
     try:
         session = RazorpayClient.from_environment().create_checkout(
@@ -225,6 +196,7 @@ async def razorpay_webhook(
     request: Request,
     x_razorpay_signature: str | None = Header(default=None),
 ) -> dict[str, object]:
+    _require_razorpay_gateway()
     raw_body = await request.body()
     if not x_razorpay_signature:
         raise HTTPException(status_code=400, detail="Missing Razorpay signature.")

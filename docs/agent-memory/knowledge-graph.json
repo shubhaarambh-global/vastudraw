@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "nodes": [
+    {
+      "id": "baseline:v1",
+      "type": "baseline",
+      "title": "Frozen V1",
+      "status": "qualified",
+      "value": "17bd86da29c50c8f73b8a47f5a4c186cf2bd7c26",
+      "provenance": [
+        "tag:phase2d9k-v1-qualified"
+      ]
+    },
+    {
+      "id": "baseline:post-v1",
+      "type": "baseline",
+      "title": "Qualified post-V1 baseline",
+      "status": "qualified",
+      "value": "cbd295f5e9028186acbfb14f40c1142e3a003b27",
+      "provenance": [
+        "tag:post-v1-development-qualified"
+      ]
+    },
+    {
+      "id": "branch:phase29",
+      "type": "branch",
+      "title": "Phase 29 launch hardening",
+      "status": "active",
+      "value": "phase29",
+      "provenance": [
+        "created from baseline:post-v1"
+      ]
+    },
+    {
+      "id": "contract:geometry-authority",
+      "type": "contract",
+      "title": "Deterministic geometry is authoritative",
+      "status": "protected",
+      "provenance": [
+        "docs/agent-system/protected-contracts.md"
+      ]
+    },
+    {
+      "id": "contract:ai-advisory",
+      "type": "contract",
+      "title": "Architectural AI is advisory",
+      "status": "protected",
+      "provenance": [
+        "docs/agent-system/protected-contracts.md"
+      ]
+    },
+    {
+      "id": "contract:wet-stack-soft",
+      "type": "contract",
+      "title": "Wet-stack coordination remains soft",
+      "status": "protected",
+      "provenance": [
+        "docs/agent-system/protected-contracts.md"
+      ]
+    },
+    {
+      "id": "provider:openrouter-reasoning",
+      "type": "provider",
+      "title": "OpenRouter reasoning/text",
+      "status": "qualified-development",
+      "value": "deepseek/deepseek-v4-flash-0731:free",
+      "provenance": [
+        "qualified project handoff"
+      ]
+    },
+    {
+      "id": "provider:gemini-vision",
+      "type": "provider",
+      "title": "Direct Gemini plan recognition",
+      "status": "qualified-development",
+      "value": "gemini-3.1-flash-lite",
+      "provenance": [
+        "qualified project handoff"
+      ]
+    },
+    {
+      "id": "payment:phonepe",
+      "type": "payment",
+      "title": "PhonePe launch gateway",
+      "status": "target-production",
+      "provenance": [
+        "product decision"
+      ]
+    },
+    {
+      "id": "payment:razorpay",
+      "type": "payment",
+      "title": "Razorpay optional future gateway",
+      "status": "retained",
+      "provenance": [
+        "product decision"
+      ]
+    },
+    {
+      "id": "subsystem:phase29a-production-config",
+      "type": "subsystem",
+      "title": "Phase 29A production configuration contract",
+      "status": "locally-validated",
+      "value": "Supabase auth with authenticated audience; AI_VASTU_DATABASE_URL; validated web origins and trusted hosts; absolute durable storage roots; OpenRouter text/reasoning with direct Gemini plan vision; explicit gateway selection. PhonePe remains unimplemented and fail-closed.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29A — Production Configuration Contract)",
+        "pnpm validate at cbd295f5e9028186acbfb14f40c1142e3a003b27 working tree"
+      ]
+    },
+    {
+      "id": "subsystem:phase29b-auth-persistence",
+      "type": "subsystem",
+      "title": "Phase 29B auth and persistence hardening",
+      "status": "locally-validated",
+      "value": "Shared canonical access-token verification and current-owner gates cover project, billing, requirements, and confirmed-generation routes. Requirements files use atomic same-directory replacement; staging/production upload roots fail closed; backups cover PostgreSQL, requirements, and generation uploads. Live database isolation, services, and restore behavior remain unqualified.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29B - Auth and Persistence Hardening)",
+        "pnpm validate on phase29 working tree, 2026-09-24"
+      ]
+    },
+    {
+      "id": "policy:model-routing",
+      "type": "agent_policy",
+      "title": "Development agent model routing policy",
+      "status": "active",
+      "value": "Luna for mechanical; Sol for normal/complex implementation; Astra for critical review/decisions; GPT-5.3-Codex optional for agentic coding.",
+      "provenance": [
+        "docs/agent-system/model-routing-policy.md",
+        "OpenAI model guidance current at package generation"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "branch:phase29",
+      "rel": "derived_from",
+      "to": "baseline:post-v1"
+    },
+    {
+      "from": "baseline:post-v1",
+      "rel": "preserves",
+      "to": "contract:geometry-authority"
+    },
+    {
+      "from": "baseline:post-v1",
+      "rel": "preserves",
+      "to": "contract:ai-advisory"
+    },
+    {
+      "from": "baseline:post-v1",
+      "rel": "preserves",
+      "to": "contract:wet-stack-soft"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "uses",
+      "to": "provider:openrouter-reasoning"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "uses",
+      "to": "provider:gemini-vision"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "targets",
+      "to": "payment:phonepe"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "retains",
+      "to": "payment:razorpay"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "uses_agent_policy",
+      "to": "policy:model-routing"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "hardens",
+      "to": "subsystem:phase29a-production-config"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "hardens",
+      "to": "subsystem:phase29b-auth-persistence"
+    }
+  ]
+}

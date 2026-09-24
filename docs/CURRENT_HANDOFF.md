@@ -507,3 +507,244 @@ Architecture decisions retained:
 
 The historical `phase2d9k-not-qualified` tag remains untouched as evidence of
 the earlier failed qualification.
+
+## Phase 29A — Production Configuration Contract
+
+Status: **IMPLEMENTED AND LOCALLY VALIDATED; NOT A PRODUCTION QUALIFICATION**
+
+### Baseline and worktree
+
+- Branch: `phase29`
+- Starting HEAD: `cbd295f5e9028186acbfb14f40c1142e3a003b27`
+- No commit, tag, staging, deployment, database migration, or live account action was performed.
+- The worktree was already dirty at entry, including a user-edited `AGENTS.md`, Agent OS files, archives, payloads, and scripts. These were preserved. No reset, clean, broad checkout/restore, or archive deletion was performed.
+- Rollback point: qualified `post-v1-development-qualified` at `cbd295f5e9028186acbfb14f40c1142e3a003b27`. Phase 29A edits are uncommitted; if rollback is needed, reverse only the listed Phase 29A files/hunks and preserve the pre-existing user changes and untracked payloads.
+- Canonical schema generation during validation produced no tracked diff in `packages/contracts/schema/plan-document.schema.json` or `packages/contracts/src/generated/plan-document.ts`.
+
+### Implementation
+
+Production configuration now agrees with runtime consumers:
+
+- Supabase authentication is selected with `AI_VASTU_AUTH_MODE=supabase` and audience `authenticated`, matching the existing shared verifier.
+- `AI_VASTU_DATABASE_URL` is the canonical PostgreSQL URL. Production billing now trims it consistently with other consumers.
+- `AI_VASTU_WEB_ORIGINS` drives CORS; explicit `AI_VASTU_TRUSTED_HOSTS` drives an outermost TrustedHost middleware.
+- Requirements and generation-upload storage roots must be explicitly absolute and configured.
+- A true `AI_VASTU_DEV_BILLING_BYPASS` is rejected in production.
+- Production provider routing is validated as the qualified hybrid: OpenRouter for text/reasoning and direct Gemini `gemini-3.1-flash-lite` for plan recognition.
+- `AI_VASTU_PAYMENT_GATEWAY` must explicitly select `phonepe`, `razorpay`, or `disabled`. Razorpay credentials are conditional on Razorpay selection. PhonePe/disabled selections block Razorpay checkout and webhooks before provider construction or billing repository side effects.
+- The production launch checker rejects PhonePe until Phase 29D implements it and rejects disabled payments. Its storage probes use unique temporary files and remove only the file created by that invocation.
+- The launch runbook and `.env.example` describe the canonical settings and the Phase 29D payment blocker.
+
+Protected deterministic geometry, Vastu semantics/hashes, canonical PlanDocument, units, project revision behavior, and generation behavior were not changed. No data migration was introduced.
+
+### Changed Phase 29A files
+
+- `.env.example`
+- `apps/api/app/billing_routes.py`
+- `apps/api/app/main.py`
+- `apps/api/tests/test_phase29a_runtime.py` (new)
+- `docs/exec-plans/active/phase29a-production-configuration.md` (new)
+- `docs/CURRENT_HANDOFF.md`
+- `docs/agent-memory/knowledge-graph.json` (verified Phase 29A node and edge)
+- `docs/runbooks/production-launch.md`
+- `python/ai_vastu/billing/factory.py`
+- `python/ai_vastu/production/settings.py`
+- `scripts/check-production-launch.py`
+- `tests/billing/test_factory.py` (new)
+- `tests/production/test_gemini_settings.py`
+- `tests/production/test_openrouter_settings.py`
+- `tests/production/test_phase29a_fixtures.py` (new)
+- `tests/production/test_settings.py`
+- `tests/test_phase25_policy.py`
+
+The pre-existing local changes in `AGENTS.md`, `.codex/`, and `docs/agent-system/` are user-owned and were preserved. `docs/agent-memory/` was also pre-existing and user-owned; the only intentional Phase 29A change there is the verified `subsystem:phase29a-production-config` node and its `branch:phase29` edge.
+
+### Independent review and tests
+
+- Two independent planners converged on config/runtime wiring only; Architecture Guardian challenged and accepted the bounded scope.
+- Fixture Engineer added deterministic production config boundary, secret-redaction, gateway-selection, and rate/HSTS limit cases.
+- Regression Tester: 218/218 affected tests passed; 10/10 Phase 25/27/28 policy tests and eight offline subsystem checks passed.
+- Adversarial Tester found no Phase 29A bypass. It identified pre-existing auxiliary JWT role/expiry divergence, recorded below.
+- Security Reviewer accepted the Phase 29A changes after path and middleware-order fixes.
+- Independent QA accepted the code changes after billing URL normalization and safe unique storage probe fixes.
+
+Final repository gate from the Phase 29A working tree:
+
+- `git diff --check`: PASS (Windows LF/CRLF notices only).
+- `pnpm validate`: PASS.
+- Ruff: PASS (`python:lint`).
+- mypy: PASS, 199 source files.
+- Python tests: 596 passed, 0 failed (five dependency deprecation warnings).
+- Plan schema generation/check: PASS; generated contract tree unchanged.
+- Vastu checks/review/production release: PASS; frozen bundle hash unchanged.
+- Offline deterministic constraints, planner, geometry, validation, scoring, project revisions, exports and generation checks: PASS.
+- Web TypeScript, lint, formatting and tests: PASS; 26 web tests and one contracts test passed.
+- Next.js production build: PASS; routes generated.
+- Phase 25/26/27/28 offline gates: PASS.
+- No live PostgreSQL, Supabase, OpenRouter, Gemini, PhonePe, or Razorpay service was exercised.
+
+### Remaining blockers and next work
+
+Phase 29A completion does not qualify production. The following existing launch blockers remain:
+
+1. **Phase 29B, HIGH:** auxiliary billing, requirements, and confirmed-generation JWT resolvers accept suitably signed tokens without requiring `exp` and `role=authenticated`; the shared canonical verifier rejects them. Offline ES256/JWKS-mocked reproduction confirmed this difference. Consolidate auxiliary resolvers onto the shared verifier and test required claims across every route family.
+2. **Phase 29D, HIGH:** webhook event recording and entitlement mutation are separate transactions, so a failure after recording can suppress retries before credit is granted. Implement atomic event/entitlement updates and authoritative payment reconciliation before live payment enablement.
+3. **Phase 29D, BLOCKER for PhonePe:** PhonePe checkout/webhooks are not implemented or live-qualified. PhonePe selection remains fail-closed in current checkout routes and launch gate.
+4. **Phase 29E, MEDIUM:** rate-limit-generated 429 responses bypass CORS middleware and omit CORS headers. No authentication bypass was demonstrated; test middleware error responses and preflight behavior.
+5. **Phase 29F:** live credentials/account actions and production database/storage deployment evidence are absent. The production launch checker connects to PostgreSQL and writes/removes storage probes, so only run it against an explicitly reviewed target.
+
+### Next phase
+
+**Phase 29B — Auth and Persistence Hardening**
+
+First action: unify auxiliary JWT resolution with the canonical Supabase verifier, preserve ownership checks, and add offline signed-token regressions for missing/expired `exp`, wrong role, issuer, audience, algorithm, and subject on billing, requirements, confirmed-generation, and project routes. Do not run live service checks without the required credentials/account authorization.
+
+---
+
+## Phase 29B - Auth and Persistence Hardening
+
+Status: **IMPLEMENTED AND LOCALLY VALIDATED; NOT A PRODUCTION QUALIFICATION**
+
+### Baseline and scope
+
+- Branch: `phase29`; starting qualified HEAD remains
+  `cbd295f5e9028186acbfb14f40c1142e3a003b27`.
+- Phase 29A and 29B changes remain uncommitted in the existing dirty worktree.
+  No staging, commit, tag, deployment, database migration, live credential use,
+  external account action, or production write was performed.
+- Protected solver, Architectural Brain, Vastu, canonical geometry,
+  PlanDocument schema, millimetre units, and immutable project revision behavior
+  were not changed.
+- The bounded plan is recorded in
+  `docs/exec-plans/active/phase29b-auth-persistence-hardening.md`.
+
+### Implementation
+
+- Added one shared FastAPI authentication dependency backed by
+  `request.app.state.access_token_verifier`. Project, billing, requirements,
+  and confirmed-generation routes now use the same canonical verifier and
+  preserve the `401` Bearer challenge.
+- The canonical verifier requires expiry, issuer, audience, UUID subject, and
+  `role=authenticated`, accepts only ES256/RS256, and now normalizes malformed
+  non-finite expiry overflow to the existing authentication failure path.
+- Project-scoped billing and requirements operations check current ownership
+  before provider construction, requirements mutation, entitlement reads, or
+  entitlement mutation. Foreign and missing projects retain concealed `404`
+  behavior. Stored requirement identity and current project ownership are both
+  required for draft, confirmation, and confirmed-record access.
+- Requirements JSON writes use unique same-directory temporary files, flush and
+  fsync before `os.replace`, clean only their own temporary file, preserve the
+  last readable record on replacement failure, and retain existing
+  reconfirmation replacement semantics.
+- Generation upload storage now requires an explicitly configured absolute path
+  in staging as well as production. Development behavior remains compatible.
+- Billing PostgreSQL connections disable prepared statements for transaction
+  pooler compatibility.
+- The production backup script now uses `AI_VASTU_DATABASE_URL`, requires
+  existing absolute storage/output directories, rejects filesystem roots and
+  Windows drive-relative rooted paths, keeps output outside both storage roots,
+  validates each command artifact, archives requirements plus generation
+  uploads, and hashes all three artifacts. The runbook reflects this scope.
+
+### Phase 29B files
+
+- `apps/api/app/auth_dependencies.py` (new)
+- `apps/api/app/main.py`
+- `apps/api/app/billing_routes.py`
+- `apps/api/app/requirements_routes.py`
+- `apps/api/app/confirmed_generation_routes.py`
+- `apps/api/tests/test_phase29a_runtime.py`
+- `apps/api/tests/test_phase29b_auth.py` (new)
+- `apps/api/tests/test_phase29b_security_fixtures.py` (new)
+- `python/ai_vastu/auth/verifier.py`
+- `python/ai_vastu/billing/postgres_repository.py`
+- `python/ai_vastu/generation_intake/store.py`
+- `python/ai_vastu/requirements/store.py`
+- `scripts/backup-production.ps1`
+- `docs/runbooks/backup-restore.md`
+- `tests/billing/test_postgres_repository_policy.py` (new)
+- `tests/generation_intake/test_store.py`
+- `tests/requirements/test_store_and_confirmation.py`
+- `tests/test_phase29b_backup_policy.py` (new)
+- `docs/exec-plans/active/phase29b-auth-persistence-hardening.md` (new)
+- `docs/CURRENT_HANDOFF.md`
+- `docs/agent-memory/knowledge-graph.json`
+
+`main.py` and `billing_routes.py` also contain the preserved Phase 29A hunks.
+The user-owned `AGENTS.md`, Agent OS files, archives, payloads, scripts, and
+other pre-existing untracked files remain untouched.
+
+### Independent evidence
+
+- Two independent planners were challenged by Architecture Guardian before the
+  coordinator fixed scope. No SQL/RLS migration, payment redesign, pool
+  lifecycle redesign, provider change, or protected generation change was
+  admitted.
+- Fixture Engineer: 11 signed-token/injected-verifier fixtures passed.
+- Regression Tester: 52 focused tests and 257 affected API/projects/
+  requirements/billing/generation-intake/production tests passed; affected Ruff,
+  mypy across 40 source files, and `git diff --check` passed.
+- Adversarial Tester: 56 focused tests passed. Its non-finite-expiry and backup
+  path findings were fixed and retested. No authentication bypass, cross-user
+  access, torn JSON, or temporary-file leak remained.
+- Security Reviewer: 109 pre-fix focused/affected tests plus five final backup
+  tests passed, with an additional 28/28 invalid ES256 route matrix rejected.
+  It accepted local Phase 29B security after the fixes.
+- Independent QA: 52 focused tests and 32 additional signed RS256 route probes
+  passed; local Phase 29B implementation accepted.
+- Release Auditor verified branch `phase29`, exact HEAD and peeled baseline tags,
+  the disclosed dirty/uncommitted tree, protected-path cleanliness,
+  `git diff --check`, and the local-vs-live claims. It accepted this local
+  handoff wording and blocked any qualification tag.
+
+Coordinator validation from the final Phase 29B working tree:
+
+- Combined focused Phase 29A/29B integration set: 54 passed before final
+  adversarial regressions; final auth/backup regression set: 17 passed.
+- `git diff --check`: PASS (Windows LF/CRLF notices only).
+- `pnpm validate`: PASS.
+- Ruff: PASS.
+- mypy: PASS, 200 source files.
+- Python: 643 passed, 0 failed, five dependency deprecation warnings.
+- Contracts: generated schema/types match authoritative models; one contract
+  test passed; generated contract files have no tracked diff.
+- Frozen Vastu, constraints, planner, geometry, validation, scoring, revisions,
+  exports, generation, requirements, billing, persistence, auth, Phase 25-28,
+  and OpenRouter deterministic gates: PASS.
+- Web formatting/lint/typecheck: PASS; 26 tests passed; Next.js production build
+  passed with all routes generated.
+- No PostgreSQL, Supabase/JWKS, OpenRouter, Gemini, PhonePe, Razorpay, real
+  `pg_dump`, real archive, restore, or deployed filesystem was exercised.
+
+### Known limitations and launch blockers
+
+1. **Production blocker - database isolation evidence:** migration review does
+   not demonstrate RLS/revokes for project/revision and billing tables. This is
+   not proof of deployed exposure. A separately reviewed migration/deployment
+   step must verify effective `PUBLIC`, `anon`, `authenticated`, and server-role
+   grants, plus TLS enforcement, before public deployment.
+2. **Phase 29D high:** payment event recording and entitlement mutation remain
+   separate commits. A failure after recording can suppress credit application
+   on retry. Atomic processing and authoritative reconciliation are required.
+3. **Phase 29D blocker:** PhonePe remains unimplemented and fail-closed.
+4. **Phase 29E medium:** limiter-generated `429` responses still omit CORS
+   headers.
+5. **Windows file-store availability:** concurrent readers/replacements can
+   raise transient `PermissionError` under Windows sharing semantics. The
+   adversarial stress test found no torn JSON or leaked temporary files. Treat
+   concurrent Windows requirements-store deployment as unsupported until a
+   retry/coordination policy is implemented; Linux production behavior was not
+   exercised.
+6. Backup tests use offline command stubs. Real dump/archive integrity,
+   concurrent-write consistency, encryption, retention, restore, permissions,
+   and fault-domain separation remain deployment evidence.
+
+### Next phase
+
+**Phase 29C - Hybrid AI Production Integration**
+
+First action: inspect the qualified OpenRouter text/reasoning and direct Gemini
+plan-vision boundaries, then design offline provider failure/timeout/response-
+validation fixtures without moving any geometry or feasibility authority into
+AI output. Do not use real credentials or live provider accounts without an
+explicitly reviewed target.

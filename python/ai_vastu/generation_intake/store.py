@@ -251,13 +251,13 @@ def create_generation_intake_store_from_environment(
     env = os.environ if environment is None else environment
     configured = env.get("AI_VASTU_GENERATION_UPLOAD_ROOT", "").strip()
     app_env = env.get("APP_ENV", "development").strip().lower()
-    if app_env == "production" and not configured:
+    if app_env in {"production", "staging"} and not configured:
         raise GenerationIntakeStorageConfigurationError(
-            "AI_VASTU_GENERATION_UPLOAD_ROOT is required in production."
+            "AI_VASTU_GENERATION_UPLOAD_ROOT is required in production/staging."
         )
     root = Path(configured) if configured else Path(".local/generation-intakes")
-    if app_env == "production" and not root.is_absolute():
+    if app_env in {"production", "staging"} and not root.is_absolute():
         raise GenerationIntakeStorageConfigurationError(
-            "Production generation upload root must be an absolute persistent path."
+            "Production/staging generation upload root must be an absolute persistent path."
         )
     return GenerationIntakeStore(root)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from uuid import UUID
 
@@ -35,12 +36,30 @@ class RequirementsStore:
     def _confirmed_path(self, draft_id: UUID) -> Path:
         return self._root / f"{draft_id}.confirmed.json"
 
+    @staticmethod
+    def _replace_json(path: Path, payload: str) -> None:
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+                temporary.write(payload)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            os.replace(temporary_path, path)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+
     def save_draft(self, draft: RequirementDraft) -> None:
         path = self._draft_path(draft.draft_id)
-        path.write_text(
-            draft.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
+        self._replace_json(path, draft.model_dump_json(indent=2))
 
     def get_draft(self, draft_id: UUID) -> RequirementDraft:
         path = self._draft_path(draft_id)
@@ -52,9 +71,8 @@ class RequirementsStore:
         draft = self.get_draft(confirmed.draft_id)
         if draft.user_id != confirmed.user_id or draft.project_id != confirmed.project_id:
             raise PermissionError("Confirmed requirements identity mismatch.")
-        self._confirmed_path(confirmed.draft_id).write_text(
-            confirmed.model_dump_json(indent=2),
-            encoding="utf-8",
+        self._replace_json(
+            self._confirmed_path(confirmed.draft_id), confirmed.model_dump_json(indent=2)
         )
 
     def get_confirmed(self, draft_id: UUID) -> ConfirmedRequirements:

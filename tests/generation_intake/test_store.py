@@ -57,13 +57,33 @@ def test_generation_intake_rejects_spoofed_media(tmp_path: Path) -> None:
         )
 
 
-def test_production_upload_storage_fails_closed_without_absolute_path() -> None:
+@pytest.mark.parametrize("app_env", ["production", "staging"])
+def test_deployed_upload_storage_fails_closed_without_absolute_path(app_env: str) -> None:
     with pytest.raises(GenerationIntakeStorageConfigurationError):
-        create_generation_intake_store_from_environment({"APP_ENV": "production"})
+        create_generation_intake_store_from_environment({"APP_ENV": app_env})
     with pytest.raises(GenerationIntakeStorageConfigurationError):
         create_generation_intake_store_from_environment(
             {
-                "APP_ENV": "production",
+                "APP_ENV": app_env,
                 "AI_VASTU_GENERATION_UPLOAD_ROOT": ".local/uploads",
             }
         )
+
+
+def test_staging_accepts_absolute_upload_root(tmp_path: Path) -> None:
+    configured = tmp_path / "uploads"
+    store = create_generation_intake_store_from_environment(
+        {"APP_ENV": "staging", "AI_VASTU_GENERATION_UPLOAD_ROOT": str(configured)}
+    )
+    assert store.root == configured.resolve()
+    assert configured.is_dir()
+
+
+def test_development_retains_relative_upload_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    store = create_generation_intake_store_from_environment(
+        {"APP_ENV": "development", "AI_VASTU_GENERATION_UPLOAD_ROOT": "uploads"}
+    )
+    assert store.root == (tmp_path / "uploads").resolve()

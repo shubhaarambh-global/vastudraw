@@ -1,5 +1,23 @@
 # Production launch runbook
 
+Phase 29A establishes a coherent fail-closed configuration contract. It does
+not qualify production services or payments. PhonePe is the launch direction,
+but its checkout/webhook implementation remains a Phase 29D blocker. Razorpay
+is retained as an optional gateway and is not required for a PhonePe profile.
+
+## Canonical production configuration
+
+- `APP_ENV=production` and `AI_VASTU_AUTH_MODE=supabase`;
+- `AI_VASTU_DATABASE_URL` is the single PostgreSQL URL used by repositories,
+  billing and rate limiting;
+- `AI_VASTU_WEB_ORIGINS` and `AI_VASTU_TRUSTED_HOSTS` contain explicit values;
+- `AI_VASTU_REQUIREMENTS_PATH` and `AI_VASTU_GENERATION_UPLOAD_ROOT` are
+  absolute durable paths;
+- `AI_VASTU_DEV_BILLING_BYPASS` is unset or false;
+- `AI_VASTU_PAYMENT_GATEWAY` is explicit;
+- OpenRouter handles text/reasoning and direct Gemini handles plan recognition,
+  using the qualified pinned models.
+
 ## Provider controls to configure
 
 ### Supabase
@@ -13,7 +31,15 @@ Before public launch:
 - configure backups and the required recovery objective (PITR if required);
 - test migrations in staging before applying them to production.
 
-### Razorpay
+### PhonePe
+
+- do not enable checkout until the Phase 29D adapter, verification and
+  idempotency fixtures are qualified;
+- configure production credentials and callbacks only through the secret
+  manager and the official PhonePe account workflow;
+- treat Phase 29A configuration acceptance as configuration evidence only.
+
+### Optional Razorpay
 
 - create production/live API credentials;
 - configure the webhook endpoint over HTTPS;
@@ -22,11 +48,13 @@ Before public launch:
 - keep webhook processing idempotent;
 - test subscription lifecycle and webhook retries before enabling live checkout.
 
-### OpenAI
+### OpenRouter and direct Gemini
 
-- keep API credentials server-side only;
-- use the configured model through `AI_VASTU_OPENAI_MODEL`;
-- retain Phase 24 structured schema validation and `store:false`;
+- keep both API credentials server-side only;
+- use OpenRouter for requirements, architectural reasoning, Vastu reasoning,
+  Architectural Brain and revisions;
+- use direct Gemini only for plan recognition/vision;
+- retain structured schema validation and non-authoritative AI boundaries;
 - enforce application + edge rate limits and monitor cost/usage.
 
 ## Infrastructure
@@ -37,7 +65,8 @@ Before public launch:
 4. Set exact CORS origins and trusted hosts; never use `*`.
 5. Put the API behind HTTPS and an edge/WAF or equivalent abuse-control layer.
 6. Run `pnpm validate`.
-7. Run `pnpm phase25:launch` with the real production environment.
+7. Run `pnpm phase25:launch` only against an explicitly reviewed target. The
+   command connects to PostgreSQL and writes/removes storage probes.
 8. Run staging payment/webhook and full generation smoke tests.
 9. Create and verify a pre-launch backup.
 10. Deploy, then verify `/health` and `/system/release-readiness`.
@@ -47,8 +76,8 @@ Before public launch:
 - generation success/error/latency;
 - PostgreSQL connection saturation;
 - 429 and 503 rate;
-- OpenAI spend and request volume;
-- Razorpay webhook failures/retries;
+- OpenRouter/Gemini spend and request volume;
+- selected payment-gateway webhook failures/retries;
 - failed auth volume;
 - storage capacity;
 - backup completion;

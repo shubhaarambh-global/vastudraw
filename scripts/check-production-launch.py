@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import socket
+from contextlib import suppress
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
 
 import psycopg
@@ -27,6 +29,14 @@ try:
 except ProductionConfigurationError as exc:
     fail(str(exc))
 
+if settings.payment_gateway == "phonepe":
+    fail(
+        "PhonePe is selected but its checkout/webhook integration is not implemented; "
+        "complete Phase 29D before launch."
+    )
+if settings.payment_gateway == "disabled":
+    fail("Payments are disabled; a production launch cannot be qualified.")
+
 bundle_path = Path(
     os.getenv(
         "AI_VASTU_VASTU_RULE_BUNDLE_PATH",
@@ -40,13 +50,28 @@ bundle = RuleBundle.model_validate_json(bundle_path.read_text(encoding="utf-8"))
 if not bundle.production or bundle.content_hash != EXPECTED_VASTU_BUNDLE_HASH:
     fail("Frozen Vastu production bundle verification failed.")
 
-settings.requirements_path.mkdir(parents=True, exist_ok=True)
-probe = settings.requirements_path / ".phase25-write-probe"
-try:
-    probe.write_text("phase25", encoding="utf-8")
-    probe.unlink()
-except OSError as exc:
-    fail(f"Requirements storage is not writable: {exc}")
+for storage_name, storage_root in (
+    ("Requirements", settings.requirements_path),
+    ("Generation upload", settings.generation_upload_root),
+):
+    probe_path: Path | None = None
+    try:
+        storage_root.mkdir(parents=True, exist_ok=True)
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=".phase29a-write-probe-",
+            dir=storage_root,
+            delete=False,
+        ) as probe:
+            probe_path = Path(probe.name)
+            probe.write("phase29a")
+        probe_path.unlink()
+    except OSError as exc:
+        if probe_path is not None:
+            with suppress(OSError):
+                probe_path.unlink(missing_ok=True)
+        fail(f"{storage_name} storage is not writable: {exc}")
 
 try:
     with (

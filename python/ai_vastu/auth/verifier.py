@@ -80,7 +80,7 @@ class SupabaseAccessTokenVerifier:
             return AuthenticatedUser(user_id=user_id, role=role, email=email)
         except AuthenticationError:
             raise
-        except (PyJWTError, ValueError, KeyError, TypeError) as exc:
+        except (PyJWTError, ValueError, KeyError, TypeError, OverflowError) as exc:
             raise AuthenticationError("Access token verification failed.") from exc
 
 

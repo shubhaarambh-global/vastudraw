@@ -11,7 +11,7 @@ from .sqlite_repository import SqliteBillingRepository
 def create_billing_repository() -> BillingRepository:
     app_env = os.getenv("APP_ENV", "development").strip().lower()
     if app_env in {"production", "staging"}:
-        database_url = os.getenv("AI_VASTU_DATABASE_URL", "")
+        database_url = os.getenv("AI_VASTU_DATABASE_URL", "").strip()
         if not database_url:
             raise RuntimeError("AI_VASTU_DATABASE_URL is required for production billing.")
         return PostgresBillingRepository(database_url)

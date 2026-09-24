@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import os
 from typing import Annotated
 from uuid import UUID
 
-import jwt
-from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from ai_vastu.requirements import (
     ConfirmedRequirements,
@@ -14,6 +12,7 @@ from ai_vastu.requirements import (
     create_provider,
 )
 from ai_vastu.requirements.providers import ReferenceAsset
+from app.auth_dependencies import CurrentUserDependency, project_service, require_project_owner
 
 router = APIRouter(prefix="/requirements", tags=["requirements"])
 
@@ -21,55 +20,6 @@ _ALLOWED_TYPES = {"image/jpeg", "image/png", "application/pdf"}
 _MAX_FILES = 8
 _MAX_FILE_BYTES = 20 * 1024 * 1024
 _MAX_TOTAL_BYTES = 50 * 1024 * 1024
-
-
-def _bearer_token(authorization: str | None) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Bearer authentication required.")
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
-        raise HTTPException(status_code=401, detail="Bearer authentication required.")
-    return token
-
-
-def _resolve_user_id(authorization: str | None) -> UUID:
-    token = _bearer_token(authorization)
-    mode = os.getenv("AI_VASTU_AUTH_MODE", "production").strip().lower()
-
-    if mode == "development":
-        expected = os.getenv("AI_VASTU_DEV_BEARER_TOKEN", "")
-        user_id = os.getenv("AI_VASTU_DEV_USER_ID", "")
-        if not expected or not user_id or token != expected:
-            raise HTTPException(status_code=401, detail="Invalid development token.")
-        return UUID(user_id)
-
-    supabase_url = os.getenv("AI_VASTU_SUPABASE_URL", "").rstrip("/")
-    if not supabase_url:
-        raise HTTPException(
-            status_code=503,
-            detail="Supabase authentication is not configured.",
-        )
-
-    try:
-        header = jwt.get_unverified_header(token)
-        algorithm = str(header.get("alg", ""))
-        if algorithm not in {"RS256", "ES256"}:
-            raise ValueError("Unsupported JWT algorithm.")
-        jwks = jwt.PyJWKClient(f"{supabase_url}/auth/v1/.well-known/jwks.json")
-        signing_key = jwks.get_signing_key_from_jwt(token)
-        claims = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=[algorithm],
-            audience=os.getenv(
-                "AI_VASTU_SUPABASE_JWT_AUDIENCE",
-                "authenticated",
-            ),
-            issuer=f"{supabase_url}/auth/v1",
-        )
-        return UUID(str(claims["sub"]))
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail="Invalid access token.") from exc
 
 
 def _validate_signature(content_type: str, data: bytes) -> None:
@@ -119,13 +69,14 @@ def _service() -> RequirementsService:
 async def interpret_requirements(
     project_id: Annotated[UUID, Form()],
     prompt: Annotated[str, Form(min_length=1, max_length=20_000)],
+    request: Request,
+    user: CurrentUserDependency,
     files: Annotated[list[UploadFile] | None, File()] = None,
-    authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    require_project_owner(project_service(request), project_id, user)
     references = await _read_references(files or [])
     draft = _service().interpret(
-        user_id=user_id,
+        user_id=user.user_id,
         project_id=project_id,
         prompt=prompt,
         references=references,
@@ -139,15 +90,16 @@ async def interpret_requirements(
 @router.get("/drafts/{draft_id}")
 def get_requirement_draft(
     draft_id: UUID,
-    authorization: str | None = Header(default=None),
+    request: Request,
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
     try:
-        draft = _service().get_draft(draft_id)
+        draft = RequirementsStore.from_environment().get_draft(draft_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Requirement draft not found.") from exc
-    if draft.user_id != user_id:
+    if draft.user_id != user.user_id:
         raise HTTPException(status_code=404, detail="Requirement draft not found.")
+    require_project_owner(project_service(request), draft.project_id, user)
     return {
         "draft": draft.model_dump(mode="json"),
         "ready_for_confirmation": draft.ready_for_confirmation,
@@ -158,14 +110,18 @@ def get_requirement_draft(
 def confirm_requirements(
     draft_id: UUID,
     confirmed: ConfirmedRequirements,
-    authorization: str | None = Header(default=None),
+    request: Request,
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
     if confirmed.draft_id != draft_id:
         raise HTTPException(status_code=422, detail="Draft identity mismatch.")
     try:
+        draft = RequirementsStore.from_environment().get_draft(draft_id)
+        if draft.user_id != user.user_id:
+            raise PermissionError("Requirement draft does not belong to this user.")
+        require_project_owner(project_service(request), draft.project_id, user)
         result = _service().confirm(
-            authenticated_user_id=user_id,
+            authenticated_user_id=user.user_id,
             confirmed=confirmed,
         )
     except (KeyError, PermissionError) as exc:
@@ -176,16 +132,17 @@ def confirm_requirements(
 @router.get("/drafts/{draft_id}/confirmed")
 def get_confirmed_requirements(
     draft_id: UUID,
-    authorization: str | None = Header(default=None),
+    request: Request,
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
     try:
-        result = _service().get_confirmed(draft_id)
+        result = RequirementsStore.from_environment().get_confirmed(draft_id)
     except KeyError as exc:
         raise HTTPException(
             status_code=404,
             detail="Confirmed requirements not found.",
         ) from exc
-    if result.user_id != user_id:
+    if result.user_id != user.user_id:
         raise HTTPException(status_code=404, detail="Confirmed requirements not found.")
+    require_project_owner(project_service(request), result.project_id, user)
     return {"confirmed": result.model_dump(mode="json")}

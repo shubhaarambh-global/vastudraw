@@ -17,7 +17,7 @@ class PostgresBillingRepository:
             database_url,
             min_size=1,
             max_size=5,
-            kwargs={"autocommit": False, "row_factory": dict_row},
+            kwargs={"autocommit": False, "prepare_threshold": None, "row_factory": dict_row},
         )
 
     def ensure_user(self, user_id: str) -> None:

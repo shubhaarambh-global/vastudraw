@@ -12,13 +12,11 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from ai_vastu.auth import (
     AccessTokenVerifier,
-    AuthenticatedUser,
-    AuthenticationError,
     create_access_token_verifier_from_environment,
 )
 from ai_vastu.exporting import (
@@ -57,6 +55,7 @@ from ai_vastu.plan_intake import (
 )
 from ai_vastu.plan_schema import PLAN_SCHEMA_VERSION, PlanDocument
 from ai_vastu.production.middleware import ProductionHardeningMiddleware
+from ai_vastu.production.settings import load_production_settings
 from ai_vastu.projects import (
     AppendRevisionCommand,
     DuplicateProjectError,
@@ -75,11 +74,10 @@ from ai_vastu.release import (
     ProductionReadinessReport,
     evaluate_production_mvp_readiness,
 )
+from app.auth_dependencies import CurrentUserDependency, require_project_owner
 from app.billing_routes import router as billing_router
 from app.confirmed_generation_routes import router as confirmed_generation_router
 from app.requirements_routes import router as requirements_router
-
-_bearer = HTTPBearer(auto_error=False)
 
 
 class CreateProjectRequest(BaseModel):
@@ -107,45 +105,11 @@ def _generation_intake_store(request: Request) -> GenerationIntakeStore:
     return cast(GenerationIntakeStore, request.app.state.generation_intake_store)
 
 
-def _current_user(
-    request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> AuthenticatedUser:
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer authentication is required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    verifier = cast(AccessTokenVerifier, request.app.state.access_token_verifier)
-    try:
-        return verifier.verify(credentials.credentials)
-    except AuthenticationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
-
-
 ProjectServiceDependency = Annotated[ProjectRevisionService, Depends(_service)]
 GenerationIntakeStoreDependency = Annotated[
     GenerationIntakeStore, Depends(_generation_intake_store)
 ]
-CurrentUserDependency = Annotated[AuthenticatedUser, Depends(_current_user)]
-
-
-def _require_project_owner(
-    service: ProjectRevisionService,
-    project_id: UUID,
-    user: AuthenticatedUser,
-) -> None:
-    if not service.is_project_owner(project_id, user.user_id):
-        # Do not reveal whether another user's project exists.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} does not exist.",
-        )
+_require_project_owner = require_project_owner
 
 
 def create_app(
@@ -153,6 +117,11 @@ def create_app(
     access_token_verifier: AccessTokenVerifier | None = None,
     generation_intake_store: GenerationIntakeStore | None = None,
 ) -> FastAPI:
+    production_settings = (
+        load_production_settings()
+        if os.environ.get("APP_ENV", "development").strip().lower() == "production"
+        else None
+    )
     project_repository = (
         repository if repository is not None else create_project_repository_from_environment()
     )
@@ -183,13 +152,17 @@ def create_app(
     app.state.project_service = ProjectRevisionService(project_repository)
     app.state.generation_intake_store = intake_store
     app.state.access_token_verifier = verifier
-    allowed_origins = tuple(
-        origin.strip()
-        for origin in os.environ.get(
-            "AI_VASTU_WEB_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000",
-        ).split(",")
-        if origin.strip()
+    allowed_origins = (
+        production_settings.allowed_origins
+        if production_settings is not None
+        else tuple(
+            origin.strip()
+            for origin in os.environ.get(
+                "AI_VASTU_WEB_ORIGINS",
+                "http://localhost:3000,http://127.0.0.1:3000",
+            ).split(",")
+            if origin.strip()
+        )
     )
     app.add_middleware(
         CORSMiddleware,
@@ -658,16 +631,17 @@ def create_app(
             headers=headers,
         )
 
+    app.include_router(billing_router)
+    app.include_router(requirements_router)
+    app.include_router(confirmed_generation_router)
+    app.add_middleware(ProductionHardeningMiddleware)
+    if production_settings is not None:
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=list(production_settings.trusted_hosts),
+        )
+
     return app
 
 
 app = create_app()
-
-app.include_router(billing_router)
-
-app.include_router(requirements_router)
-
-app.include_router(confirmed_generation_router)
-
-# Phase 25 production defense-in-depth middleware.
-app.add_middleware(ProductionHardeningMiddleware)

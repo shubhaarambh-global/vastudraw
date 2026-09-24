@@ -14,7 +14,8 @@ def test_phase25_middleware_protects_commercial_paths() -> None:
 def test_launch_gate_rejects_dev_and_test_commerce_configuration() -> None:
     source = (ROOT / "python/ai_vastu/production/settings.py").read_text(encoding="utf-8")
     assert "APP_ENV must be production" in source
-    assert "AI_VASTU_AUTH_MODE must be production" in source
+    assert "AI_VASTU_AUTH_MODE must be supabase in production" in source
+    assert "AI_VASTU_DEV_BILLING_BYPASS cannot be enabled in production" in source
     assert 'key_id.startswith("rzp_test_")' in source
 
 

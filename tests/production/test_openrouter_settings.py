@@ -3,12 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.production.test_settings import base_environment
 
-from ai_vastu.openrouter_http import (
-    FALLBACK_REASONING_MODEL,
-    PRIMARY_ARCHITECTURAL_MODEL,
-    VISION_PLAN_MODEL,
-)
+from ai_vastu.openrouter_http import FALLBACK_REASONING_MODEL, PRIMARY_ARCHITECTURAL_MODEL
 from ai_vastu.production.settings import (
     ProductionConfigurationError,
     load_production_settings,
@@ -16,39 +13,21 @@ from ai_vastu.production.settings import (
 
 
 def _environment(tmp_path: Path) -> dict[str, str]:
-    return {
-        "APP_ENV": "production",
-        "AI_VASTU_AUTH_MODE": "production",
-        "DATABASE_URL": "postgresql://user:pass@db.example.com:5432/vastu",
-        "AI_VASTU_SUPABASE_URL": "https://example.supabase.co",
-        "AI_VASTU_SUPABASE_JWT_AUDIENCE": "authenticated",
-        "AI_VASTU_ALLOWED_ORIGINS": "https://app.example.com",
-        "AI_VASTU_TRUSTED_HOSTS": "api.example.com",
-        "AI_VASTU_REQUIREMENTS_PATH": str(tmp_path.resolve()),
-        "AI_VASTU_RAZORPAY_KEY_ID": "rzp_live_example",
-        "AI_VASTU_RAZORPAY_KEY_SECRET": "secret",
-        "AI_VASTU_RAZORPAY_WEBHOOK_SECRET": "webhook-secret",
-        "AI_VASTU_RAZORPAY_MONTHLY_PLAN_ID": "plan_month",
-        "AI_VASTU_RAZORPAY_YEARLY_PLAN_ID": "plan_year",
-        "AI_VASTU_REQUIREMENTS_PROVIDER": "openrouter",
-        "OPENROUTER_API_KEY": "test-openrouter-key",
-        "AI_VASTU_OPENROUTER_PRIMARY_MODEL": PRIMARY_ARCHITECTURAL_MODEL,
-        "AI_VASTU_OPENROUTER_VISION_MODEL": VISION_PLAN_MODEL,
-        "AI_VASTU_OPENROUTER_FALLBACK_MODEL": FALLBACK_REASONING_MODEL,
-    }
+    return base_environment(tmp_path)
 
 
-def test_production_settings_accept_pinned_openrouter_free_stack(
+def test_production_settings_accept_pinned_hybrid_stack(
     tmp_path: Path,
 ) -> None:
     settings = load_production_settings(_environment(tmp_path))
 
     assert settings.requirements_provider == "openrouter"
     assert settings.openrouter_primary_model == PRIMARY_ARCHITECTURAL_MODEL
-    assert settings.openrouter_vision_model == VISION_PLAN_MODEL
     assert settings.openrouter_fallback_model == FALLBACK_REASONING_MODEL
+    assert settings.plan_recognition_provider == "gemini"
+    assert settings.plan_recognition_model == "gemini-3.1-flash-lite"
     assert settings.openai_model is None
-    assert settings.gemini_model is None
+    assert settings.gemini_model == "gemini-3.1-flash-lite"
 
 
 def test_production_settings_reject_paid_model_substitution(tmp_path: Path) -> None:
@@ -56,4 +35,47 @@ def test_production_settings_reject_paid_model_substitution(tmp_path: Path) -> N
     env["AI_VASTU_OPENROUTER_PRIMARY_MODEL"] = "deepseek/deepseek-v4-flash-0731"
 
     with pytest.raises(ProductionConfigurationError):
+        load_production_settings(env)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "AI_VASTU_REQUIREMENTS_PROVIDER",
+        "AI_VASTU_ARCHITECT_PROVIDER",
+        "AI_VASTU_VASTU_PROVIDER",
+        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER",
+        "AI_VASTU_REVISION_PROVIDER",
+    ],
+)
+@pytest.mark.parametrize("value", ["", "fixture", "gemini"])
+def test_production_settings_reject_text_provider_drift(
+    tmp_path: Path, name: str, value: str
+) -> None:
+    env = _environment(tmp_path)
+    env[name] = value
+    with pytest.raises(ProductionConfigurationError, match=name):
+        load_production_settings(env)
+
+
+@pytest.mark.parametrize(
+    "name", [
+        "AI_VASTU_OPENROUTER_PRIMARY_MODEL",
+        "AI_VASTU_OPENROUTER_VISION_MODEL",
+        "AI_VASTU_OPENROUTER_FALLBACK_MODEL",
+    ]
+)
+def test_production_settings_require_explicit_pinned_openrouter_models(
+    tmp_path: Path, name: str
+) -> None:
+    env = _environment(tmp_path)
+    env.pop(name)
+    with pytest.raises(ProductionConfigurationError, match=name):
+        load_production_settings(env)
+
+
+def test_production_settings_require_openrouter_server_secret(tmp_path: Path) -> None:
+    env = _environment(tmp_path)
+    env["OPENROUTER_API_KEY"] = " "
+    with pytest.raises(ProductionConfigurationError, match="OPENROUTER_API_KEY"):
         load_production_settings(env)

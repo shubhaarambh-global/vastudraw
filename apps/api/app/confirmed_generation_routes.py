@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import logging
-import os
-from typing import cast
 from uuid import UUID
 
-import jwt
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from ai_vastu.architectural_intelligence import (
     ArchitecturalIntelligenceConfigurationError,
@@ -16,7 +13,6 @@ from ai_vastu.billing import BillingService, create_billing_repository
 from ai_vastu.billing.service import development_billing_bypass_enabled
 from ai_vastu.multi_candidate import MultiCandidateGenerationError
 from ai_vastu.projects.errors import ProjectNotFoundError, RevisionConflictError
-from ai_vastu.projects.service import ProjectRevisionService
 from ai_vastu.requirements.candidate_orchestrator import (
     CandidateGenerationOrchestrator,
     CandidateSelectionError,
@@ -37,63 +33,11 @@ from ai_vastu.vastu_reasoning import (
     VastuReasoningConfigurationError,
     VastuReasoningProviderError,
 )
+from app.auth_dependencies import CurrentUserDependency, project_service, require_project_owner
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/confirmed-generation", tags=["confirmed-generation"])
-
-
-def _project_service(request: Request) -> ProjectRevisionService:
-    return cast(ProjectRevisionService, request.app.state.project_service)
-
-
-def _bearer_token(authorization: str | None) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Bearer authentication required.")
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
-        raise HTTPException(status_code=401, detail="Bearer authentication required.")
-    return token
-
-
-def _resolve_user_id(authorization: str | None) -> UUID:
-    token = _bearer_token(authorization)
-    mode = os.getenv("AI_VASTU_AUTH_MODE", "production").strip().lower()
-
-    if mode == "development":
-        expected = os.getenv("AI_VASTU_DEV_BEARER_TOKEN", "")
-        user_id = os.getenv("AI_VASTU_DEV_USER_ID", "")
-        if not expected or not user_id or token != expected:
-            raise HTTPException(status_code=401, detail="Invalid development token.")
-        return UUID(user_id)
-
-    supabase_url = os.getenv("AI_VASTU_SUPABASE_URL", "").rstrip("/")
-    if not supabase_url:
-        raise HTTPException(
-            status_code=503,
-            detail="Supabase authentication is not configured.",
-        )
-
-    try:
-        header = jwt.get_unverified_header(token)
-        algorithm = str(header.get("alg", ""))
-        if algorithm not in {"RS256", "ES256"}:
-            raise ValueError("Unsupported JWT algorithm.")
-        jwks = jwt.PyJWKClient(f"{supabase_url}/auth/v1/.well-known/jwks.json")
-        signing_key = jwks.get_signing_key_from_jwt(token)
-        claims = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=[algorithm],
-            audience=os.getenv(
-                "AI_VASTU_SUPABASE_JWT_AUDIENCE",
-                "authenticated",
-            ),
-            issuer=f"{supabase_url}/auth/v1",
-        )
-        return UUID(str(claims["sub"]))
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail="Invalid access token.") from exc
 
 
 @router.post("/projects/{project_id}/alternatives")
@@ -101,11 +45,12 @@ def generate_confirmed_alternatives(
     project_id: UUID,
     request: Request,
     options: GenerateAlternativesOptions,
-    authorization: str | None = Header(default=None),
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    require_project_owner(project_service(request), project_id, user)
+    user_id = user.user_id
     billing_repository = create_billing_repository()
-    project_service = _project_service(request)
+    projects = project_service(request)
     try:
         orchestrator = CandidateGenerationOrchestrator(
             requirements_store=RequirementsStore.from_environment(),
@@ -113,7 +58,7 @@ def generate_confirmed_alternatives(
                 billing_repository,
                 development_bypass=development_billing_bypass_enabled(),
             ),
-            project_service=project_service,
+            project_service=projects,
         )
         preview = orchestrator.preview(
             authenticated_user_id=user_id,
@@ -184,11 +129,12 @@ def select_confirmed_alternative(
     project_id: UUID,
     request: Request,
     options: SelectAlternativeOptions,
-    authorization: str | None = Header(default=None),
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    require_project_owner(project_service(request), project_id, user)
+    user_id = user.user_id
     billing_repository = create_billing_repository()
-    project_service = _project_service(request)
+    projects = project_service(request)
     try:
         orchestrator = CandidateGenerationOrchestrator(
             requirements_store=RequirementsStore.from_environment(),
@@ -196,7 +142,7 @@ def select_confirmed_alternative(
                 billing_repository,
                 development_bypass=development_billing_bypass_enabled(),
             ),
-            project_service=project_service,
+            project_service=projects,
         )
         selection = orchestrator.select(
             authenticated_user_id=user_id,
@@ -239,11 +185,12 @@ def generate_from_confirmed_requirements(
     project_id: UUID,
     request: Request,
     options: GenerateConfirmedOptions,
-    authorization: str | None = Header(default=None),
+    user: CurrentUserDependency,
 ) -> dict[str, object]:
-    user_id = _resolve_user_id(authorization)
+    require_project_owner(project_service(request), project_id, user)
+    user_id = user.user_id
     billing_repository = create_billing_repository()
-    project_service = _project_service(request)
+    projects = project_service(request)
     try:
         orchestrator = FinalGenerationOrchestrator(
             requirements_store=RequirementsStore.from_environment(),
@@ -251,7 +198,7 @@ def generate_from_confirmed_requirements(
                 billing_repository,
                 development_bypass=development_billing_bypass_enabled(),
             ),
-            project_service=project_service,
+            project_service=projects,
         )
         run = orchestrator.run(
             authenticated_user_id=user_id,
