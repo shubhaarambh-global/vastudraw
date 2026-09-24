@@ -516,9 +516,14 @@ Status: **IMPLEMENTED AND LOCALLY VALIDATED; NOT A PRODUCTION QUALIFICATION**
 
 - Branch: `phase29`
 - Starting HEAD: `cbd295f5e9028186acbfb14f40c1142e3a003b27`
-- No commit, tag, staging, deployment, database migration, or live account action was performed.
+- Phase 29A and Phase 29B were checkpointed together after local validation at
+  commit `abb24feb0209a18f14877c2f8154e24c4dbcffcc`. No qualification tag,
+  deployment, database migration, or live account action was performed.
 - The worktree was already dirty at entry, including a user-edited `AGENTS.md`, Agent OS files, archives, payloads, and scripts. These were preserved. No reset, clean, broad checkout/restore, or archive deletion was performed.
-- Rollback point: qualified `post-v1-development-qualified` at `cbd295f5e9028186acbfb14f40c1142e3a003b27`. Phase 29A edits are uncommitted; if rollback is needed, reverse only the listed Phase 29A files/hunks and preserve the pre-existing user changes and untracked payloads.
+- Rollback point: qualified `post-v1-development-qualified` at
+  `cbd295f5e9028186acbfb14f40c1142e3a003b27`. The Phase 29A/29B checkpoint is
+  `abb24feb0209a18f14877c2f8154e24c4dbcffcc`; preserve the pre-existing user
+  changes and untracked payloads during any rollback.
 - Canonical schema generation during validation produced no tracked diff in `packages/contracts/schema/plan-document.schema.json` or `packages/contracts/src/generated/plan-document.ts`.
 
 ### Implementation
@@ -609,8 +614,9 @@ Status: **IMPLEMENTED AND LOCALLY VALIDATED; NOT A PRODUCTION QUALIFICATION**
 
 - Branch: `phase29`; starting qualified HEAD remains
   `cbd295f5e9028186acbfb14f40c1142e3a003b27`.
-- Phase 29A and 29B changes remain uncommitted in the existing dirty worktree.
-  No staging, commit, tag, deployment, database migration, live credential use,
+- Phase 29A and 29B are checkpointed at
+  `abb24feb0209a18f14877c2f8154e24c4dbcffcc` in the existing dirty worktree.
+  No qualification tag, deployment, database migration, live credential use,
   external account action, or production write was performed.
 - Protected solver, Architectural Brain, Vastu, canonical geometry,
   PlanDocument schema, millimetre units, and immutable project revision behavior
@@ -692,8 +698,8 @@ other pre-existing untracked files remain untouched.
   It accepted local Phase 29B security after the fixes.
 - Independent QA: 52 focused tests and 32 additional signed RS256 route probes
   passed; local Phase 29B implementation accepted.
-- Release Auditor verified branch `phase29`, exact HEAD and peeled baseline tags,
-  the disclosed dirty/uncommitted tree, protected-path cleanliness,
+- Release Auditor verified branch `phase29`, the then-current HEAD and peeled
+  baseline tags, the disclosed dirty/uncommitted tree, protected-path cleanliness,
   `git diff --check`, and the local-vs-live claims. It accepted this local
   handoff wording and blocked any qualification tag.
 

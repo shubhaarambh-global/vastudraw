@@ -104,7 +104,8 @@
       "value": "Supabase auth with authenticated audience; AI_VASTU_DATABASE_URL; validated web origins and trusted hosts; absolute durable storage roots; OpenRouter text/reasoning with direct Gemini plan vision; explicit gateway selection. PhonePe remains unimplemented and fail-closed.",
       "provenance": [
         "docs/CURRENT_HANDOFF.md (Phase 29A — Production Configuration Contract)",
-        "pnpm validate at cbd295f5e9028186acbfb14f40c1142e3a003b27 working tree"
+        "pnpm validate at cbd295f5e9028186acbfb14f40c1142e3a003b27 working tree",
+        "commit:abb24feb0209a18f14877c2f8154e24c4dbcffcc"
       ]
     },
     {
@@ -115,7 +116,8 @@
       "value": "Shared canonical access-token verification and current-owner gates cover project, billing, requirements, and confirmed-generation routes. Requirements files use atomic same-directory replacement; staging/production upload roots fail closed; backups cover PostgreSQL, requirements, and generation uploads. Live database isolation, services, and restore behavior remain unqualified.",
       "provenance": [
         "docs/CURRENT_HANDOFF.md (Phase 29B - Auth and Persistence Hardening)",
-        "pnpm validate on phase29 working tree, 2026-09-24"
+        "pnpm validate on phase29 working tree, 2026-09-24",
+        "commit:abb24feb0209a18f14877c2f8154e24c4dbcffcc"
       ]
     },
     {
