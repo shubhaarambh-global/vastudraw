@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from ai_vastu.auth import (
@@ -70,10 +71,12 @@ from ai_vastu.projects import (
     RevisionRecord,
     create_project_repository_from_environment,
 )
+from ai_vastu.provider_runtime import ProviderFailureCategory
 from ai_vastu.release import (
     ProductionReadinessReport,
     evaluate_production_mvp_readiness,
 )
+from ai_vastu.runtime_environment import parse_runtime_environment
 from app.auth_dependencies import CurrentUserDependency, require_project_owner
 from app.billing_routes import router as billing_router
 from app.confirmed_generation_routes import router as confirmed_generation_router
@@ -112,15 +115,34 @@ GenerationIntakeStoreDependency = Annotated[
 _require_project_owner = require_project_owner
 
 
+def _plan_intake_provider_http_error(exc: PlanIntakeProviderError) -> HTTPException:
+    if exc.category is ProviderFailureCategory.TIMEOUT:
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="AI provider timed out.",
+        )
+    if exc.category in {
+        ProviderFailureCategory.REQUEST_REJECTED,
+        ProviderFailureCategory.INVALID_RESPONSE,
+    }:
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI provider returned an invalid response.",
+        )
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="AI provider is unavailable.",
+    )
+
+
 def create_app(
     repository: ProjectRepository | None = None,
     access_token_verifier: AccessTokenVerifier | None = None,
     generation_intake_store: GenerationIntakeStore | None = None,
 ) -> FastAPI:
+    app_env = parse_runtime_environment(os.environ)
     production_settings = (
-        load_production_settings()
-        if os.environ.get("APP_ENV", "development").strip().lower() == "production"
-        else None
+        load_production_settings() if app_env == "production" else None
     )
     project_repository = (
         repository if repository is not None else create_project_repository_from_environment()
@@ -164,24 +186,6 @@ def create_app(
             if origin.strip()
         )
     )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=list(allowed_origins),
-        allow_credentials=False,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Authorization", "Content-Type"],
-        expose_headers=[
-            "Content-Disposition",
-            "ETag",
-            "X-Vastudraw-Artifact-Sha256",
-            "X-Vastudraw-Candidate-Id",
-            "X-Vastudraw-Combined",
-            "X-Vastudraw-Export-Manifest",
-            "X-Vastudraw-Floor-Index",
-            "X-Vastudraw-Source-Hash",
-        ],
-    )
-
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
         return {
@@ -237,7 +241,12 @@ def create_app(
                 )
             )
         try:
-            return intake_store.create(project_id, prompt, tuple(uploads))
+            return await run_in_threadpool(
+                intake_store.create,
+                project_id,
+                prompt,
+                tuple(uploads),
+            )
         except GenerationIntakeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -332,13 +341,10 @@ def create_app(
         except PlanIntakeConfigurationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=str(exc),
+                detail="AI provider is not configured.",
             ) from exc
         except PlanIntakeProviderError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
-            ) from exc
+            raise _plan_intake_provider_http_error(exc) from exc
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -635,6 +641,23 @@ def create_app(
     app.include_router(requirements_router)
     app.include_router(confirmed_generation_router)
     app.add_middleware(ProductionHardeningMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(allowed_origins),
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=[
+            "Content-Disposition",
+            "ETag",
+            "X-Vastudraw-Artifact-Sha256",
+            "X-Vastudraw-Candidate-Id",
+            "X-Vastudraw-Combined",
+            "X-Vastudraw-Export-Manifest",
+            "X-Vastudraw-Floor-Index",
+            "X-Vastudraw-Source-Hash",
+        ],
+    )
     if production_settings is not None:
         app.add_middleware(
             TrustedHostMiddleware,

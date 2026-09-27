@@ -7,6 +7,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from ai_vastu.upload_validation import (
+    UploadContentError,
+    validate_image_content,
+    validate_pdf_content,
+)
+
 from .models import (
     GenerationAttachmentRecord,
     GenerationIntakeRecord,
@@ -68,28 +74,42 @@ def _classify_attachment(
     if by_extension is not None:
         expected_kind, storage_suffix, canonical_media = by_extension
         by_media = _ALLOWED_MEDIA_TYPES.get(normalized_media)
-        if by_media is not None and by_media[0] is not expected_kind:
+        cad_octet_stream = (
+            normalized_media == "application/octet-stream"
+            and expected_kind in {GenerationReferenceKind.DXF, GenerationReferenceKind.DWG}
+        )
+        if not cad_octet_stream and (
+            by_media is None or by_media[2] != canonical_media
+        ):
             raise GenerationIntakeError(f"{filename}: file extension and media type disagree.")
         return expected_kind, storage_suffix, canonical_media
-
-    by_media = _ALLOWED_MEDIA_TYPES.get(normalized_media)
-    if by_media is not None:
-        return by_media
 
     raise GenerationIntakeError(
         "Only JPEG, PNG, PDF, DXF, and DWG generation references are supported."
     )
 
 
-def _verify_signature(kind: GenerationReferenceKind, content: bytes) -> None:
+def _verify_signature(
+    kind: GenerationReferenceKind,
+    media_type: str,
+    content: bytes,
+) -> None:
     if kind is GenerationReferenceKind.IMAGE:
-        if content.startswith(b"\xff\xd8\xff") or content.startswith(b"\x89PNG\r\n\x1a\n"):
-            return
-        raise GenerationIntakeError("Image attachment signature is not JPEG or PNG.")
+        try:
+            validate_image_content(media_type, content)
+        except UploadContentError as exc:
+            raise GenerationIntakeError(
+                f"Image attachment signature does not match {media_type}."
+            ) from exc
+        return
 
     if kind is GenerationReferenceKind.PDF:
-        if not content.startswith(b"%PDF-"):
-            raise GenerationIntakeError("PDF attachment signature does not match file type.")
+        try:
+            validate_pdf_content(content)
+        except UploadContentError as exc:
+            raise GenerationIntakeError(
+                "PDF attachment signature does not match file type."
+            ) from exc
         return
 
     if kind is GenerationReferenceKind.DXF:
@@ -152,7 +172,7 @@ class GenerationIntakeStore:
                     incoming.original_filename,
                     incoming.media_type,
                 )
-                _verify_signature(kind, incoming.content)
+                _verify_signature(kind, canonical_media, incoming.content)
 
                 attachment_id = uuid4()
                 storage_name = f"{attachment_id}{suffix}"

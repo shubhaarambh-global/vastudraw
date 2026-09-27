@@ -9,11 +9,12 @@ from ai_vastu.openrouter_http import (
     OpenRouterClient,
     OpenRouterConfigurationError,
     OpenRouterModelPolicy,
-    OpenRouterRequestError,
     image_url_part,
     pdf_file_part,
     schema_instruction,
 )
+from ai_vastu.provider_runtime import ProviderRuntimeError
+from ai_vastu.requirements.errors import RequirementsProviderError
 from ai_vastu.requirements.models import RequirementDraft
 from ai_vastu.requirements.providers.base import InterpretationInput
 
@@ -117,8 +118,8 @@ class OpenRouterRequirementsProvider:
                 temperature=0.1,
                 plugins=FREE_PDF_PLUGIN if has_pdf else (),
             )
-        except OpenRouterRequestError as exc:
-            raise RuntimeError(f"OpenRouter requirements interpretation failed: {exc}") from exc
+        except ProviderRuntimeError as exc:
+            raise RequirementsProviderError(exc.category) from exc
 
 
 def build_openrouter_requirements_provider_for_test(

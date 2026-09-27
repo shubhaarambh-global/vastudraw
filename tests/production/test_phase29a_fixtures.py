@@ -22,6 +22,7 @@ def qualified_production_environment(tmp_path: Path) -> dict[str, str]:
     [
         "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR",
         "AI_VASTU_RATE_LIMIT_GENERATION_PER_HOUR",
+        "AI_VASTU_RATE_LIMIT_PLAN_ANALYSIS_PER_HOUR",
         "AI_VASTU_RATE_LIMIT_CHECKOUT_PER_HOUR",
         "AI_VASTU_HSTS_SECONDS",
     ],

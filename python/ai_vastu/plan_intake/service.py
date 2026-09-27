@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import os
 
+from ai_vastu.provider_runtime import ProviderRuntimeError
+
 from .audit import build_plan_analysis
 from .errors import PlanIntakeConfigurationError, PlanIntakeProviderError
-from .models import PlanAnalysisResult, PlanRecognitionDraft
+from .models import (
+    PlanAnalysisResult,
+    PlanObservationSource,
+    PlanRecognitionDraft,
+    PlanReferenceKind,
+)
 from .openrouter_provider import OpenRouterPlanRecognitionProvider
 from .provider import (
     FixturePlanRecognitionProvider,
@@ -74,6 +81,61 @@ def _normalize_recognition_questions(
     ).with_content_hash()
 
 
+def _normalize_visual_observations(
+    draft: PlanRecognitionDraft,
+    request: PlanRecognitionInput,
+) -> PlanRecognitionDraft:
+    visual_kinds = {
+        reference.kind
+        for reference in request.references
+        if reference.kind in {PlanReferenceKind.IMAGE, PlanReferenceKind.PDF}
+    }
+    if not visual_kinds:
+        return draft
+
+    if visual_kinds == {PlanReferenceKind.IMAGE}:
+        safe_source = PlanObservationSource.IMAGE
+    elif visual_kinds == {PlanReferenceKind.PDF}:
+        safe_source = PlanObservationSource.PDF
+    else:
+        safe_source = PlanObservationSource.MODEL_INFERENCE
+
+    def source(current: PlanObservationSource) -> PlanObservationSource:
+        if current is PlanObservationSource.USER_CONFIRMED:
+            return safe_source
+        return current
+
+    envelope = draft.envelope.model_copy(
+        update={
+            "source": source(draft.envelope.source),
+            "requires_confirmation": True,
+        }
+    )
+    orientation = draft.orientation.model_copy(
+        update={
+            "source": source(draft.orientation.source),
+            "requires_confirmation": True,
+        }
+    )
+    rooms = tuple(
+        room.model_copy(
+            update={
+                "source": source(room.source),
+                "requires_confirmation": True,
+            }
+        )
+        for room in draft.rooms
+    )
+    return draft.model_copy(
+        update={
+            "envelope": envelope,
+            "orientation": orientation,
+            "rooms": rooms,
+            "content_hash": None,
+        }
+    ).with_content_hash()
+
+
 def create_plan_recognition_provider() -> PlanRecognitionProvider:
     name = configured_plan_recognition_provider_name()
     if name == "fixture":
@@ -97,14 +159,17 @@ class PlanIntakeService:
             draft = self._provider.recognize(request)
         except (PlanIntakeConfigurationError, PlanIntakeProviderError):
             raise
+        except ProviderRuntimeError as exc:
+            raise PlanIntakeProviderError(exc.category) from exc
         except Exception as exc:
-            raise PlanIntakeProviderError(str(exc)) from exc
+            raise PlanIntakeProviderError.from_exception(exc) from exc
 
         if draft.project_id != request.project_id:
             raise PlanIntakeProviderError("Plan recognition project identity mismatch.")
         if draft.intake_id != request.intake_id:
             raise PlanIntakeProviderError("Plan recognition intake identity mismatch.")
-        return _normalize_recognition_questions(draft)
+        normalized = _normalize_visual_observations(draft, request)
+        return _normalize_recognition_questions(normalized)
 
     def analyze(self, request: PlanRecognitionInput) -> PlanAnalysisResult:
         return build_plan_analysis(self.recognize(request))

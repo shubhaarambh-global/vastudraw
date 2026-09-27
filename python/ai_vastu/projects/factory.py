@@ -3,6 +3,11 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 
+from ai_vastu.runtime_environment import (
+    RuntimeEnvironmentConfigurationError,
+    parse_runtime_environment,
+)
+
 from .errors import ProjectStoreConfigurationError
 from .postgres_repository import PostgresProjectRepository
 from .repository import ProjectRepository
@@ -34,7 +39,10 @@ def create_project_repository_from_environment(
     environment: Mapping[str, str] | None = None,
 ) -> ProjectRepository:
     env = os.environ if environment is None else environment
-    app_env = env.get("APP_ENV", "development").strip().lower()
+    try:
+        app_env = parse_runtime_environment(env)
+    except RuntimeEnvironmentConfigurationError as exc:
+        raise ProjectStoreConfigurationError(str(exc)) from exc
     database_url = env.get("AI_VASTU_DATABASE_URL", "").strip()
 
     if database_url:

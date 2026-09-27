@@ -13,6 +13,13 @@ from ai_vastu.architectural_intelligence.providers.schema_utils import (
     sanitize_gemini_schema,
 )
 from ai_vastu.gemini_http import post_json_with_retry
+from ai_vastu.provider_runtime import (
+    DEFAULT_GEMINI_BUDGET,
+    ProviderBudget,
+    ProviderBudgetConfigurationError,
+    ProviderRuntimeError,
+    load_provider_budget,
+)
 
 from .cad import convert_dwg_to_dxf, summarize_dxf
 from .errors import PlanIntakeConfigurationError, PlanIntakeProviderError
@@ -119,10 +126,12 @@ class GeminiPlanRecognitionProvider:
         model: str,
         *,
         transport: httpx.BaseTransport | None = None,
+        budget: ProviderBudget | None = None,
     ) -> None:
         self._api_key = api_key
         self._model = model
         self._transport = transport
+        self._budget = budget
 
     @classmethod
     def from_environment(cls) -> GeminiPlanRecognitionProvider:
@@ -135,7 +144,17 @@ class GeminiPlanRecognitionProvider:
         ).strip()
         if not model:
             raise PlanIntakeConfigurationError("AI_VASTU_PLAN_RECOGNITION_MODEL must not be blank.")
-        return cls(api_key, model)
+        try:
+            budget = load_provider_budget(
+                os.environ,
+                prefix="AI_VASTU_GEMINI",
+                default=DEFAULT_GEMINI_BUDGET,
+            )
+        except ProviderBudgetConfigurationError as exc:
+            raise PlanIntakeConfigurationError(
+                "Gemini plan-recognition runtime budget is invalid."
+            ) from exc
+        return cls(api_key, model, budget=budget)
 
     def recognize(self, request: PlanRecognitionInput) -> PlanRecognitionDraft:
         parts: list[dict[str, Any]] = [
@@ -212,6 +231,7 @@ class GeminiPlanRecognitionProvider:
                     client,
                     f"/models/{self._model}:generateContent",
                     json_payload=payload,
+                    budget=self._budget,
                 )
             result = response.json()
             if not isinstance(result, dict):
@@ -223,8 +243,10 @@ class GeminiPlanRecognitionProvider:
                 )
         except PlanIntakeProviderError:
             raise
+        except ProviderRuntimeError as exc:
+            raise PlanIntakeProviderError(exc.category) from exc
         except Exception as exc:
-            raise PlanIntakeProviderError(f"Gemini plan recognition failed: {exc}") from exc
+            raise PlanIntakeProviderError.from_exception(exc) from exc
 
         parsed.update(
             {
@@ -245,9 +267,7 @@ class GeminiPlanRecognitionProvider:
         try:
             return PlanRecognitionDraft.model_validate_json(json.dumps(parsed)).with_content_hash()
         except Exception as exc:
-            raise PlanIntakeProviderError(
-                f"Gemini plan recognition output failed validation: {exc}"
-            ) from exc
+            raise PlanIntakeProviderError.from_exception(exc) from exc
 
 
 class FixturePlanRecognitionProvider:

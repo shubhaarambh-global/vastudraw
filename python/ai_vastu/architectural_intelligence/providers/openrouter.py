@@ -9,9 +9,9 @@ from ai_vastu.openrouter_http import (
     OpenRouterClient,
     OpenRouterConfigurationError,
     OpenRouterModelPolicy,
-    OpenRouterRequestError,
     schema_instruction,
 )
+from ai_vastu.provider_runtime import ProviderRuntimeError
 
 from ..errors import (
     ArchitecturalIntelligenceConfigurationError,
@@ -153,10 +153,8 @@ class OpenRouterArchitecturalIntelligenceProvider:
                 validator=validate,
                 temperature=0.2,
             )
-        except OpenRouterRequestError as exc:
-            raise ArchitecturalIntelligenceProviderError(
-                f"OpenRouter architectural reasoning failed: {exc}"
-            ) from exc
+        except ProviderRuntimeError as exc:
+            raise ArchitecturalIntelligenceProviderError(exc.category) from exc
 
 
 def build_openrouter_architectural_intelligence_for_test(

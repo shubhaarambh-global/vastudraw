@@ -3,12 +3,18 @@ from __future__ import annotations
 import os
 from uuid import UUID, uuid4
 
+from ai_vastu.provider_runtime import ProviderRuntimeError
+
+from .errors import RequirementsConfigurationError, RequirementsProviderError
 from .models import ConfirmedRequirements, RequirementDraft
 from .providers import (
     FixtureRequirementsProvider,
     GeminiGenerateContentRequirementsProvider,
+    GeminiRequirementsConfigurationError,
     InterpretationInput,
+    OpenAIRequirementsConfigurationError,
     OpenAIResponsesRequirementsProvider,
+    OpenRouterRequirementsConfigurationError,
     OpenRouterRequirementsProvider,
     ReferenceAsset,
     RequirementsProvider,
@@ -26,15 +32,24 @@ def create_provider() -> RequirementsProvider:
         .lower()
     )
 
-    if provider_name == "fixture":
-        return FixtureRequirementsProvider()
-    if provider_name == "openai":
-        return OpenAIResponsesRequirementsProvider.from_environment()
-    if provider_name == "gemini":
-        return GeminiGenerateContentRequirementsProvider.from_environment()
-    if provider_name == "openrouter":
-        return OpenRouterRequirementsProvider.from_environment()
-    raise RuntimeError(f"Unsupported requirements provider: {provider_name}")
+    try:
+        if provider_name == "fixture":
+            return FixtureRequirementsProvider()
+        if provider_name == "openai":
+            return OpenAIResponsesRequirementsProvider.from_environment()
+        if provider_name == "gemini":
+            return GeminiGenerateContentRequirementsProvider.from_environment()
+        if provider_name == "openrouter":
+            return OpenRouterRequirementsProvider.from_environment()
+    except (
+        GeminiRequirementsConfigurationError,
+        OpenAIRequirementsConfigurationError,
+        OpenRouterRequirementsConfigurationError,
+    ) as exc:
+        raise RequirementsConfigurationError(
+            "Requirements interpretation provider is not configured."
+        ) from exc
+    raise RequirementsConfigurationError("Unsupported requirements interpretation provider.")
 
 
 class RequirementsService:
@@ -55,15 +70,22 @@ class RequirementsService:
         references: tuple[ReferenceAsset, ...],
     ) -> RequirementDraft:
         draft_id = uuid4()
-        draft = self._provider.interpret(
-            InterpretationInput(
-                draft_id=draft_id,
-                user_id=user_id,
-                project_id=project_id,
-                prompt=prompt,
-                references=references,
+        try:
+            draft = self._provider.interpret(
+                InterpretationInput(
+                    draft_id=draft_id,
+                    user_id=user_id,
+                    project_id=project_id,
+                    prompt=prompt,
+                    references=references,
+                )
             )
-        )
+        except RequirementsProviderError:
+            raise
+        except ProviderRuntimeError as exc:
+            raise RequirementsProviderError(exc.category) from exc
+        except Exception as exc:
+            raise RequirementsProviderError.from_exception(exc) from exc
         self._store.save_draft(draft)
         return draft
 

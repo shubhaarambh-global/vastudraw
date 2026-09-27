@@ -8,6 +8,11 @@ from uuid import UUID
 import jwt
 from jwt.exceptions import PyJWTError
 
+from ai_vastu.runtime_environment import (
+    RuntimeEnvironmentConfigurationError,
+    parse_runtime_environment,
+)
+
 from .errors import AuthConfigurationError, AuthenticationError
 from .models import AuthenticatedUser
 
@@ -88,7 +93,10 @@ def create_access_token_verifier_from_environment(
     environment: Mapping[str, str] | None = None,
 ) -> AccessTokenVerifier:
     env = os.environ if environment is None else environment
-    app_env = env.get("APP_ENV", "development").strip().lower()
+    try:
+        app_env = parse_runtime_environment(env)
+    except RuntimeEnvironmentConfigurationError as exc:
+        raise AuthConfigurationError(str(exc)) from exc
     auth_mode = env.get("AI_VASTU_AUTH_MODE", "").strip().lower()
     supabase_url = env.get("AI_VASTU_SUPABASE_URL", "").strip()
 

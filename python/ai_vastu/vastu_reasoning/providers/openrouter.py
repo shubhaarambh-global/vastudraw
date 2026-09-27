@@ -9,9 +9,10 @@ from ai_vastu.openrouter_http import (
     OpenRouterClient,
     OpenRouterConfigurationError,
     OpenRouterModelPolicy,
-    OpenRouterRequestError,
     schema_instruction,
 )
+from ai_vastu.provider_runtime import ProviderRuntimeError
+from ai_vastu.vastu_reasoning.errors import VastuReasoningProviderError
 
 from ..errors import VastuReasoningConfigurationError
 from ..models import VastuReasoningProfile
@@ -111,8 +112,8 @@ class OpenRouterVastuReasoningProvider:
                 validator=validate,
                 temperature=0.15,
             )
-        except OpenRouterRequestError as exc:
-            raise RuntimeError(f"OpenRouter Vastu reasoning failed: {exc}") from exc
+        except ProviderRuntimeError as exc:
+            raise VastuReasoningProviderError(exc.category) from exc
 
 
 def build_openrouter_vastu_provider_for_test(

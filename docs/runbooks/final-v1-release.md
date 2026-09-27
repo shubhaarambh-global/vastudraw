@@ -41,7 +41,7 @@ AI_VASTU_REVISION_PROVIDER=openrouter
 
 The OpenRouter model variables remain pinned to the validated free-only stack.
 
-## 3. Live qualification
+## 3. Legacy live preflight
 
 With real production Supabase/PostgreSQL/payment/OpenRouter configuration loaded:
 
@@ -49,8 +49,11 @@ With real production Supabase/PostgreSQL/payment/OpenRouter configuration loaded
 pnpm phase27:live
 ```
 
-This command deliberately fails closed. It first qualifies OpenRouter against the
-live provider and then executes the existing production launch gate.
+This legacy command deliberately fails closed. It now exercises the current
+OpenRouter/Gemini provider probes and then executes the existing production
+launch gate. A pass is only provider and launch-configuration preflight evidence;
+it is not a production qualification and does not resolve database grants/RLS/TLS,
+payments, restore evidence, deployment isolation, or deployed end-to-end smoke.
 
 ## 4. Deployment
 

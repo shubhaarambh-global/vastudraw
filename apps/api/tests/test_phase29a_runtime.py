@@ -26,6 +26,7 @@ def _production_client(
         database_url="postgresql://unused.example.test/vastu",
         rate_limit_interpret_per_hour=20,
         rate_limit_generation_per_hour=10,
+        rate_limit_plan_analysis_per_hour=10,
         rate_limit_checkout_per_hour=20,
         hsts_seconds=31_536_000,
     )
@@ -111,6 +112,100 @@ def test_untrusted_host_is_rejected_before_rate_limit_storage(
     )
 
     assert response.status_code == 400
+    rate_limiter.assert_not_called()
+
+
+def test_allowed_origin_receives_cors_on_plan_analysis_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rate_limiter = MagicMock(return_value=SimpleNamespace(allowed=False))
+    client = _production_client(monkeypatch, rate_limiter=rate_limiter)
+
+    response = client.post(
+        "/projects/11111111-1111-1111-1111-111111111111/"
+        "generation-intakes/22222222-2222-2222-2222-222222222222/plan-analysis",
+        headers={"Origin": "https://app.example.test"},
+    )
+
+    assert response.status_code == 429
+    assert response.headers["access-control-allow-origin"] == "https://app.example.test"
+    rate_limiter.assert_called_once()
+    assert rate_limiter.call_args.kwargs["scope"] == "plan_analysis"
+
+
+def test_rotating_authorization_headers_do_not_create_new_rate_limit_buckets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rate_limiter = MagicMock(return_value=SimpleNamespace(allowed=False))
+    client = _production_client(monkeypatch, rate_limiter=rate_limiter)
+
+    for token in ("first-token", "rotated-token"):
+        response = client.post(
+            "/requirements/interpret",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 429
+
+    assert rate_limiter.call_count == 2
+    first_key = rate_limiter.call_args_list[0].kwargs["key_hash"]
+    second_key = rate_limiter.call_args_list[1].kwargs["key_hash"]
+    assert first_key == second_key
+
+
+def test_allowed_origin_receives_cors_on_runtime_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _production_client(monkeypatch)
+    monkeypatch.setattr(
+        production_middleware,
+        "load_production_settings",
+        MagicMock(side_effect=ProductionConfigurationError("secret-shaped detail")),
+    )
+
+    response = client.get(
+        "/health",
+        headers={"Origin": "https://app.example.test"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Production configuration is invalid."}
+    assert response.headers["access-control-allow-origin"] == "https://app.example.test"
+    assert "secret-shaped detail" not in response.text
+
+
+def test_allowed_origin_receives_cors_when_rate_limit_storage_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rate_limiter = MagicMock(side_effect=RuntimeError("storage-secret-shaped-detail"))
+    client = _production_client(monkeypatch, rate_limiter=rate_limiter)
+
+    response = client.post(
+        "/projects/11111111-1111-1111-1111-111111111111/"
+        "generation-intakes/22222222-2222-2222-2222-222222222222/plan-analysis",
+        headers={"Origin": "https://app.example.test"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Rate-limit service unavailable."}
+    assert response.headers["access-control-allow-origin"] == "https://app.example.test"
+    assert "storage-secret-shaped-detail" not in response.text
+
+
+def test_plan_analysis_get_and_confirmation_are_not_rate_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rate_limiter = MagicMock(return_value=SimpleNamespace(allowed=False))
+    client = _production_client(monkeypatch, rate_limiter=rate_limiter)
+    base_path = (
+        "/projects/11111111-1111-1111-1111-111111111111/"
+        "generation-intakes/22222222-2222-2222-2222-222222222222"
+    )
+
+    analysis = client.get(f"{base_path}/plan-analysis")
+    confirmation = client.post(f"{base_path}/plan-confirmation", json={})
+
+    assert analysis.status_code == 401
+    assert confirmation.status_code == 401
     rate_limiter.assert_not_called()
 
 

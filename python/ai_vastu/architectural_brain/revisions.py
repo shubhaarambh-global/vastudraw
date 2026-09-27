@@ -111,7 +111,7 @@ def interpret_revision_with_gemini(
     }
     response = httpx.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key": key},
+        headers={"x-goog-api-key": key},
         json={
             "contents": [{"parts": [{"text": json.dumps(prompt)}]}],
             "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1},

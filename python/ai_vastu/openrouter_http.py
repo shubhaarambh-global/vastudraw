@@ -3,11 +3,22 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
 import httpx
+
+from ai_vastu.provider_runtime import (
+    DEFAULT_OPENROUTER_BUDGET,
+    ProviderBudget,
+    ProviderBudgetConfigurationError,
+    ProviderFailureCategory,
+    ProviderRuntimeError,
+    load_provider_budget,
+    read_limited_provider_response,
+)
 
 PRIMARY_ARCHITECTURAL_MODEL = "deepseek/deepseek-v4-flash-0731:free"
 VISION_PLAN_MODEL = "inclusionai/ling-3.0-flash-vl:free"
@@ -36,8 +47,9 @@ class OpenRouterConfigurationError(RuntimeError):
     pass
 
 
-class OpenRouterRequestError(RuntimeError):
-    pass
+class OpenRouterRequestError(ProviderRuntimeError):
+    def __init__(self, category: ProviderFailureCategory) -> None:
+        super().__init__(category, "openrouter")
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +119,51 @@ def _approved(model: str) -> str:
             f"Refusing non-approved or non-free OpenRouter model: {model!r}."
         )
     return model
+
+
+def _approved_chain(models: Sequence[str]) -> tuple[str, ...]:
+    chain = tuple(_approved(model) for model in models)
+    approved_chains = {
+        (PRIMARY_ARCHITECTURAL_MODEL,),
+        (VISION_PLAN_MODEL,),
+        (FALLBACK_REASONING_MODEL,),
+        (PRIMARY_ARCHITECTURAL_MODEL, FALLBACK_REASONING_MODEL),
+    }
+    if chain not in approved_chains:
+        raise OpenRouterConfigurationError(
+            "OpenRouter model attempts must use an exact approved pinned chain."
+        )
+    return chain
+
+
+def _status_category(status_code: int) -> ProviderFailureCategory:
+    if status_code in {401, 403}:
+        return ProviderFailureCategory.AUTHENTICATION
+    if status_code in {408, 504}:
+        return ProviderFailureCategory.TIMEOUT
+    if status_code == 429:
+        return ProviderFailureCategory.RATE_LIMITED
+    if 400 <= status_code < 500:
+        return ProviderFailureCategory.REQUEST_REJECTED
+    return ProviderFailureCategory.UNAVAILABLE
+
+
+def _transport_category(exc: httpx.TransportError) -> ProviderFailureCategory:
+    if isinstance(exc, httpx.TimeoutException):
+        return ProviderFailureCategory.TIMEOUT
+    return ProviderFailureCategory.UNAVAILABLE
+
+
+def _eligible_transport_failure(exc: httpx.TransportError) -> bool:
+    return isinstance(
+        exc,
+        (
+            httpx.TimeoutException,
+            httpx.NetworkError,
+            httpx.RemoteProtocolError,
+            httpx.ProxyError,
+        ),
+    )
 
 
 def image_url_part(content_type: str, data: bytes) -> dict[str, Any]:
@@ -186,6 +243,8 @@ class OpenRouterClient:
         transport: httpx.BaseTransport | None = None,
         base_url: str = OPENROUTER_API_BASE,
         timeout_seconds: float = 120.0,
+        budget: ProviderBudget | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if not api_key.strip():
             raise OpenRouterConfigurationError("OPENROUTER_API_KEY is required.")
@@ -196,11 +255,35 @@ class OpenRouterClient:
         self._api_key = api_key.strip()
         self._transport = transport
         self._base_url = OPENROUTER_API_BASE
-        self._timeout_seconds = timeout_seconds
+        try:
+            self._budget = budget or ProviderBudget(
+                attempt_timeout_seconds=timeout_seconds,
+                total_timeout_seconds=timeout_seconds * 2,
+                retry_delay_seconds=0.0,
+                max_retry_after_seconds=0.0,
+            )
+        except ProviderBudgetConfigurationError as exc:
+            raise OpenRouterConfigurationError(
+                "OpenRouter runtime budget is invalid."
+            ) from exc
+        self._monotonic = monotonic
 
     @classmethod
     def from_environment(cls) -> OpenRouterClient:
-        return cls(api_key=os.getenv("OPENROUTER_API_KEY", ""))
+        try:
+            budget = load_provider_budget(
+                os.environ,
+                prefix="AI_VASTU_OPENROUTER",
+                default=DEFAULT_OPENROUTER_BUDGET,
+            )
+        except ProviderBudgetConfigurationError as exc:
+            raise OpenRouterConfigurationError(
+                "OpenRouter runtime budget is invalid."
+            ) from exc
+        return cls(
+            api_key=os.getenv("OPENROUTER_API_KEY", ""),
+            budget=budget,
+        )
 
     def complete_validated_json(
         self,
@@ -211,47 +294,96 @@ class OpenRouterClient:
         temperature: float,
         plugins: Sequence[dict[str, Any]] = (),
     ) -> T:
-        if not models:
-            raise OpenRouterConfigurationError(
-                "At least one approved OpenRouter model is required."
-            )
+        chain = _approved_chain(models)
+        deadline = self._monotonic() + self._budget.total_timeout_seconds
+        with httpx.Client(
+            base_url=self._base_url,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=self._budget.attempt_timeout_seconds,
+            transport=self._transport,
+        ) as client:
+            for attempt, model in enumerate(chain):
+                has_fallback = attempt + 1 < len(chain)
+                remaining = deadline - self._monotonic()
+                if remaining <= 0:
+                    raise OpenRouterRequestError(ProviderFailureCategory.TIMEOUT)
+                body: dict[str, Any] = {
+                    "model": model,
+                    "messages": list(messages),
+                    "temperature": temperature,
+                }
+                if plugins:
+                    body["plugins"] = list(plugins)
 
-        failures: list[str] = []
-        for requested_model in models:
-            model = _approved(requested_model)
-            body: dict[str, Any] = {
-                "model": model,
-                "messages": list(messages),
-                "temperature": temperature,
-            }
-            if plugins:
-                body["plugins"] = list(plugins)
+                try:
+                    with client.stream(
+                        "POST",
+                        "/chat/completions",
+                        json=body,
+                        timeout=min(self._budget.attempt_timeout_seconds, remaining),
+                    ) as response:
+                        if self._monotonic() >= deadline:
+                            raise OpenRouterRequestError(
+                                ProviderFailureCategory.TIMEOUT
+                            )
 
-            try:
-                with httpx.Client(
-                    base_url=self._base_url,
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=self._timeout_seconds,
-                    transport=self._transport,
-                ) as client:
-                    response = client.post("/chat/completions", json=body)
-                    response.raise_for_status()
-                    raw_payload = response.json()
+                        if not response.is_success:
+                            category = _status_category(response.status_code)
+                            if category in {
+                                ProviderFailureCategory.AUTHENTICATION,
+                                ProviderFailureCategory.REQUEST_REJECTED,
+                            } or not has_fallback:
+                                raise OpenRouterRequestError(category)
+                            continue
 
-                if not isinstance(raw_payload, dict):
-                    raise ValueError("OpenRouter returned a non-object response.")
-                parsed = extract_json_object(_message_text(raw_payload))
-                return validator(parsed, model)
-            except (httpx.HTTPError, json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
-                failures.append(f"{model}: {type(exc).__name__}: {exc}")
+                        response_bytes = read_limited_provider_response(
+                            response,
+                            provider="openrouter",
+                            deadline=deadline,
+                            monotonic=self._monotonic,
+                        )
+                except ProviderRuntimeError as exc:
+                    if (
+                        has_fallback
+                        and exc.category is ProviderFailureCategory.INVALID_RESPONSE
+                    ):
+                        continue
+                    raise OpenRouterRequestError(exc.category) from None
+                except httpx.TransportError as exc:
+                    category = _transport_category(exc)
+                    if has_fallback and _eligible_transport_failure(exc):
+                        continue
+                    raise OpenRouterRequestError(category) from None
 
-        detail = " | ".join(failures)
-        raise OpenRouterRequestError(
-            "All explicitly approved free OpenRouter models failed. " + detail
-        )
+                if self._monotonic() >= deadline:
+                    raise OpenRouterRequestError(ProviderFailureCategory.TIMEOUT)
+
+                try:
+                    raw_payload = json.loads(response_bytes)
+                    if not isinstance(raw_payload, dict):
+                        raise ValueError
+                    parsed = extract_json_object(_message_text(raw_payload))
+                    validated = validator(parsed, model)
+                except (
+                    json.JSONDecodeError,
+                    UnicodeDecodeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                ):
+                    if has_fallback:
+                        continue
+                    raise OpenRouterRequestError(
+                        ProviderFailureCategory.INVALID_RESPONSE
+                    ) from None
+                if self._monotonic() >= deadline:
+                    raise OpenRouterRequestError(ProviderFailureCategory.TIMEOUT)
+                return validated
+
+        raise OpenRouterRequestError(ProviderFailureCategory.UNAVAILABLE)
 
 
 def schema_instruction(schema: dict[str, Any]) -> str:

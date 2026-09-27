@@ -28,6 +28,7 @@ from .candidate_dedup import (
     spatially_equivalent,
 )
 from .critic import critique_plan
+from .errors import ArchitecturalBrainConfigurationError, ArchitecturalBrainProviderError
 from .precedent_topology import bind_precedent_topologies
 from .scoring import score_plan_document
 from .service import ArchitecturalBrainService
@@ -199,6 +200,8 @@ def run_architectural_brain_candidates(
             entrance_side=_value(confirmed.entrance_facing),
             concept_count=6,
         )
+    except (ArchitecturalBrainConfigurationError, ArchitecturalBrainProviderError):
+        raise
     except RuntimeError as exc:
         raise MultiCandidateGenerationError(f"Architectural Brain provider failed: {exc}") from exc
 

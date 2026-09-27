@@ -10,6 +10,13 @@ from ai_vastu.openrouter_http import (
     OpenRouterConfigurationError,
     OpenRouterModelPolicy,
 )
+from ai_vastu.provider_runtime import (
+    DEFAULT_GEMINI_BUDGET,
+    DEFAULT_OPENROUTER_BUDGET,
+    ProviderBudget,
+    ProviderBudgetConfigurationError,
+    load_provider_budget,
+)
 
 EXPECTED_VASTU_BUNDLE_HASH = "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
 QUALIFIED_GEMINI_PLAN_MODEL = "gemini-3.1-flash-lite"
@@ -112,8 +119,11 @@ class ProductionSettings:
     openrouter_primary_model: str | None
     openrouter_vision_model: str | None
     openrouter_fallback_model: str | None
+    openrouter_budget: ProviderBudget
+    gemini_budget: ProviderBudget
     rate_limit_interpret_per_hour: int
     rate_limit_generation_per_hour: int
+    rate_limit_plan_analysis_per_hour: int
     rate_limit_checkout_per_hour: int
     hsts_seconds: int
 
@@ -139,8 +149,21 @@ class ProductionSettings:
             "openrouter_primary_model": self.openrouter_primary_model,
             "openrouter_vision_model": self.openrouter_vision_model,
             "openrouter_fallback_model": self.openrouter_fallback_model,
+            "openrouter_attempt_timeout_seconds": (
+                self.openrouter_budget.attempt_timeout_seconds
+            ),
+            "openrouter_total_timeout_seconds": self.openrouter_budget.total_timeout_seconds,
+            "openrouter_retry_delay_seconds": self.openrouter_budget.retry_delay_seconds,
+            "openrouter_max_retry_after_seconds": (
+                self.openrouter_budget.max_retry_after_seconds
+            ),
+            "gemini_attempt_timeout_seconds": self.gemini_budget.attempt_timeout_seconds,
+            "gemini_total_timeout_seconds": self.gemini_budget.total_timeout_seconds,
+            "gemini_retry_delay_seconds": self.gemini_budget.retry_delay_seconds,
+            "gemini_max_retry_after_seconds": self.gemini_budget.max_retry_after_seconds,
             "rate_limit_interpret_per_hour": self.rate_limit_interpret_per_hour,
             "rate_limit_generation_per_hour": self.rate_limit_generation_per_hour,
+            "rate_limit_plan_analysis_per_hour": self.rate_limit_plan_analysis_per_hour,
             "rate_limit_checkout_per_hour": self.rate_limit_checkout_per_hour,
             "hsts_seconds": self.hsts_seconds,
         }
@@ -282,6 +305,22 @@ def load_production_settings(
     openrouter_vision_model = policy.vision
     openrouter_fallback_model = policy.fallback
 
+    try:
+        openrouter_budget = load_provider_budget(
+            env,
+            prefix="AI_VASTU_OPENROUTER",
+            default=DEFAULT_OPENROUTER_BUDGET,
+        )
+        gemini_budget = load_provider_budget(
+            env,
+            prefix="AI_VASTU_GEMINI",
+            default=DEFAULT_GEMINI_BUDGET,
+        )
+    except ProviderBudgetConfigurationError as exc:
+        raise ProductionConfigurationError(
+            f"Provider runtime budget is invalid: {exc}"
+        ) from exc
+
     return ProductionSettings(
         database_url=database_url,
         supabase_url=supabase_url,
@@ -308,6 +347,8 @@ def load_production_settings(
         openrouter_primary_model=openrouter_primary_model,
         openrouter_vision_model=openrouter_vision_model,
         openrouter_fallback_model=openrouter_fallback_model,
+        openrouter_budget=openrouter_budget,
+        gemini_budget=gemini_budget,
         rate_limit_interpret_per_hour=_positive_int(
             env,
             "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR",
@@ -316,6 +357,11 @@ def load_production_settings(
         rate_limit_generation_per_hour=_positive_int(
             env,
             "AI_VASTU_RATE_LIMIT_GENERATION_PER_HOUR",
+            default=10,
+        ),
+        rate_limit_plan_analysis_per_hour=_positive_int(
+            env,
+            "AI_VASTU_RATE_LIMIT_PLAN_ANALYSIS_PER_HOUR",
             default=10,
         ),
         rate_limit_checkout_per_hour=_positive_int(

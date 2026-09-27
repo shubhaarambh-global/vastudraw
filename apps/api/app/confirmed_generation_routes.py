@@ -5,6 +5,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ai_vastu.architectural_brain.errors import (
+    ArchitecturalBrainConfigurationError,
+    ArchitecturalBrainProviderError,
+)
 from ai_vastu.architectural_intelligence import (
     ArchitecturalIntelligenceConfigurationError,
     ArchitecturalIntelligenceProviderError,
@@ -13,6 +17,7 @@ from ai_vastu.billing import BillingService, create_billing_repository
 from ai_vastu.billing.service import development_billing_bypass_enabled
 from ai_vastu.multi_candidate import MultiCandidateGenerationError
 from ai_vastu.projects.errors import ProjectNotFoundError, RevisionConflictError
+from ai_vastu.provider_runtime import ProviderFailureCategory
 from ai_vastu.requirements.candidate_orchestrator import (
     CandidateGenerationOrchestrator,
     CandidateSelectionError,
@@ -38,6 +43,21 @@ from app.auth_dependencies import CurrentUserDependency, project_service, requir
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/confirmed-generation", tags=["confirmed-generation"])
+
+
+def _provider_http_error(category: ProviderFailureCategory) -> HTTPException:
+    if category is ProviderFailureCategory.TIMEOUT:
+        return HTTPException(status_code=504, detail="AI provider timed out.")
+    if category in {
+        ProviderFailureCategory.AUTHENTICATION,
+        ProviderFailureCategory.RATE_LIMITED,
+        ProviderFailureCategory.UNAVAILABLE,
+    }:
+        return HTTPException(status_code=503, detail="AI provider is unavailable.")
+    return HTTPException(
+        status_code=502,
+        detail="AI provider returned an invalid response.",
+    )
 
 
 @router.post("/projects/{project_id}/alternatives")
@@ -77,14 +97,21 @@ def generate_confirmed_alternatives(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ProjectNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ArchitecturalIntelligenceConfigurationError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (
+        ArchitecturalBrainConfigurationError,
+        ArchitecturalIntelligenceConfigurationError,
+        VastuReasoningConfigurationError,
+    ) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI provider is not configured.",
+        ) from exc
+    except ArchitecturalBrainProviderError as exc:
+        raise _provider_http_error(exc.category) from exc
     except ArchitecturalIntelligenceProviderError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except VastuReasoningConfigurationError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise _provider_http_error(exc.category) from exc
     except VastuReasoningProviderError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _provider_http_error(exc.category) from exc
     except MultiCandidateGenerationError as exc:
         logger.warning(
             "Confirmed candidate generation rejected:\n%s",
@@ -214,14 +241,21 @@ def generate_from_confirmed_requirements(
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except ArchitecturalIntelligenceConfigurationError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (
+        ArchitecturalBrainConfigurationError,
+        ArchitecturalIntelligenceConfigurationError,
+        VastuReasoningConfigurationError,
+    ) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI provider is not configured.",
+        ) from exc
+    except ArchitecturalBrainProviderError as exc:
+        raise _provider_http_error(exc.category) from exc
     except ArchitecturalIntelligenceProviderError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except VastuReasoningConfigurationError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise _provider_http_error(exc.category) from exc
     except VastuReasoningProviderError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _provider_http_error(exc.category) from exc
     except (
         UnsupportedConfirmedRequirement,
         Phase24FinalizationError,

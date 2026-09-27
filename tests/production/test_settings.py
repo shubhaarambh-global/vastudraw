@@ -13,6 +13,7 @@ from ai_vastu.production.settings import (
     ProductionConfigurationError,
     load_production_settings,
 )
+from ai_vastu.provider_runtime import DEFAULT_GEMINI_BUDGET, DEFAULT_OPENROUTER_BUDGET
 
 
 def base_environment(tmp_path: Path) -> dict[str, str]:
@@ -38,6 +39,14 @@ def base_environment(tmp_path: Path) -> dict[str, str]:
         "AI_VASTU_OPENROUTER_PRIMARY_MODEL": PRIMARY_ARCHITECTURAL_MODEL,
         "AI_VASTU_OPENROUTER_VISION_MODEL": VISION_PLAN_MODEL,
         "AI_VASTU_OPENROUTER_FALLBACK_MODEL": FALLBACK_REASONING_MODEL,
+        "AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS": "120",
+        "AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS": "240",
+        "AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS": "0",
+        "AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS": "0",
+        "AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS": "90",
+        "AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS": "181",
+        "AI_VASTU_GEMINI_RETRY_DELAY_SECONDS": "1",
+        "AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS": "5",
         "OPENROUTER_API_KEY": "openrouter-test-secret",
         "GEMINI_API_KEY": "gemini-test-secret",
     }
@@ -56,6 +65,51 @@ def test_production_settings_accept_qualified_phonepe_configuration(tmp_path: Pa
     assert settings.payment_gateway == "phonepe"
     assert settings.razorpay_key_id is None
     assert settings.rate_limit_generation_per_hour == 10
+    assert settings.rate_limit_plan_analysis_per_hour == 10
+    assert settings.openrouter_budget == DEFAULT_OPENROUTER_BUDGET
+    assert settings.gemini_budget == DEFAULT_GEMINI_BUDGET
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS", "0"),
+        ("AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS", "119"),
+        ("AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS", "-1"),
+        ("AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS", "nan"),
+        ("AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS", "inf"),
+        ("AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS", "89"),
+        ("AI_VASTU_GEMINI_RETRY_DELAY_SECONDS", "-0.1"),
+        ("AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS", "not-a-number"),
+    ],
+)
+def test_production_settings_reject_invalid_provider_budgets(
+    tmp_path: Path,
+    name: str,
+    value: str,
+) -> None:
+    env = base_environment(tmp_path)
+    env[name] = value
+
+    with pytest.raises(ProductionConfigurationError, match="Provider runtime budget"):
+        load_production_settings(env)
+
+
+def test_production_settings_use_shared_provider_budget_defaults(tmp_path: Path) -> None:
+    env = base_environment(tmp_path)
+    for prefix in ("AI_VASTU_OPENROUTER", "AI_VASTU_GEMINI"):
+        for suffix in (
+            "ATTEMPT_TIMEOUT_SECONDS",
+            "TOTAL_TIMEOUT_SECONDS",
+            "RETRY_DELAY_SECONDS",
+            "MAX_RETRY_AFTER_SECONDS",
+        ):
+            env.pop(f"{prefix}_{suffix}")
+
+    settings = load_production_settings(env)
+
+    assert settings.openrouter_budget == DEFAULT_OPENROUTER_BUDGET
+    assert settings.gemini_budget == DEFAULT_GEMINI_BUDGET
 
 
 @pytest.mark.parametrize("mode", ["", "production", "development"])
@@ -228,7 +282,13 @@ def test_redacted_summary_excludes_secrets(tmp_path: Path) -> None:
             "AI_VASTU_RAZORPAY_YEARLY_PLAN_ID": "plan_year",
         }
     )
-    summary = str(load_production_settings(env).redacted_summary())
+    redacted = load_production_settings(env).redacted_summary()
+    assert redacted["openrouter_attempt_timeout_seconds"] == 120.0
+    assert redacted["openrouter_total_timeout_seconds"] == 240.0
+    assert redacted["gemini_attempt_timeout_seconds"] == 90.0
+    assert redacted["gemini_total_timeout_seconds"] == 181.0
+    assert redacted["rate_limit_plan_analysis_per_hour"] == 10
+    summary = str(redacted)
     for secret in (
         "user:pass", "openrouter-test-secret", "gemini-test-secret",
         "razorpay-test-secret", "webhook-test-secret", "rzp_live_example",

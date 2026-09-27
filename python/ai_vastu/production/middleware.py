@@ -21,20 +21,23 @@ class ProductionHardeningMiddleware:
         self.app = app
 
     @staticmethod
-    def _scope_for_path(path: str) -> str | None:
+    def _scope_for_request(method: str, path: str) -> str | None:
         if path == "/requirements/interpret":
             return "requirements_interpret"
         if path.startswith("/confirmed-generation/projects/"):
             return "confirmed_generation"
         if path == "/billing/checkout":
             return "billing_checkout"
+        if (
+            method == "POST"
+            and path.startswith("/projects/")
+            and path.endswith("/plan-analysis")
+        ):
+            return "plan_analysis"
         return None
 
     @staticmethod
     def _rate_key(request: Request) -> str:
-        authorization = request.headers.get("authorization", "").strip()
-        if authorization:
-            return f"auth:{authorization}"
         host = request.client.host if request.client is not None else "unknown"
         return f"ip:{host}"
 
@@ -74,12 +77,13 @@ class ProductionHardeningMiddleware:
                 )
                 return
 
-            rate_scope = self._scope_for_path(request.url.path)
+            rate_scope = self._scope_for_request(request.method, request.url.path)
             if rate_scope is not None:
                 limits = {
                     "requirements_interpret": settings.rate_limit_interpret_per_hour,
                     "confirmed_generation": settings.rate_limit_generation_per_hour,
                     "billing_checkout": settings.rate_limit_checkout_per_hour,
+                    "plan_analysis": settings.rate_limit_plan_analysis_per_hour,
                 }
                 try:
                     decision = consume_postgres_fixed_window(

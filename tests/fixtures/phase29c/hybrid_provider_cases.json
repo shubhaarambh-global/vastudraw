@@ -1,0 +1,101 @@
+{
+  "fixture_version": "29C.1",
+  "purpose": "Secret-free deterministic provider and upload cases for Phase 29C hybrid routing.",
+  "openrouter": {
+    "valid": {"status": 200, "content": "{\"ok\":true}"},
+    "timeout": {"exception": "ReadTimeout"},
+    "rate_limited": {"status": 429},
+    "server_errors": [{"status": 500}, {"status": 503}],
+    "invalid_json": {"status": 200, "content": "not-json"},
+    "unexpected_schema": {"status": 200, "content": "{\"unexpected\":true}"},
+    "empty_content": {"status": 200, "content": ""},
+    "invalid_model": {"model": "unapproved/example-model:free"}
+  },
+  "gemini": {
+    "valid_response": {
+      "envelope": {
+        "geometry_type": "RECTANGLE",
+        "width_mm": 9144,
+        "depth_mm": 15240,
+        "confidence": 0.91,
+        "source": "MODEL_INFERENCE",
+        "requires_confirmation": true,
+        "evidence": ["dimension labels visible"]
+      },
+      "orientation": {
+        "north_rotation_deg": 0.0,
+        "road_side": null,
+        "entrance_facing": null,
+        "confidence": 0.72,
+        "source": "MODEL_INFERENCE",
+        "requires_confirmation": true,
+        "evidence": ["north arrow visible"]
+      },
+      "rooms": [],
+      "observations": ["Plan recognition remains advisory."],
+      "questions": ["Confirm the extracted dimensions and North."],
+      "warnings": []
+    },
+    "malformed_output": "not-json",
+    "missing_fields": {"observations": []},
+    "timeout": {"exception": "ReadTimeout"},
+    "rate_limited": {"status": 429},
+    "server_error": {"status": 500}
+  },
+  "uploads": [
+    {
+      "case": "valid_jpg",
+      "filename": "plan.jpg",
+      "content_type": "image/jpeg",
+      "kind": "IMAGE",
+      "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q=="
+    },
+    {
+      "case": "valid_png",
+      "filename": "plan.png",
+      "content_type": "image/png",
+      "kind": "IMAGE",
+      "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    },
+    {
+      "case": "valid_pdf",
+      "filename": "plan.pdf",
+      "content_type": "application/pdf",
+      "kind": "PDF",
+      "base64": "JVBERi0xLjQKMSAwIG9iago8PD4+CmVuZG9iagolJUVPRgo="
+    },
+    {
+      "case": "corrupt_image",
+      "filename": "corrupt.png",
+      "content_type": "image/png",
+      "kind": "IMAGE",
+      "base64": "bm90LWEtcG5n"
+    },
+    {
+      "case": "corrupt_pdf",
+      "filename": "corrupt.pdf",
+      "content_type": "application/pdf",
+      "kind": "PDF",
+      "base64": "bm90LWEtcGRm"
+    },
+    {
+      "case": "unsupported_mime",
+      "filename": "plan.gif",
+      "content_type": "image/gif",
+      "kind": "IMAGE",
+      "base64": "R0lGODlh"
+    },
+    {
+      "case": "unsupported_extension",
+      "filename": "plan.exe",
+      "content_type": "application/octet-stream",
+      "kind": "IMAGE",
+      "base64": "TVqQAAMAAAAEAAAA"
+    }
+  ],
+  "routing": {
+    "text_provider": "openrouter",
+    "plan_recognition_provider": "gemini",
+    "unauthorized_cross_fallback": false
+  }
+}

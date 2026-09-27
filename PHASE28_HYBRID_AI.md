@@ -17,13 +17,21 @@ Existing-plan recognition:
 - provider: Google Gemini API directly
 - model: `gemini-3.1-flash-lite`
 - credential: `GEMINI_API_KEY`
-- OpenRouter shared vision pools are not used
+- the persisted Analyze Plan route uses direct Gemini
+
+The retained `/requirements/interpret` compatibility path is separate from
+persisted Analyze Plan. When a requirements request includes an image or PDF,
+that path uses the pinned OpenRouter vision model. Phase 29C keeps that behavior
+for compatibility; whether visual requirements should remain on OpenRouter is a
+launch decision that is not resolved by the hybrid profile.
 
 ## Responsibilities
 
 DeepSeek handles requirements interpretation, architectural reasoning, soft-Vastu reasoning, Architectural Brain intent/topology and natural-language revisions.
 
-Gemini handles JPG, PNG and PDF existing-plan recognition as non-authoritative observations.
+Gemini handles JPG, PNG and PDF existing-plan recognition for persisted Analyze
+Plan as non-authoritative observations. OpenRouter continues to handle visual
+requirements attachments on the compatibility route described above.
 
 ## Authority
 
@@ -35,6 +43,7 @@ Offline:
 
 ```powershell
 pnpm phase28:check
+pnpm phase29c:check
 pnpm validate
 ```
 
@@ -42,6 +51,11 @@ Live development provider qualification:
 
 ```powershell
 pnpm phase28:live
+pnpm phase29c:live
 ```
 
-Commercial production may replace the development AI models without changing the deterministic geometry authority.
+The live commands require explicit credentials and make provider calls with
+synthetic inputs. They report provider status without printing credentials,
+prompts, uploaded bytes or raw provider response bodies. Provider attempt
+counts are code-owned; operators configure only the bounded per-attempt, total,
+retry-delay and Retry-After timing budgets shown in the environment template.

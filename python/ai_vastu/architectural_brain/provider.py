@@ -11,10 +11,11 @@ from ai_vastu.openrouter_http import (
     OpenRouterClient,
     OpenRouterConfigurationError,
     OpenRouterModelPolicy,
-    OpenRouterRequestError,
     schema_instruction,
 )
+from ai_vastu.provider_runtime import ProviderFailureCategory, ProviderRuntimeError
 
+from .errors import ArchitecturalBrainConfigurationError, ArchitecturalBrainProviderError
 from .models import ArchitecturalConcept, RetrievedPrecedent
 from .topology import build_fallback_concept
 
@@ -159,11 +160,17 @@ class GeminiArchitecturalBrainProvider:
     def from_environment(cls) -> GeminiArchitecturalBrainProvider:
         key = os.getenv("GEMINI_API_KEY", "").strip()
         if not key:
-            raise RuntimeError("GEMINI_API_KEY is required for the architectural brain.")
+            raise ArchitecturalBrainConfigurationError(
+                "GEMINI_API_KEY is required for the architectural brain."
+            )
         model = os.getenv(
             "AI_VASTU_ARCHITECTURAL_BRAIN_MODEL",
             "gemini-3.1-flash-lite",
         ).strip()
+        if not model:
+            raise ArchitecturalBrainConfigurationError(
+                "AI_VASTU_ARCHITECTURAL_BRAIN_MODEL must not be blank."
+            )
         return cls(api_key=key, model=model)
 
     def propose(
@@ -196,52 +203,64 @@ class GeminiArchitecturalBrainProvider:
             precedents=precedents,
             concept_count=concept_count,
         )
-        response = httpx.post(
-            (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{self._model}:generateContent"
-            ),
-            params={"key": self._api_key},
-            json={
-                "contents": [{"parts": [{"text": json.dumps(prompt)}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.3,
+        try:
+            response = httpx.post(
+                (
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                    f"{self._model}:generateContent"
+                ),
+                headers={"x-goog-api-key": self._api_key},
+                json={
+                    "contents": [{"parts": [{"text": json.dumps(prompt)}]}],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "temperature": 0.3,
+                    },
                 },
-            },
-            timeout=60,
-        )
-        response.raise_for_status()
-        raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-        parsed = json.loads(raw)
-        results: list[ArchitecturalConcept] = []
-        for item in parsed.get("concepts", []):
-            if not isinstance(item, dict):
-                continue
-            item.update(
-                {
-                    "schema_version": "26.4B.1",
-                    "project_id": str(project_id),
-                    "precedent_ids": [p.fingerprint.precedent_id for p in precedents[:8]],
-                    "authoritative_geometry": False,
-                    "content_hash": None,
-                }
+                timeout=60,
             )
-            results.append(ArchitecturalConcept.model_validate(item).with_content_hash())
+            response.raise_for_status()
+            raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(raw)
+            if not isinstance(parsed, dict):
+                raise ValueError("Architectural Brain response was not an object.")
+            results: list[ArchitecturalConcept] = []
+            for raw_item in parsed.get("concepts", []):
+                if not isinstance(raw_item, dict):
+                    continue
+                item = dict(raw_item)
+                item.update(
+                    {
+                        "schema_version": "26.4B.1",
+                        "project_id": str(project_id),
+                        "precedent_ids": [p.fingerprint.precedent_id for p in precedents[:8]],
+                        "authoritative_geometry": False,
+                        "content_hash": None,
+                    }
+                )
+                results.append(ArchitecturalConcept.model_validate(item).with_content_hash())
+        except httpx.TimeoutException as exc:
+            raise ArchitecturalBrainProviderError(ProviderFailureCategory.TIMEOUT) from exc
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code in {401, 403}:
+                category = ProviderFailureCategory.AUTHENTICATION
+            elif status_code in {408, 504}:
+                category = ProviderFailureCategory.TIMEOUT
+            elif status_code == 429:
+                category = ProviderFailureCategory.RATE_LIMITED
+            elif status_code >= 500:
+                category = ProviderFailureCategory.UNAVAILABLE
+            else:
+                category = ProviderFailureCategory.REQUEST_REJECTED
+            raise ArchitecturalBrainProviderError(category) from exc
+        except httpx.HTTPError as exc:
+            raise ArchitecturalBrainProviderError(ProviderFailureCategory.UNAVAILABLE) from exc
+        except Exception as exc:
+            raise ArchitecturalBrainProviderError.from_exception(exc) from exc
         if not results:
-            return FixtureArchitecturalBrainProvider().propose(
-                project_id=project_id,
-                original_prompt=original_prompt,
-                width_mm=width_mm,
-                depth_mm=depth_mm,
-                bedroom_count=bedroom_count,
-                toilet_count=toilet_count,
-                parking_count=parking_count,
-                room_types=room_types,
-                road_side=road_side,
-                entrance_side=entrance_side,
-                precedents=precedents,
-                concept_count=concept_count,
+            raise ArchitecturalBrainProviderError(
+                ProviderFailureCategory.INVALID_RESPONSE
             )
         return tuple(results[:concept_count])
 
@@ -265,7 +284,9 @@ class OpenRouterArchitecturalBrainProvider:
                 policy=OpenRouterModelPolicy.from_environment(),
             )
         except OpenRouterConfigurationError as exc:
-            raise RuntimeError(str(exc)) from exc
+            raise ArchitecturalBrainConfigurationError(
+                "OpenRouter is not configured for the Architectural Brain."
+            ) from exc
 
     def propose(
         self,
@@ -355,8 +376,8 @@ class OpenRouterArchitecturalBrainProvider:
                 validator=validate,
                 temperature=0.3,
             )
-        except OpenRouterRequestError as exc:
-            raise RuntimeError(f"OpenRouter Architectural Brain failed: {exc}") from exc
+        except ProviderRuntimeError as exc:
+            raise ArchitecturalBrainProviderError(exc.category) from exc
 
 
 def create_architectural_brain_provider() -> ArchitecturalBrainProvider:
@@ -367,6 +388,6 @@ def create_architectural_brain_provider() -> ArchitecturalBrainProvider:
         return GeminiArchitecturalBrainProvider.from_environment()
     if name == "openrouter":
         return OpenRouterArchitecturalBrainProvider.from_environment()
-    raise RuntimeError(
+    raise ArchitecturalBrainConfigurationError(
         "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER must be fixture/deterministic/gemini/openrouter."
     )
