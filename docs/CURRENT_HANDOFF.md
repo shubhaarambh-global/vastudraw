@@ -754,3 +754,157 @@ plan-vision boundaries, then design offline provider failure/timeout/response-
 validation fixtures without moving any geometry or feasibility authority into
 AI output. Do not use real credentials or live provider accounts without an
 explicitly reviewed target.
+
+---
+
+## Phase 29C - Hybrid AI Production Integration
+
+Status: **IMPLEMENTED, COMMITTED, AND LOCALLY VALIDATED; LIVE PROVIDERS BLOCKED BY CREDENTIALS; NOT PRODUCTION QUALIFIED**
+
+### Checkpoint and rollback
+
+- Branch: `phase29`.
+- Phase 29C implementation commit:
+  `6b770bca1cfa88f8be55ad526d2681c155fe606a`
+  (`feat: harden production hybrid AI routing`).
+- Rollback point immediately before Phase 29C:
+  `a6f59747d00facf2b6387e31a7e4e670ef215ef9`.
+- Phase 29A/29B implementation remains checkpointed at
+  `abb24feb0209a18f14877c2f8154e24c4dbcffcc`.
+- No qualification tag, deployment, migration, production write, payment call,
+  database/storage probe, or external account action was performed.
+
+### Runtime architecture and provider policy
+
+- Production configuration explicitly requires OpenRouter for requirements,
+  architectural reasoning, soft-Vastu reasoning, Architectural Brain, and
+  revisions; persisted Analyze Plan recognition uses direct Gemini.
+- OpenRouter remains pinned to development primary
+  `deepseek/deepseek-v4-flash-0731:free` and the existing approved free-only
+  fallback. Random, paid, unpinned, duplicate, mixed, and cross-provider chains
+  fail closed.
+- Direct Gemini plan recognition remains pinned to
+  `gemini-3.1-flash-lite`, retries only one eligible transient failure, and
+  never switches provider/model.
+- The retained `/requirements/interpret` visual-attachment compatibility path
+  still uses the pinned OpenRouter vision model. That behavior is now documented
+  accurately but remains an unresolved launch/product decision; Phase 29C did
+  not introduce a composite provider or silently reroute it.
+- AI output remains advisory. Direct-Gemini image/PDF envelope, orientation,
+  and room observations are forced to confirmation-required and cannot claim
+  `USER_CONFIRMED`; deterministic parsing, confirmation, validation, geometry,
+  Vastu, hashes, revisions, and billing authority remain unchanged.
+
+### Provider runtime and API hardening
+
+- Added shared typed provider failure categories and validated per-attempt/total
+  timeout budgets. OpenRouter and Gemini responses are streamed under a 2 MiB
+  decoded-body cap and the shared total deadline, including slow/chunked bodies.
+- Provider authentication, rejection, quota, timeout, connection, 5xx,
+  malformed JSON, empty content, and schema failures produce fixed sanitized
+  internal/API outcomes. Provider bodies, prompts, keys, authorization headers,
+  and uploaded bytes are not returned to clients.
+- Requirements interpretation and upload validation/storage run off the async
+  event loop. Provider failure does not save a requirements draft, append a
+  revision, or record successful billing.
+- Architectural Brain provider outages remain distinct from deterministic
+  candidate rejection; genuine deterministic rejection remains `422`.
+- Gemini keys use `x-goog-api-key`, not query parameters.
+- Unknown `APP_ENV` values fail closed before development auth/SQLite can be
+  selected.
+- Plan-analysis POST requests have their own production rate-limit scope.
+  Limiter/configuration errors receive CORS headers, TrustedHost remains
+  outermost, and outer abuse buckets are keyed by client IP rather than
+  rotatable/unverified bearer text.
+- JPEG/PNG uploads require exact extension/MIME agreement and Pillow format
+  verification with decompression-bomb rejection. PDFs receive bounded header
+  plus terminal-`%%EOF` truncation screening. Unknown/extensionless uploads are
+  rejected; Pillow remains confined to an explicit media-validation adapter.
+- Legacy Phase 27 live output is now explicitly preflight-only with
+  `production_qualification=false`.
+
+### Main implementation and evidence files
+
+- Runtime/config: `python/ai_vastu/provider_runtime.py`,
+  `python/ai_vastu/openrouter_http.py`, `python/ai_vastu/gemini_http.py`,
+  `python/ai_vastu/production/settings.py`,
+  `python/ai_vastu/production/middleware.py`,
+  `python/ai_vastu/runtime_environment.py`.
+- Provider/API boundaries: requirements, plan-intake, Architectural Brain,
+  architectural-intelligence, and Vastu provider/error modules plus
+  `apps/api/app/main.py`, `apps/api/app/requirements_routes.py`, and
+  `apps/api/app/confirmed_generation_routes.py`.
+- Upload security: `python/ai_vastu/upload_validation.py`,
+  `python/ai_vastu/media_validation_adapter.py`, and generation-intake store/API
+  regressions.
+- Operations/evidence: `.env.example`, `phase28-hybrid.env.example`,
+  `PHASE28_HYBRID_AI.md`, production/final runbooks,
+  `scripts/check-phase29c-hybrid.py`, `scripts/check-phase29c-live.py`, and
+  corrected Phase 25/27/28 checks.
+- New Phase 29C tests/fixtures live under `tests/provider_runtime`,
+  `tests/gemini`, `tests/adversarial`, `tests/fixtures/phase29c`, and focused
+  requirements/plan-intake/Architectural-Brain/production/API test modules.
+  The exact 59-file scope is recorded by the implementation commit above.
+
+### Independent review evidence
+
+- Two independent planners were challenged by Architecture Guardian before the
+  coordinator selected the narrow integration. No composite provider, provider
+  factory duplication, schema change, or deterministic-authority change was
+  admitted.
+- Fixture Engineer: 16 fixture tests and 95 combined provider/fixture tests
+  passed with secret-free JPG/PNG/PDF and failure matrices.
+- Regression Tester: 145 focused, 420 affected provider/API/production, and 139
+  deterministic-authority tests passed; thirteen offline subsystem gates passed.
+- Adversarial Tester: 22 independent adversarial cases and a 173-test combined
+  matrix passed after MIME/extension/signature fixes.
+- Security Reviewer: local ACCEPT after response-cap, APP_ENV, limiter identity,
+  key transport, and corrupt-upload fixes; final reviewed matrix 216 passed.
+- Independent QA: local ACCEPT after slow-stream and false qualification-claim
+  fixes; final focused/affected matrix 245 passed. No unresolved BLOCKER, HIGH,
+  or MEDIUM QA finding remained.
+
+### Coordinator validation
+
+- `git diff --check`: PASS (Windows LF/CRLF notices only).
+- `pnpm validate`: PASS on 2026-09-27.
+- Ruff: PASS.
+- mypy: PASS across 206 source files.
+- Python: 830 passed, 0 failed, five dependency deprecation warnings.
+- Contracts: generated schema/types match authoritative models; one contract
+  test passed; no tracked contract drift remained.
+- Frozen Vastu specification/review/production gates: PASS; bundle hash remains
+  `b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667`.
+- Deterministic constraints, planner, geometry, validation, scoring, revisions,
+  exports, generation, and all Phase 24-29C offline gates: PASS.
+- Web formatting/lint/typecheck: PASS; 26 tests passed.
+- Next.js production build: PASS with all routes generated.
+- OpenRouter live status: `BLOCKED_CREDENTIALS`.
+- Gemini live status: `BLOCKED_CREDENTIALS`.
+- The live checker made no provider call because neither credential was present.
+
+### Remaining production blockers and limitations
+
+1. PostgreSQL/Supabase grants, RLS, and production TLS remain unverified live.
+2. PhonePe is unimplemented; payment-event and entitlement mutation atomicity,
+   idempotency, replay protection, and reconciliation remain Phase 29D work.
+3. OpenRouter and Gemini live provider qualification is blocked by credentials.
+4. Real backup/archive/restore evidence remains absent.
+5. Deployment-isolation and deployed end-to-end evidence remain absent.
+6. Concurrent Windows JSON requirements-store deployment remains unsupported
+   pending retry/coordination handling.
+7. The visual requirements compatibility route decision remains unresolved.
+8. IP limiter correctness depends on exact trusted-proxy configuration and
+   staging verification; expired rate-window row retention/cleanup must be
+   operationalized before production qualification.
+9. PDF screening detects truncation/signature failures but is not a full PDF
+   structural parser.
+
+### Next phase
+
+**Phase 29D - PhonePe + Payment Atomicity**
+
+First action: inspect the existing billing repository, checkout, webhook, event,
+and entitlement transaction boundaries; then design PhonePe-independent checkout
+and atomic/idempotent callback processing without changing the frozen pricing
+catalog or enabling Razorpay as a production dependency.

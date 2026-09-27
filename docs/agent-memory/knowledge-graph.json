@@ -121,6 +121,18 @@
       ]
     },
     {
+      "id": "subsystem:phase29c-hybrid-ai",
+      "type": "subsystem",
+      "title": "Phase 29C hybrid AI production integration",
+      "status": "locally-validated-live-blocked",
+      "value": "Production requires OpenRouter for text/reasoning and direct Gemini for persisted plan recognition. Provider retries, deadlines, response sizes, errors, uploads, environment selection, and rate-limit boundaries fail closed. AI observations remain advisory. Both live provider checks are blocked by absent credentials; visual requirements compatibility routing remains unresolved.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29C - Hybrid AI Production Integration)",
+        "pnpm validate on phase29, 2026-09-27: 830 Python, 26 web, 1 contract",
+        "commit:6b770bca1cfa88f8be55ad526d2681c155fe606a"
+      ]
+    },
+    {
       "id": "policy:model-routing",
       "type": "agent_policy",
       "title": "Development agent model routing policy",
@@ -187,6 +199,11 @@
       "from": "branch:phase29",
       "rel": "hardens",
       "to": "subsystem:phase29b-auth-persistence"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "hardens",
+      "to": "subsystem:phase29c-hybrid-ai"
     }
   ]
 }
