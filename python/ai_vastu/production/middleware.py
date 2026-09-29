@@ -30,6 +30,17 @@ class ProductionHardeningMiddleware:
             return "billing_checkout"
         if (
             method == "POST"
+            and path.startswith("/billing/orders/")
+            and path.endswith("/refresh")
+        ):
+            return "payment_status"
+        if method == "POST" and path in {
+            "/billing/webhooks/phonepe",
+            "/billing/webhooks/razorpay",
+        }:
+            return "payment_webhook"
+        if (
+            method == "POST"
             and path.startswith("/projects/")
             and path.endswith("/plan-analysis")
         ):
@@ -83,6 +94,8 @@ class ProductionHardeningMiddleware:
                     "requirements_interpret": settings.rate_limit_interpret_per_hour,
                     "confirmed_generation": settings.rate_limit_generation_per_hour,
                     "billing_checkout": settings.rate_limit_checkout_per_hour,
+                    "payment_status": settings.rate_limit_payment_status_per_hour,
+                    "payment_webhook": settings.rate_limit_payment_webhook_per_hour,
                     "plan_analysis": settings.rate_limit_plan_analysis_per_hour,
                 }
                 try:

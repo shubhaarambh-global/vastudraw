@@ -4,7 +4,13 @@ import os
 from datetime import datetime
 
 from .catalog import ProductKind, get_product
-from .models import EntitlementSnapshot, GenerationAuthorization, SubscriptionStatus
+from .models import (
+    EntitlementSnapshot,
+    GenerationAuthorization,
+    NewPaymentOrder,
+    PaymentOrder,
+    SubscriptionStatus,
+)
 from .repository import BillingRepository
 
 
@@ -105,14 +111,123 @@ class BillingService:
             raise PermissionError("Free generation was already consumed.")
         self._repository.update_project_grant_source(user_id, project_id, "free_trial_used")
 
-    def apply_one_time_purchase(self, event_key: str, user_id: str, sku: str) -> bool:
+    def create_or_get_payment_order(
+        self,
+        *,
+        merchant_order_id: str,
+        idempotency_key: str,
+        user_id: str,
+        sku: str,
+        provider: str,
+    ) -> tuple[PaymentOrder, bool]:
+        product = get_product(sku)
+        if product.kind == ProductKind.FREE:
+            raise ValueError("The free SKU does not create a payment order.")
+        return self._repository.create_or_get_payment_order(
+            NewPaymentOrder(
+                merchant_order_id=merchant_order_id,
+                user_id=user_id,
+                sku=product.sku,
+                provider=provider,
+                amount_paise=product.amount_paise,
+                currency=product.currency,
+                idempotency_key=idempotency_key,
+            )
+        )
+
+    def get_payment_order(
+        self, provider: str, merchant_order_id: str
+    ) -> PaymentOrder | None:
+        return self._repository.get_payment_order(provider, merchant_order_id)
+
+    def list_reconcilable_payment_orders(
+        self, provider: str, limit: int
+    ) -> list[PaymentOrder]:
+        return self._repository.list_reconcilable_payment_orders(provider, limit)
+
+    def mark_checkout_created(
+        self,
+        *,
+        provider: str,
+        merchant_order_id: str,
+        provider_order_id: str,
+        checkout_url: str,
+        expires_at: datetime | None,
+    ) -> PaymentOrder:
+        return self._repository.mark_checkout_created(
+            provider=provider,
+            merchant_order_id=merchant_order_id,
+            provider_order_id=provider_order_id,
+            checkout_url=checkout_url,
+            expires_at=expires_at,
+        )
+
+    def mark_checkout_unknown(
+        self,
+        *,
+        provider: str,
+        merchant_order_id: str,
+        failure_code: str,
+    ) -> PaymentOrder:
+        return self._repository.mark_checkout_unknown(
+            provider=provider,
+            merchant_order_id=merchant_order_id,
+            failure_code=failure_code,
+        )
+
+    def mark_checkout_failed(
+        self,
+        *,
+        provider: str,
+        merchant_order_id: str,
+        failure_code: str,
+    ) -> PaymentOrder:
+        return self._repository.mark_checkout_failed(
+            provider=provider,
+            merchant_order_id=merchant_order_id,
+            failure_code=failure_code,
+        )
+
+    def apply_payment_order_event(
+        self,
+        *,
+        provider: str,
+        event_key: str,
+        event_type: str,
+        merchant_order_id: str,
+        provider_order_id: str,
+        amount_paise: int,
+        currency: str,
+    ) -> bool:
+        return self._repository.apply_payment_order_event(
+            provider=provider,
+            event_key=event_key,
+            event_type=event_type,
+            merchant_order_id=merchant_order_id,
+            provider_order_id=provider_order_id,
+            amount_paise=amount_paise,
+            currency=currency,
+        )
+
+    def apply_one_time_purchase(
+        self,
+        event_key: str,
+        user_id: str,
+        sku: str,
+        *,
+        provider: str = "razorpay",
+        event_type: str = "payment_link.paid",
+    ) -> bool:
         product = get_product(sku)
         if product.kind not in {ProductKind.PROJECT, ProductKind.PROJECT_PACK}:
             raise ValueError("SKU is not a one-time project product.")
-        if not self._repository.record_event_once("razorpay", event_key, "payment_link.paid"):
-            return False
-        self._repository.grant_project_credits(user_id, product.project_credits)
-        return True
+        return self._repository.apply_legacy_one_time_event(
+            provider=provider,
+            event_key=event_key,
+            event_type=event_type,
+            user_id=user_id,
+            sku=sku,
+        )
 
     def apply_subscription_event(
         self,
@@ -124,19 +239,18 @@ class BillingService:
         status: SubscriptionStatus,
         provider_subscription_id: str,
         period_end: datetime | None,
+        provider: str = "razorpay",
     ) -> bool:
         product = get_product(sku)
         if product.kind != ProductKind.SUBSCRIPTION:
             raise ValueError("SKU is not a subscription.")
-        if not self._repository.record_event_once("razorpay", event_key, event_type):
-            return False
-
-        active_sku = sku if status == SubscriptionStatus.ACTIVE else None
-        self._repository.set_subscription(
+        return self._repository.apply_legacy_subscription_event(
+            provider=provider,
+            event_key=event_key,
+            event_type=event_type,
             user_id=user_id,
-            sku=active_sku,
+            sku=sku,
             status=status,
-            period_end=period_end,
             provider_subscription_id=provider_subscription_id,
+            period_end=period_end,
         )
-        return True

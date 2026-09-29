@@ -133,14 +133,36 @@
       ]
     },
     {
-      "id": "policy:model-routing",
+      "id": "subsystem:phase29d-payment-atomicity",
+      "type": "subsystem",
+      "title": "Phase 29D PhonePe and payment atomicity",
+      "status": "locally-validated-live-blocked",
+      "value": "PhonePe Standard Checkout v2 is launch-capable locally with persisted checkout intent, authoritative provider-status reconciliation, and atomic event/order/entitlement settlement. Replay, duplicate, stale-state, and concurrent settlement paths fail closed. Recurring products remain unavailable until genuine AutoPay exists. Live PhonePe, database, backup/restore, and deployment qualification remain outstanding.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29D - PhonePe + Payment Atomicity)",
+        "Phase 29D local checkpoint: 940 Python tests, 32 web tests, Ruff PASS, mypy PASS across 208 files, Phase 29C and Phase 29D gates PASS"
+      ]
+    },
+    {
+      "id": "policy:model-routing-legacy",
       "type": "agent_policy",
-      "title": "Development agent model routing policy",
-      "status": "active",
+      "title": "Superseded development agent model routing policy",
+      "status": "superseded",
       "value": "Luna for mechanical; Sol for normal/complex implementation; Astra for critical review/decisions; GPT-5.3-Codex optional for agentic coding.",
       "provenance": [
         "docs/agent-system/model-routing-policy.md",
         "OpenAI model guidance current at package generation"
+      ]
+    },
+    {
+      "id": "policy:model-routing",
+      "type": "agent_policy",
+      "title": "Fixed development agent model policy",
+      "status": "active",
+      "value": "Vastudraw/Codex development uses GPT-5.6 Sol Medium for all agents and skills by default. Model or reasoning escalation requires explicit user approval. The Model Router routes roles, workflow, context, tests, reviewers, and human-review conditions, not model family or effort.",
+      "provenance": [
+        "docs/agent-system/model-routing-policy.md",
+        "explicit user policy, 2026-09-29"
       ]
     }
   ],
@@ -204,6 +226,11 @@
       "from": "branch:phase29",
       "rel": "hardens",
       "to": "subsystem:phase29c-hybrid-ai"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "hardens",
+      "to": "subsystem:phase29d-payment-atomicity"
     }
   ]
 }

@@ -4,6 +4,11 @@ from pathlib import Path
 
 ROOT = Path(".")
 
+raise SystemExit(
+    "This historical Phase 26 overlay is retired. Use the current qualified branch; "
+    "the overlay contains superseded provider and pricing migrations."
+)
+
 
 def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")

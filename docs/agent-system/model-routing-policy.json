@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "purpose": "Development-agent role and workflow routing; does not modify Vastudraw runtime AI providers.",
+  "required_profile": {
+    "model": "gpt-5.6-sol",
+    "effort": "medium",
+    "applies_to": "all Vastudraw Agent OS roles, skills, and agentic work",
+    "change_requires": "explicit user approval"
+  },
+  "model_router_routes": [
+    "role",
+    "parallel_or_sequential_execution",
+    "required_context_and_skills",
+    "required_tests_and_reviewers",
+    "human_review_escalation"
+  ],
+  "model_router_does_not_route": [
+    "model_family",
+    "reasoning_effort"
+  ],
+  "reliability_sequence": [
+    "try a second independent agent",
+    "use adversarial review",
+    "use Architecture Guardian or Security Reviewer",
+    "gather more evidence",
+    "reduce or split the task",
+    "escalate to the human user"
+  ],
+  "unavailable_rule": "If GPT-5.6 Sol Medium is temporarily unavailable, pause and retry it unless the user explicitly approves a different profile.",
+  "automatic_escalation": false
+}

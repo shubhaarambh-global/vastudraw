@@ -83,6 +83,13 @@ def _production_environment(tmp_path: Path) -> dict[str, str]:
         "AI_VASTU_REQUIREMENTS_PATH": str((tmp_path / "requirements").resolve()),
         "AI_VASTU_GENERATION_UPLOAD_ROOT": str((tmp_path / "uploads").resolve()),
         "AI_VASTU_PAYMENT_GATEWAY": "phonepe",
+        "AI_VASTU_PHONEPE_ENVIRONMENT": "production",
+        "AI_VASTU_PHONEPE_CLIENT_ID": "offline-phonepe-client",
+        "AI_VASTU_PHONEPE_CLIENT_SECRET": "offline-phonepe-secret",
+        "AI_VASTU_PHONEPE_CLIENT_VERSION": "1",
+        "AI_VASTU_PHONEPE_WEBHOOK_USERNAME": "offline-phonepe-webhook",
+        "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD": "offline-phonepe-password",
+        "AI_VASTU_PHONEPE_REDIRECT_URL": "https://app.example.com/billing",
         "AI_VASTU_REQUIREMENTS_PROVIDER": "openrouter",
         "AI_VASTU_ARCHITECT_PROVIDER": "openrouter",
         "AI_VASTU_VASTU_PROVIDER": "openrouter",
@@ -100,7 +107,12 @@ def _production_environment(tmp_path: Path) -> dict[str, str]:
 
 
 def test_frontend_sources_cannot_reference_server_provider_keys() -> None:
-    forbidden = ("OPENROUTER_API_KEY", "GEMINI_API_KEY")
+    forbidden = (
+        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
+        "AI_VASTU_PHONEPE_CLIENT_SECRET",
+        "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD",
+    )
     frontend_root = REPOSITORY_ROOT / "apps" / "web"
     examined = 0
 

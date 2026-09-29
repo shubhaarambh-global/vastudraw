@@ -99,23 +99,40 @@ export function PricingPage() {
               >
                 {product.description}
               </p>
-              <Link
-                href={`/billing?plan=${product.sku}`}
-                style={{
-                  display: "inline-block",
-                  marginTop: "8px",
-                  borderRadius: "10px",
-                  padding: "11px 15px",
-                  textDecoration: "none",
-                  background: product.featured ? "#285b38" : "#eef1ed",
-                  color: product.featured ? "#ffffff" : "#172018",
-                  fontWeight: 800,
-                }}
-              >
-                {product.sku === "free_first_generation"
-                  ? "Start free"
-                  : "Choose plan"}
-              </Link>
+              {product.checkoutMode === "coming_soon" ? (
+                <span
+                  role="status"
+                  style={{
+                    display: "inline-block",
+                    marginTop: "8px",
+                    borderRadius: "10px",
+                    padding: "11px 15px",
+                    background: "#eef1ed",
+                    color: "#566057",
+                    fontWeight: 800,
+                  }}
+                >
+                  Coming soon · AutoPay qualification pending
+                </span>
+              ) : (
+                <Link
+                  href={`/billing?plan=${product.sku}`}
+                  style={{
+                    display: "inline-block",
+                    marginTop: "8px",
+                    borderRadius: "10px",
+                    padding: "11px 15px",
+                    textDecoration: "none",
+                    background: product.featured ? "#285b38" : "#eef1ed",
+                    color: product.featured ? "#ffffff" : "#172018",
+                    fontWeight: 800,
+                  }}
+                >
+                  {product.checkoutMode === "free"
+                    ? "Start free"
+                    : "Choose plan"}
+                </Link>
+              )}
             </article>
           ))}
         </section>
@@ -125,9 +142,9 @@ export function PricingPage() {
           <p style={{ marginBottom: 0, color: "#606960", lineHeight: 1.6 }}>
             The first successful generation is free once per account. A failed
             generation does not consume it. Single-project and 10-project
-            purchases grant permanent project entitlements. Active subscriptions
-            authorize professional project work while the subscription remains
-            active.
+            purchases grant permanent project entitlements. Monthly and yearly
+            prices are published for the planned AutoPay launch, but recurring
+            checkout remains unavailable until that flow is qualified.
           </p>
         </section>
       </div>

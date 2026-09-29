@@ -1,0 +1,40 @@
+{
+  "oauth": {
+    "access_token": "fixture-oauth-token",
+    "token_type": "O-Bearer",
+    "issued_at": 1700000000,
+    "expires_at": 1700003600
+  },
+  "checkout": {
+    "orderId": "OMO_FIXTURE_001",
+    "state": "PENDING",
+    "expireAt": 1700001200000,
+    "redirectUrl": "https://mercury-uat.phonepe.com/transact/fixture"
+  },
+  "status": {
+    "merchantOrderId": "vd_fixture_order_001",
+    "orderId": "OMO_FIXTURE_001",
+    "state": "COMPLETED",
+    "amount": 39900,
+    "currency": "INR",
+    "expireAt": 1700001200000,
+    "paymentDetails": []
+  },
+  "http_failures": [
+    {"status": 401, "category": "authentication", "retryable": false},
+    {"status": 429, "category": "rate_limited", "retryable": true},
+    {"status": 500, "category": "unavailable", "retryable": true},
+    {"status": 503, "category": "unavailable", "retryable": true}
+  ],
+  "invalid_bodies": [
+    "not-json",
+    "[]",
+    "{\"orderId\":\"OMO_FIXTURE_001\",\"state\":\"PENDING\",\"state\":\"COMPLETED\",\"expireAt\":1700001200000,\"redirectUrl\":\"https://mercury-uat.phonepe.com/transact/fixture\"}",
+    "{\"orderId\":\"OMO_FIXTURE_001\",\"state\":\"UNKNOWN\"}"
+  ],
+  "oversized_padding_bytes": 65537,
+  "mismatches": {
+    "amount": 39901,
+    "currency": "USD"
+  }
+}

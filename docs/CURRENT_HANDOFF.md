@@ -908,3 +908,83 @@ First action: inspect the existing billing repository, checkout, webhook, event,
 and entitlement transaction boundaries; then design PhonePe-independent checkout
 and atomic/idempotent callback processing without changing the frozen pricing
 catalog or enabling Razorpay as a production dependency.
+
+---
+
+## Phase 29D - PhonePe + Payment Atomicity
+
+Status: **PASS_LOCAL; LIVE PAYMENT, DATABASE, AND DEPLOYMENT QUALIFICATION OUTSTANDING**
+
+### Checkpoint scope
+
+- Branch: `phase29`; starting HEAD for the final Phase 29D checkpoint is
+  `eddd465c9e45bbf0d32b604b245b8667b7a3b935`.
+- The launch catalog is server-authoritative at free first generation, INR 399
+  single-project access, INR 3,399 ten-project access, INR 2,499 monthly, and
+  INR 24,999 yearly.
+- Authenticated checkout intent is persisted before provider I/O. PhonePe
+  Standard Checkout v2 uses an isolated bounded adapter, fixed provider
+  endpoints, server-side credentials, and sanitized failures.
+- PhonePe callback/webhook input is an authenticated reconciliation trigger,
+  not settlement authority. Entitlement is granted only after authoritative
+  provider order-status confirmation.
+- Provider event recording, monotonic payment-order state, and entitlement
+  mutation share one atomic repository transaction with duplicate, replay,
+  stale-state, and concurrent-settlement protection. The reconciliation command
+  uses the same settlement path.
+- Monthly and yearly products remain fail-closed for checkout because Standard
+  Checkout is not represented as recurring AutoPay. Razorpay remains optional
+  and cannot become a production dependency for PhonePe.
+- Production configuration, payment-specific rate limits, checkout/status/
+  webhook routes, RLS/revocation migration policy, billing UI, fixtures,
+  adversarial tests, runbooks, and launch gates were updated together.
+- Agent OS routing, orchestration, protected-contract, memory, QA, testing, and
+  release-review guidance is included as repository governance. GPT-5.6 Sol
+  Medium is the fixed development-agent profile unless the user approves a
+  different profile.
+- Canonical PlanDocument, deterministic geometry, solver, frozen Vastu,
+  project-revision, generation, and export authority were not changed.
+
+### Final local evidence
+
+- Python: **940 passed**.
+- Web: **32 passed**.
+- Ruff: **PASS**.
+- mypy: **PASS across 208 source files**.
+- Formatting, lint, TypeScript typecheck, and production build: **PASS**.
+- Phase 29C gate: **PASS**.
+- Phase 29D gate: **PASS**.
+- `git diff --check`: **PASS**; Windows LF/CRLF notices only.
+- Security review: **no unresolved BLOCKER or HIGH finding**.
+- Independent QA corrections are complete. The corrected Phase 29D tree is the
+  tree covered by the final local validation evidence.
+- The user directed continuation from this GREEN checkpoint without rerunning
+  Phase 29A-29D validation; the counts above are preserved checkpoint evidence,
+  not a newly repeated validation run.
+
+### Qualification boundary
+
+Phase 29D is a local checkpoint, not a production qualification. The following
+remain outstanding and must not be converted into PASS without live evidence:
+
+1. Live PhonePe sandbox checkout, callback/webhook delivery, pending/success/
+   failure behavior, replay handling, reconciliation, and exactly-once
+   entitlement evidence.
+2. Live PostgreSQL/Supabase TLS, grants, ownership isolation, applicable RLS,
+   migrations, revision persistence, backup, and restore evidence.
+3. Live Supabase/JWT, production CORS/rate-limit, OpenRouter, and direct Gemini
+   qualification.
+4. Deployment-isolated end-to-end workflow evidence.
+
+No real-money transaction, production deployment, database mutation, external
+account action, or production-qualified tag is authorized by this checkpoint.
+
+### Next phase
+
+**Phase 29E - Live / Deployment End-to-End Qualification**
+
+First action: audit available deployment configuration and credential presence
+without exposing secret values or making write-producing live calls. Complete
+all safe local preparation, then classify each external gate strictly as
+`PASS_LOCAL`, `PASS_LIVE`, `BLOCKED_CREDENTIALS`, `BLOCKED_HUMAN_ACTION`,
+`BLOCKED_EXTERNAL_SERVICE`, or `FAIL`.

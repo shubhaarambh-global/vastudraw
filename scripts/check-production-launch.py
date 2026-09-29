@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 import psycopg
 
+from ai_vastu.billing.phonepe import PhonePeConfigurationError
+from ai_vastu.billing.phonepe_factory import create_phonepe_client
 from ai_vastu.production.settings import (
     EXPECTED_VASTU_BUNDLE_HASH,
     ProductionConfigurationError,
@@ -29,13 +31,14 @@ try:
 except ProductionConfigurationError as exc:
     fail(str(exc))
 
-if settings.payment_gateway == "phonepe":
-    fail(
-        "PhonePe is selected but its checkout/webhook integration is not implemented; "
-        "complete Phase 29D before launch."
-    )
 if settings.payment_gateway == "disabled":
     fail("Payments are disabled; a production launch cannot be qualified.")
+if settings.payment_gateway == "phonepe":
+    try:
+        with create_phonepe_client():
+            pass
+    except (PhonePeConfigurationError, ValueError) as exc:
+        fail(f"PhonePe runtime configuration is invalid: {exc}")
 
 bundle_path = Path(
     os.getenv(
@@ -89,11 +92,19 @@ try:
             """
         )
         limiter_row = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT to_regclass('public.billing_payment_orders') IS NOT NULL
+            """
+        )
+        payment_orders_row = cursor.fetchone()
 except Exception as exc:
     fail(f"PostgreSQL connectivity failed: {exc}")
 
 if limiter_row is None or limiter_row[0] is not True:
     fail("Phase 25 rate-limit migration has not been applied.")
+if payment_orders_row is None or payment_orders_row[0] is not True:
+    fail("Phase 29D payment atomicity migration has not been applied.")
 
 supabase_host = urlparse(settings.supabase_url).hostname
 if not supabase_host:
@@ -108,6 +119,7 @@ summary["vastu_bundle_hash"] = bundle.content_hash
 summary["vastu_rules"] = len(bundle.rules)
 summary["database_identity"] = list(database_row) if database_row else None
 summary["rate_limit_table"] = True
+summary["payment_orders_table"] = True
 
 print(json.dumps(summary, indent=2, sort_keys=True))
 print("PRODUCTION LAUNCH GATE: PASS")

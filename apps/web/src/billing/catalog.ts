@@ -1,3 +1,5 @@
+export type BillingCheckoutMode = "free" | "one_time" | "coming_soon";
+
 export type BillingProduct = {
   sku: string;
   name: string;
@@ -6,6 +8,7 @@ export type BillingProduct = {
   suffix?: string;
   description: string;
   featured?: boolean;
+  checkoutMode: BillingCheckoutMode;
 };
 
 export const billingProducts: BillingProduct[] = [
@@ -15,6 +18,7 @@ export const billingProducts: BillingProduct[] = [
     eyebrow: "Free",
     price: "₹0",
     description: "Your first successful plan generation is free.",
+    checkoutMode: "free",
   },
   {
     sku: "project_single",
@@ -23,6 +27,7 @@ export const billingProducts: BillingProduct[] = [
     price: "₹399",
     description:
       "One permanent paid project with repeat edits and generations.",
+    checkoutMode: "one_time",
   },
   {
     sku: "project_pack_10",
@@ -30,6 +35,7 @@ export const billingProducts: BillingProduct[] = [
     eyebrow: "Studio pack",
     price: "₹3,399",
     description: "Ten permanent project entitlements for client work.",
+    checkoutMode: "one_time",
   },
   {
     sku: "pro_monthly",
@@ -39,6 +45,7 @@ export const billingProducts: BillingProduct[] = [
     suffix: "/month",
     description: "Subscription access for active professional work.",
     featured: true,
+    checkoutMode: "coming_soon",
   },
   {
     sku: "pro_yearly",
@@ -47,5 +54,10 @@ export const billingProducts: BillingProduct[] = [
     price: "₹24,999",
     suffix: "/year",
     description: "Save ₹4,989 compared with twelve monthly payments.",
+    checkoutMode: "coming_soon",
   },
 ];
+
+export function billingProductBySku(sku: string): BillingProduct | undefined {
+  return billingProducts.find((product) => product.sku === sku);
+}

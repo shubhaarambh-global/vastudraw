@@ -40,6 +40,18 @@ def _required(environment: dict[str, str], name: str) -> str:
     return value
 
 
+def _bounded_required(
+    environment: dict[str, str],
+    name: str,
+    *,
+    maximum: int,
+) -> str:
+    value = _required(environment, name)
+    if len(value) > maximum:
+        raise ProductionConfigurationError(f"{name} exceeds its maximum length.")
+    return value
+
+
 def _positive_int(
     environment: dict[str, str],
     name: str,
@@ -102,6 +114,16 @@ class ProductionSettings:
     requirements_path: Path
     generation_upload_root: Path
     payment_gateway: str
+    phonepe_environment: str | None
+    phonepe_client_id: str | None
+    phonepe_client_secret: str | None
+    phonepe_client_version: str | None
+    phonepe_webhook_username: str | None
+    phonepe_webhook_password: str | None
+    phonepe_redirect_url: str | None
+    phonepe_connect_timeout_seconds: int | None
+    phonepe_read_timeout_seconds: int | None
+    phonepe_order_expire_seconds: int | None
     razorpay_key_id: str | None
     razorpay_key_secret: str | None
     razorpay_webhook_secret: str | None
@@ -125,6 +147,8 @@ class ProductionSettings:
     rate_limit_generation_per_hour: int
     rate_limit_plan_analysis_per_hour: int
     rate_limit_checkout_per_hour: int
+    rate_limit_payment_status_per_hour: int
+    rate_limit_payment_webhook_per_hour: int
     hsts_seconds: int
 
     def redacted_summary(self) -> dict[str, object]:
@@ -137,6 +161,8 @@ class ProductionSettings:
             "requirements_path": "configured_absolute",
             "generation_upload_root": "configured_absolute",
             "payment_gateway": self.payment_gateway,
+            "phonepe_environment": self.phonepe_environment,
+            "phonepe_configured": self.phonepe_client_id is not None,
             "requirements_provider": self.requirements_provider,
             "architect_provider": self.architect_provider,
             "vastu_provider": self.vastu_provider,
@@ -165,6 +191,8 @@ class ProductionSettings:
             "rate_limit_generation_per_hour": self.rate_limit_generation_per_hour,
             "rate_limit_plan_analysis_per_hour": self.rate_limit_plan_analysis_per_hour,
             "rate_limit_checkout_per_hour": self.rate_limit_checkout_per_hour,
+            "rate_limit_payment_status_per_hour": self.rate_limit_payment_status_per_hour,
+            "rate_limit_payment_webhook_per_hour": self.rate_limit_payment_webhook_per_hour,
             "hsts_seconds": self.hsts_seconds,
         }
 
@@ -260,6 +288,70 @@ def load_production_settings(
     webhook_secret: str | None = None
     monthly_plan_id: str | None = None
     yearly_plan_id: str | None = None
+    phonepe_environment: str | None = None
+    phonepe_client_id: str | None = None
+    phonepe_client_secret: str | None = None
+    phonepe_client_version: str | None = None
+    phonepe_webhook_username: str | None = None
+    phonepe_webhook_password: str | None = None
+    phonepe_redirect_url: str | None = None
+    phonepe_connect_timeout_seconds: int | None = None
+    phonepe_read_timeout_seconds: int | None = None
+    phonepe_order_expire_seconds: int | None = None
+    if payment_gateway == "phonepe":
+        phonepe_environment = _required(env, "AI_VASTU_PHONEPE_ENVIRONMENT").lower()
+        if phonepe_environment != "production":
+            raise ProductionConfigurationError(
+                "AI_VASTU_PHONEPE_ENVIRONMENT must be production in production."
+            )
+        phonepe_client_id = _bounded_required(
+            env, "AI_VASTU_PHONEPE_CLIENT_ID", maximum=256
+        )
+        phonepe_client_secret = _bounded_required(
+            env, "AI_VASTU_PHONEPE_CLIENT_SECRET", maximum=512
+        )
+        phonepe_client_version = _required(env, "AI_VASTU_PHONEPE_CLIENT_VERSION")
+        if re.fullmatch(r"[1-9][0-9]{0,8}", phonepe_client_version) is None:
+            raise ProductionConfigurationError(
+                "AI_VASTU_PHONEPE_CLIENT_VERSION must be a positive numeric version."
+            )
+        phonepe_webhook_username = _bounded_required(
+            env, "AI_VASTU_PHONEPE_WEBHOOK_USERNAME", maximum=256
+        )
+        phonepe_webhook_password = _bounded_required(
+            env, "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD", maximum=512
+        )
+        phonepe_redirect_url = _https_url(
+            _required(env, "AI_VASTU_PHONEPE_REDIRECT_URL"),
+            "AI_VASTU_PHONEPE_REDIRECT_URL",
+        )
+        parsed_redirect = urlparse(phonepe_redirect_url)
+        redirect_origin = f"{parsed_redirect.scheme}://{parsed_redirect.netloc}"
+        if redirect_origin not in origins:
+            raise ProductionConfigurationError(
+                "AI_VASTU_PHONEPE_REDIRECT_URL must use an AI_VASTU_WEB_ORIGINS origin."
+            )
+        phonepe_connect_timeout_seconds = _positive_int(
+            env, "AI_VASTU_PHONEPE_CONNECT_TIMEOUT_SECONDS", default=3
+        )
+        phonepe_read_timeout_seconds = _positive_int(
+            env, "AI_VASTU_PHONEPE_READ_TIMEOUT_SECONDS", default=10
+        )
+        if phonepe_connect_timeout_seconds > 60:
+            raise ProductionConfigurationError(
+                "AI_VASTU_PHONEPE_CONNECT_TIMEOUT_SECONDS must not exceed 60."
+            )
+        if phonepe_read_timeout_seconds > 60:
+            raise ProductionConfigurationError(
+                "AI_VASTU_PHONEPE_READ_TIMEOUT_SECONDS must not exceed 60."
+            )
+        phonepe_order_expire_seconds = _positive_int(
+            env, "AI_VASTU_PHONEPE_ORDER_EXPIRE_SECONDS", default=1200
+        )
+        if not 300 <= phonepe_order_expire_seconds <= 3600:
+            raise ProductionConfigurationError(
+                "AI_VASTU_PHONEPE_ORDER_EXPIRE_SECONDS must be between 300 and 3600."
+            )
     if payment_gateway == "razorpay":
         key_id = _required(env, "AI_VASTU_RAZORPAY_KEY_ID")
         if key_id.startswith("rzp_test_"):
@@ -330,6 +422,16 @@ def load_production_settings(
         requirements_path=requirements_path,
         generation_upload_root=generation_upload_root,
         payment_gateway=payment_gateway,
+        phonepe_environment=phonepe_environment,
+        phonepe_client_id=phonepe_client_id,
+        phonepe_client_secret=phonepe_client_secret,
+        phonepe_client_version=phonepe_client_version,
+        phonepe_webhook_username=phonepe_webhook_username,
+        phonepe_webhook_password=phonepe_webhook_password,
+        phonepe_redirect_url=phonepe_redirect_url,
+        phonepe_connect_timeout_seconds=phonepe_connect_timeout_seconds,
+        phonepe_read_timeout_seconds=phonepe_read_timeout_seconds,
+        phonepe_order_expire_seconds=phonepe_order_expire_seconds,
         razorpay_key_id=key_id,
         razorpay_key_secret=key_secret,
         razorpay_webhook_secret=webhook_secret,
@@ -368,6 +470,16 @@ def load_production_settings(
             env,
             "AI_VASTU_RATE_LIMIT_CHECKOUT_PER_HOUR",
             default=20,
+        ),
+        rate_limit_payment_status_per_hour=_positive_int(
+            env,
+            "AI_VASTU_RATE_LIMIT_PAYMENT_STATUS_PER_HOUR",
+            default=30,
+        ),
+        rate_limit_payment_webhook_per_hour=_positive_int(
+            env,
+            "AI_VASTU_RATE_LIMIT_PAYMENT_WEBHOOK_PER_HOUR",
+            default=240,
         ),
         hsts_seconds=_positive_int(
             env,

@@ -13,19 +13,19 @@ checks = {
     ),
     "single_price": (
         ROOT / "python/ai_vastu/billing/catalog.py",
-        "amount_paise=49_900",
+        "amount_paise=39_900",
     ),
     "pack_price": (
         ROOT / "python/ai_vastu/billing/catalog.py",
-        "amount_paise=489_900",
+        "amount_paise=339_900",
     ),
     "monthly_price": (
         ROOT / "python/ai_vastu/billing/catalog.py",
-        "amount_paise=999_900",
+        "amount_paise=249_900",
     ),
     "yearly_price": (
         ROOT / "python/ai_vastu/billing/catalog.py",
-        "amount_paise=6_999_900",
+        "amount_paise=2_499_900",
     ),
     "single_limit_metadata": (
         ROOT / "python/ai_vastu/billing/catalog.py",
@@ -47,6 +47,6 @@ if missing:
 
 print(
     "Launch Gemini/pricing wired: gemini_2_5_flash=true, "
-    "single_499=true, single_limit_metadata=3, pack_4899=true, "
-    "pack_limit_metadata=5, monthly_9999=true, yearly_69999=true"
+    "single_399=true, single_limit_metadata=3, pack_3399=true, "
+    "pack_limit_metadata=5, monthly_2499=true, yearly_24999=true"
 )

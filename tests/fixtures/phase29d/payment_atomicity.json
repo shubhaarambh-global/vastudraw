@@ -1,0 +1,13 @@
+{
+  "user_id": "11111111-1111-1111-1111-111111111111",
+  "sku": "project_single",
+  "merchant_order_id": "vd_fixture_order_001",
+  "provider_order_id": "OMO_FIXTURE_001",
+  "idempotency_key": "fixture-idempotency-digest",
+  "event_key": "fixture-status-completed-v1",
+  "event_type": "checkout.order.completed",
+  "amount_paise": 39900,
+  "currency": "INR",
+  "concurrency_workers": 4,
+  "providers": ["phonepe", "razorpay"]
+}

@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from uuid import UUID
 
 from ai_vastu.auth import (
@@ -38,7 +38,7 @@ assert "REVOKE ALL" in migration
 api_source = (ROOT / "apps/api/app/main.py").read_text(encoding="utf-8")
 assert "CurrentUserDependency" in api_source
 assert "_require_project_owner" in api_source
-assert 'allow_headers=["Authorization", "Content-Type"]' in api_source
+assert 'allow_headers=["Authorization", "Content-Type", "Idempotency-Key"]' in api_source
 
 web_source = (ROOT / "apps/web/src/components/dashboard/DashboardPage.tsx").read_text(
     encoding="utf-8"

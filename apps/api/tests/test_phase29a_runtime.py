@@ -28,6 +28,8 @@ def _production_client(
         rate_limit_generation_per_hour=10,
         rate_limit_plan_analysis_per_hour=10,
         rate_limit_checkout_per_hour=20,
+        rate_limit_payment_status_per_hour=30,
+        rate_limit_payment_webhook_per_hour=240,
         hsts_seconds=31_536_000,
     )
     monkeypatch.setenv("APP_ENV", "production")
@@ -87,6 +89,20 @@ def test_production_cors_and_trusted_hosts_use_validated_settings(
     assert allowed.status_code == 200
     assert allowed.headers["access-control-allow-origin"] == "https://app.example.test"
 
+    checkout_preflight = client.options(
+        "/billing/checkout",
+        headers={
+            "Origin": "https://app.example.test",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": (
+                "authorization,content-type,idempotency-key"
+            ),
+        },
+    )
+    assert checkout_preflight.status_code == 200
+    allowed_headers = checkout_preflight.headers["access-control-allow-headers"].lower()
+    assert "idempotency-key" in allowed_headers
+
     disallowed_origin = client.options(
         "/health",
         headers={**preflight_headers, "Origin": "https://ignored.example.test"},
@@ -131,6 +147,30 @@ def test_allowed_origin_receives_cors_on_plan_analysis_rate_limit(
     assert response.headers["access-control-allow-origin"] == "https://app.example.test"
     rate_limiter.assert_called_once()
     assert rate_limiter.call_args.kwargs["scope"] == "plan_analysis"
+
+
+def test_payment_status_refresh_has_a_dedicated_production_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rate_limiter = MagicMock(return_value=SimpleNamespace(allowed=False))
+    client = _production_client(
+        monkeypatch,
+        gateway="phonepe",
+        rate_limiter=rate_limiter,
+    )
+
+    response = client.post(
+        "/billing/orders/vd_order_1/refresh",
+        headers={
+            "Authorization": "Bearer payment-status-token",
+            "Origin": "https://app.example.test",
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.headers["access-control-allow-origin"] == "https://app.example.test"
+    assert rate_limiter.call_args.kwargs["scope"] == "payment_status"
+    assert rate_limiter.call_args.kwargs["limit"] == 30
 
 
 def test_rotating_authorization_headers_do_not_create_new_rate_limit_buckets(
@@ -209,11 +249,10 @@ def test_plan_analysis_get_and_confirmation_are_not_rate_limited(
     rate_limiter.assert_not_called()
 
 
-@pytest.mark.parametrize("gateway", ["phonepe", "disabled"])
 def test_unavailable_gateway_blocks_razorpay_before_provider_or_entitlement_side_effects(
     monkeypatch: pytest.MonkeyPatch,
-    gateway: str,
 ) -> None:
+    gateway = "disabled"
     client = _production_client(monkeypatch, gateway)
     provider_factory = MagicMock(side_effect=AssertionError("Razorpay must not be constructed"))
     billing_service = MagicMock(side_effect=AssertionError("Billing service must not be opened"))
@@ -233,7 +272,7 @@ def test_unavailable_gateway_blocks_razorpay_before_provider_or_entitlement_side
 
     assert checkout.status_code == 503
     assert webhook.status_code == 503
-    assert "Razorpay payments are unavailable" in checkout.json()["detail"]
+    assert "Payments are unavailable" in checkout.json()["detail"]
     assert "Razorpay payments are unavailable" in webhook.json()["detail"]
     provider_factory.assert_not_called()
     billing_service.assert_not_called()

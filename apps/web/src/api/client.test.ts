@@ -108,6 +108,78 @@ void test("authenticated requests include bearer access token", async () => {
   assert.equal(authorization, "Bearer signed-access-token");
 });
 
+void test("billing checkout binds authentication and idempotency headers", async () => {
+  let checkoutRequestUrl = "";
+  let requestHeaders = new Headers();
+  let requestBody: BodyInit | null | undefined;
+  const fetchImpl: typeof fetch = (input, init) => {
+    checkoutRequestUrl = requestUrl(input);
+    requestHeaders = new Headers(init?.headers);
+    requestBody = init?.body;
+    return Promise.resolve(
+      jsonResponse({
+        merchant_order_id: "vd_order_1",
+        sku: "project_single",
+        provider: "phonepe",
+        provider_reference_id: "OMO_1",
+        checkout_url: "https://mercury-uat.phonepe.com/pay/token",
+        status: "checkout_created",
+        amount_paise: 39_900,
+        currency: "INR",
+      }),
+    );
+  };
+  const client = new ProjectApiClient(
+    "http://api.example.test",
+    fetchImpl,
+    () => Promise.resolve("signed-access-token"),
+  );
+
+  await client.createBillingCheckout("project_single", "checkout-attempt-1");
+
+  assert.equal(checkoutRequestUrl, "http://api.example.test/billing/checkout");
+  assert.equal(
+    requestHeaders.get("Authorization"),
+    "Bearer signed-access-token",
+  );
+  assert.equal(requestHeaders.get("Idempotency-Key"), "checkout-attempt-1");
+  if (typeof requestBody !== "string") {
+    throw new TypeError("Expected billing checkout body to be a JSON string.");
+  }
+  assert.deepEqual(JSON.parse(requestBody), { sku: "project_single" });
+});
+
+void test("billing order status paths encode the server order identifier", async () => {
+  const requests: Array<{ url: string; method: string }> = [];
+  const fetchImpl: typeof fetch = (input, init) => {
+    requests.push({ url: requestUrl(input), method: init?.method ?? "GET" });
+    return Promise.resolve(
+      jsonResponse({
+        merchant_order_id: "vd/order",
+        sku: "project_single",
+        provider: "phonepe",
+        provider_reference_id: null,
+        checkout_url: null,
+        status: "checkout_unknown",
+        amount_paise: 39_900,
+        currency: "INR",
+      }),
+    );
+  };
+  const client = new ProjectApiClient("http://api.example.test", fetchImpl);
+
+  await client.getPaymentOrder("vd/order");
+  await client.refreshPaymentOrder("vd/order");
+
+  assert.deepEqual(requests, [
+    { url: "http://api.example.test/billing/orders/vd%2Forder", method: "GET" },
+    {
+      url: "http://api.example.test/billing/orders/vd%2Forder/refresh",
+      method: "POST",
+    },
+  ]);
+});
+
 void test("API failures preserve HTTP status and server detail", async () => {
   const client = new ProjectApiClient("http://api.example.test", () =>
     Promise.resolve(jsonResponse({ detail: "stale parent" }, 409)),

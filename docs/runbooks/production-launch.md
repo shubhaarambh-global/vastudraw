@@ -1,9 +1,10 @@
 # Production launch runbook
 
-Phase 29A establishes a coherent fail-closed configuration contract. It does
-not qualify production services or payments. PhonePe is the launch direction,
-but its checkout/webhook implementation remains a Phase 29D blocker. Razorpay
-is retained as an optional gateway and is not required for a PhonePe profile.
+Phase 29A establishes a coherent fail-closed configuration contract. Phase 29D
+adds server-side PhonePe Standard Checkout for one-time project purchases and
+atomic entitlement settlement. Neither phase, by itself, qualifies live
+production services or payments. Razorpay remains optional and is not required
+for a PhonePe profile.
 
 ## Canonical production configuration
 
@@ -38,11 +39,20 @@ Before public launch:
 
 ### PhonePe
 
-- do not enable checkout until the Phase 29D adapter, verification and
-  idempotency fixtures are qualified;
 - configure production credentials and callbacks only through the secret
   manager and the official PhonePe account workflow;
-- treat Phase 29A configuration acceptance as configuration evidence only.
+- configure the HTTPS redirect and callback endpoints from the reviewed public
+  API origin;
+- apply the Phase 29D payment-order migration before enabling checkout;
+- schedule `python scripts/reconcile-phonepe-payments.py` as a bounded recovery
+  job for pending or ambiguous orders;
+- drain or explicitly reconcile all in-flight orders before changing the
+  selected production gateway; owner status routes follow the active gateway;
+- confirm callbacks by querying authoritative PhonePe order status; callback
+  fields never grant entitlement directly;
+- keep monthly/yearly checkout disabled until a recurring AutoPay mandate flow
+  and its lifecycle semantics are separately implemented and qualified;
+- treat local configuration and fixture acceptance as offline evidence only.
 
 ### Optional Razorpay
 
@@ -107,7 +117,7 @@ against a provider account or target that has not been explicitly reviewed.
 
 ## Infrastructure
 
-1. Apply all PostgreSQL/Supabase migrations, including Phase 25.
+1. Apply all PostgreSQL/Supabase migrations, including Phase 25 and Phase 29D.
 2. Mount durable encrypted storage for requirements/intake artifacts.
 3. Load production secrets from the hosting secret manager.
 4. Set exact CORS origins and trusted hosts; never use `*`.
@@ -122,6 +132,8 @@ against a provider account or target that has not been explicitly reviewed.
 8. Run `pnpm phase25:launch` only against an explicitly reviewed target. The
    command connects to PostgreSQL and writes/removes storage probes.
 9. Run staging payment/webhook and full generation smoke tests.
+   For PhonePe, exercise checkout creation, redirect/return, repeated callbacks,
+   reconciliation after timeout, amount mismatch rejection, and replay safety.
 10. Create and verify a pre-launch backup.
 11. Deploy, then verify `/health` and `/system/release-readiness`.
 

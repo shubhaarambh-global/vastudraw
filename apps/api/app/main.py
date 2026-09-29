@@ -646,7 +646,7 @@ def create_app(
         allow_origins=list(allowed_origins),
         allow_credentials=False,
         allow_methods=["GET", "POST"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
         expose_headers=[
             "Content-Disposition",
             "ETag",

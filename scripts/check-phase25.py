@@ -29,6 +29,24 @@ assert (
     ProductionHardeningMiddleware._scope_for_request("POST", "/billing/checkout")
     == "billing_checkout"
 )
+assert (
+    ProductionHardeningMiddleware._scope_for_request(
+        "POST", "/billing/webhooks/phonepe"
+    )
+    == "payment_webhook"
+)
+assert (
+    ProductionHardeningMiddleware._scope_for_request(
+        "POST", "/billing/webhooks/razorpay"
+    )
+    == "payment_webhook"
+)
+assert (
+    ProductionHardeningMiddleware._scope_for_request(
+        "POST", "/billing/orders/vd_order/refresh"
+    )
+    == "payment_status"
+)
 assert len(hash_rate_limit_key("Bearer secret")) == 64
 
 migration = ROOT / "infra" / "supabase" / "migrations" / "202609150025_phase25_rate_limits.sql"

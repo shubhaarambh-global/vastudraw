@@ -19,6 +19,22 @@ export interface RevisionRecord {
   readonly payload_hash: string;
 }
 
+export interface PaymentOrderSummary {
+  readonly merchant_order_id: string;
+  readonly sku: string;
+  readonly provider: string;
+  readonly provider_reference_id: string | null;
+  readonly checkout_url: string | null;
+  readonly status:
+    | "pending"
+    | "checkout_created"
+    | "checkout_unknown"
+    | "checkout_failed"
+    | "fulfilled";
+  readonly amount_paise: number;
+  readonly currency: string;
+}
+
 export interface GenerationAttachmentRecord {
   readonly attachment_id: string;
   readonly kind: "IMAGE" | "PDF" | "DXF" | "DWG";
@@ -401,6 +417,35 @@ export class ProjectApiClient {
 
   async listProjects(): Promise<readonly ProjectRecord[]> {
     return this.request<readonly ProjectRecord[]>("/projects");
+  }
+
+  async createBillingCheckout(
+    sku: string,
+    idempotencyKey: string,
+  ): Promise<PaymentOrderSummary> {
+    return this.request<PaymentOrderSummary>("/billing/checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({ sku }),
+    });
+  }
+
+  async getPaymentOrder(merchantOrderId: string): Promise<PaymentOrderSummary> {
+    return this.request<PaymentOrderSummary>(
+      `/billing/orders/${encodeURIComponent(merchantOrderId)}`,
+    );
+  }
+
+  async refreshPaymentOrder(
+    merchantOrderId: string,
+  ): Promise<PaymentOrderSummary> {
+    return this.request<PaymentOrderSummary>(
+      `/billing/orders/${encodeURIComponent(merchantOrderId)}/refresh`,
+      { method: "POST" },
+    );
   }
 
   async createProject(name: string, projectId: string): Promise<ProjectRecord> {

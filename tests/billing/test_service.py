@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -78,7 +79,7 @@ def test_active_subscription_authorizes_generation(tmp_path: Path) -> None:
             sku="pro_monthly",
             status=SubscriptionStatus.ACTIVE,
             provider_subscription_id="sub_123",
-            period_end=None,
+            period_end=datetime.now(UTC) + timedelta(days=30),
         )
         assert service.authorize_generation(USER, PROJECT_A).allowed
 
@@ -92,6 +93,27 @@ def test_active_subscription_authorizes_generation(tmp_path: Path) -> None:
             period_end=None,
         )
         assert not service.authorize_generation(USER, PROJECT_A).allowed
+    finally:
+        repository.close()
+
+
+def test_active_subscription_without_a_future_period_fails_closed(tmp_path: Path) -> None:
+    service, repository = make_service(tmp_path)
+    try:
+        for event_key, period_end in (
+            ("evt-sub-missing-end", None),
+            ("evt-sub-expired", datetime.now(UTC) - timedelta(seconds=1)),
+        ):
+            assert service.apply_subscription_event(
+                event_key=event_key,
+                event_type="subscription.activated",
+                user_id=USER,
+                sku="pro_monthly",
+                status=SubscriptionStatus.ACTIVE,
+                provider_subscription_id=f"sub_{event_key}",
+                period_end=period_end,
+            )
+            assert not service.authorize_generation(USER, PROJECT_A).allowed
     finally:
         repository.close()
 

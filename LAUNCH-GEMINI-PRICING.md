@@ -1,5 +1,10 @@
 # Launch Gemini + pricing patch (Part A)
 
+> Historical record only. This overlay is retired and must not be applied to
+> the current qualified branch. Phase 29D preserves the launch catalog at
+> ₹399 / ₹3,399 / ₹2,499 monthly / ₹24,999 yearly, with the first generation
+> free.
+
 This overlay changes only contracts that were present in `provider-contracts.txt`.
 
 Implemented:

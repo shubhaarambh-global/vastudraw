@@ -28,6 +28,13 @@ def base_environment(tmp_path: Path) -> dict[str, str]:
         "AI_VASTU_REQUIREMENTS_PATH": str((tmp_path / "requirements").resolve()),
         "AI_VASTU_GENERATION_UPLOAD_ROOT": str((tmp_path / "uploads").resolve()),
         "AI_VASTU_PAYMENT_GATEWAY": "phonepe",
+        "AI_VASTU_PHONEPE_ENVIRONMENT": "production",
+        "AI_VASTU_PHONEPE_CLIENT_ID": "phonepe-client-id",
+        "AI_VASTU_PHONEPE_CLIENT_SECRET": "phonepe-client-secret",
+        "AI_VASTU_PHONEPE_CLIENT_VERSION": "1",
+        "AI_VASTU_PHONEPE_WEBHOOK_USERNAME": "phonepe-webhook-user",
+        "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD": "phonepe-webhook-password",
+        "AI_VASTU_PHONEPE_REDIRECT_URL": "https://app.example.com/billing/return",
         "AI_VASTU_REQUIREMENTS_PROVIDER": "openrouter",
         "AI_VASTU_ARCHITECT_PROVIDER": "openrouter",
         "AI_VASTU_VASTU_PROVIDER": "openrouter",
@@ -63,9 +70,12 @@ def test_production_settings_accept_qualified_phonepe_configuration(tmp_path: Pa
     assert settings.requirements_path == Path(env["AI_VASTU_REQUIREMENTS_PATH"])
     assert settings.generation_upload_root == Path(env["AI_VASTU_GENERATION_UPLOAD_ROOT"])
     assert settings.payment_gateway == "phonepe"
+    assert settings.phonepe_environment == "production"
+    assert settings.phonepe_redirect_url == "https://app.example.com/billing/return"
     assert settings.razorpay_key_id is None
     assert settings.rate_limit_generation_per_hour == 10
     assert settings.rate_limit_plan_analysis_per_hour == 10
+    assert settings.rate_limit_payment_status_per_hour == 30
     assert settings.openrouter_budget == DEFAULT_OPENROUTER_BUDGET
     assert settings.gemini_budget == DEFAULT_GEMINI_BUDGET
 
@@ -222,6 +232,56 @@ def test_production_settings_accept_disabled_gateway_without_razorpay_credential
     settings = load_production_settings(env)
     assert settings.payment_gateway == "disabled"
     assert settings.razorpay_key_secret is None
+    assert settings.phonepe_client_secret is None
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "AI_VASTU_PHONEPE_ENVIRONMENT",
+        "AI_VASTU_PHONEPE_CLIENT_ID",
+        "AI_VASTU_PHONEPE_CLIENT_SECRET",
+        "AI_VASTU_PHONEPE_CLIENT_VERSION",
+        "AI_VASTU_PHONEPE_WEBHOOK_USERNAME",
+        "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD",
+        "AI_VASTU_PHONEPE_REDIRECT_URL",
+    ],
+)
+def test_production_settings_require_phonepe_fields_only_when_selected(
+    tmp_path: Path, name: str
+) -> None:
+    env = base_environment(tmp_path)
+    env.pop(name)
+
+    with pytest.raises(ProductionConfigurationError, match=name):
+        load_production_settings(env)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("AI_VASTU_PHONEPE_ENVIRONMENT", "sandbox"),
+        ("AI_VASTU_PHONEPE_REDIRECT_URL", "http://app.example.com/billing/return"),
+        ("AI_VASTU_PHONEPE_REDIRECT_URL", "https://other.example.com/billing/return"),
+        ("AI_VASTU_PHONEPE_CONNECT_TIMEOUT_SECONDS", "0"),
+        ("AI_VASTU_PHONEPE_CONNECT_TIMEOUT_SECONDS", "61"),
+        ("AI_VASTU_PHONEPE_READ_TIMEOUT_SECONDS", "invalid"),
+        ("AI_VASTU_PHONEPE_READ_TIMEOUT_SECONDS", "61"),
+        ("AI_VASTU_PHONEPE_CLIENT_VERSION", "v1"),
+        ("AI_VASTU_PHONEPE_CLIENT_VERSION", "0"),
+        ("AI_VASTU_PHONEPE_CLIENT_SECRET", "x" * 513),
+        ("AI_VASTU_PHONEPE_ORDER_EXPIRE_SECONDS", "299"),
+        ("AI_VASTU_PHONEPE_ORDER_EXPIRE_SECONDS", "3601"),
+    ],
+)
+def test_production_settings_reject_unsafe_phonepe_configuration(
+    tmp_path: Path, name: str, value: str
+) -> None:
+    env = base_environment(tmp_path)
+    env[name] = value
+
+    with pytest.raises(ProductionConfigurationError, match=name):
+        load_production_settings(env)
 
 
 def test_production_settings_reject_test_razorpay_key(tmp_path: Path) -> None:
@@ -288,9 +348,11 @@ def test_redacted_summary_excludes_secrets(tmp_path: Path) -> None:
     assert redacted["gemini_attempt_timeout_seconds"] == 90.0
     assert redacted["gemini_total_timeout_seconds"] == 181.0
     assert redacted["rate_limit_plan_analysis_per_hour"] == 10
+    assert redacted["rate_limit_payment_status_per_hour"] == 30
     summary = str(redacted)
     for secret in (
         "user:pass", "openrouter-test-secret", "gemini-test-secret",
         "razorpay-test-secret", "webhook-test-secret", "rzp_live_example",
+        "phonepe-client-secret", "phonepe-webhook-password",
     ):
         assert secret not in summary
