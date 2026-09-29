@@ -988,3 +988,92 @@ without exposing secret values or making write-producing live calls. Complete
 all safe local preparation, then classify each external gate strictly as
 `PASS_LOCAL`, `PASS_LIVE`, `BLOCKED_CREDENTIALS`, `BLOCKED_HUMAN_ACTION`,
 `BLOCKED_EXTERNAL_SERVICE`, or `FAIL`.
+
+---
+
+## Phase 29E - Development E2E Qualification
+
+Status: **PASS_LOCAL FOR THE DEVELOPMENT WORKFLOW; LIVE EXTERNAL QUALIFICATION REMAINS BLOCKED**
+
+### Development payment boundary
+
+- `APP_ENV=development`.
+- PhonePe and Razorpay are disabled. No payment credential, network call,
+  callback, webhook, sandbox flow, or real-money transaction was used.
+- The existing billing bypass was enabled explicitly only inside the isolated
+  E2E test. Existing negative tests prove it remains unavailable in staging and
+  production.
+- PhonePe and Razorpay production implementations and security tests remain
+  intact.
+- PhonePe live qualification: `BLOCKED_HUMAN_ACTION`.
+- Razorpay live qualification: `BLOCKED_HUMAN_ACTION`.
+- These deferred payment gates are expected and are not Phase 29E failures.
+
+### Local workflow and correction
+
+The new fixture-backed development workflow E2E exercises:
+
+auth -> project creation -> JPG/PNG/PDF intake -> fixture plan recognition ->
+human confirmation -> fixture requirements interpretation -> confirmed program
+-> real deterministic candidate generation -> hard validation -> Vastu scoring
+-> selection -> immutable persistence/reload -> revision -> PDF export ->
+development billing bypass.
+
+PhonePe and Razorpay methods are patched with call-failing tripwires. The passed
+workflow test therefore provides direct evidence that this route sequence makes
+no payment-provider call. This is not a deployed, PostgreSQL, Supabase, or live-
+provider E2E.
+
+The first run exposed a real candidate-selection API defect: valid canonical
+PlanDocument JSON was rejected because the nested document was validated in
+Python-strict mode directly from an HTTP object. The route now accepts the same
+request shape but parses the nested canonical document with
+`PlanDocument.model_validate_json`, matching the established revision endpoint.
+No PlanDocument schema, migration, geometry, hash, Vastu, or solver rule changed.
+
+A second focused regression proves malformed canonical-plan input is rejected
+before the billing repository is created or a payment-provider method can be
+called.
+
+Phase 29E files changed:
+
+- `apps/api/app/confirmed_generation_routes.py`
+- `apps/api/tests/test_phase29e_development_e2e.py`
+- `docs/exec-plans/active/phase29e-live-deployment-qualification.md`
+- `docs/CURRENT_HANDOFF.md`
+
+### Validation evidence
+
+- Development E2E file: **2 passed** (complete local workflow and malformed-
+  selection rejection).
+- Focused auth/JWT, ownership, persistence, uploads, exports, provider-runtime,
+  production-settings, rate-limit, backup-safeguard, and project-policy matrix:
+  **224 passed**.
+- Additional database-policy and hybrid-provider-fixture matrix: **29 passed**.
+- Ruff on Phase 29E code/test files: **PASS**.
+- mypy on Phase 29E code/test files: **PASS**.
+- No Phase 29A-29D broad gate was rerun.
+- No external database, Supabase, OpenRouter, Gemini, payment, deployment, or
+  backup/restore service was contacted.
+- PostgreSQL/Supabase policy, JWT, AI adapter, payment, and backup evidence is
+  fixture/static/local safeguard evidence only. It does not qualify a live
+  runtime, PostgreSQL dump/restore, deployed RLS/grants/TLS, or provider path.
+- Independent QA, architecture, and release review accepted these scoped local
+  gates while rejecting any production-qualified or release-ready claim.
+
+### Remaining Phase 29E gates
+
+- PostgreSQL connectivity/TLS, deployed grants/RLS/migrations, live ownership,
+  and revision persistence: `BLOCKED_CREDENTIALS`.
+- Supabase/JWT live configuration and two-user deployed denial:
+  `BLOCKED_CREDENTIALS`.
+- OpenRouter live: `BLOCKED_CREDENTIALS`.
+- Direct Gemini JPG/PNG/PDF live: `BLOCKED_CREDENTIALS`.
+- Real backup creation: `BLOCKED_CREDENTIALS`.
+- Disposable restore drill, deployed CORS/rate limits, and deployment isolation:
+  `BLOCKED_HUMAN_ACTION`.
+- Deployed production-equivalent E2E: `BLOCKED_CREDENTIALS`.
+- Live payments: `BLOCKED_HUMAN_ACTION` by explicit development policy.
+
+No gate is `PASS_LIVE`. No production-qualified tag is justified. Git metadata
+remains intentionally untouched in the managed read-only sandbox.

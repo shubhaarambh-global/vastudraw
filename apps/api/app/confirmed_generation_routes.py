@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, ConfigDict, Field
 
 from ai_vastu.architectural_brain.errors import (
     ArchitecturalBrainConfigurationError,
@@ -16,6 +19,7 @@ from ai_vastu.architectural_intelligence import (
 from ai_vastu.billing import BillingService, create_billing_repository
 from ai_vastu.billing.service import development_billing_bypass_enabled
 from ai_vastu.multi_candidate import MultiCandidateGenerationError
+from ai_vastu.plan_schema import PlanDocument
 from ai_vastu.projects.errors import ProjectNotFoundError, RevisionConflictError
 from ai_vastu.provider_runtime import ProviderFailureCategory
 from ai_vastu.requirements.candidate_orchestrator import (
@@ -43,6 +47,15 @@ from app.auth_dependencies import CurrentUserDependency, project_service, requir
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/confirmed-generation", tags=["confirmed-generation"])
+
+
+class SelectAlternativeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    draft_id: UUID
+    candidate_run_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_id: UUID
+    plan_document: dict[str, Any]
 
 
 def _provider_http_error(category: ProviderFailureCategory) -> HTTPException:
@@ -155,10 +168,22 @@ def generate_confirmed_alternatives(
 def select_confirmed_alternative(
     project_id: UUID,
     request: Request,
-    options: SelectAlternativeOptions,
+    payload: SelectAlternativeRequest,
     user: CurrentUserDependency,
 ) -> dict[str, object]:
     require_project_owner(project_service(request), project_id, user)
+    try:
+        document = PlanDocument.model_validate_json(
+            json.dumps(payload.plan_document, sort_keys=True, separators=(",", ":"))
+        )
+        options = SelectAlternativeOptions(
+            draft_id=payload.draft_id,
+            candidate_run_hash=payload.candidate_run_hash,
+            candidate_id=payload.candidate_id,
+            plan_document=document,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     user_id = user.user_id
     billing_repository = create_billing_repository()
     projects = project_service(request)
