@@ -22,6 +22,34 @@ identified isolated staging deployment with retained, sanitized evidence.
 Configuration review, local fixtures, or a successful setup step is not
 `PASS_LIVE`.
 
+Before loading credentials or allowing egress, run the offline-only preflight:
+
+```powershell
+python scripts/check-phase29e-staging-preflight.py
+```
+
+It inspects only named configuration entries and local storage paths, emits a
+redacted JSON report, performs no network/database/provider call, and can report
+at most `PASS_LOCAL`. Missing credentials are expected to report
+`BLOCKED_CREDENTIALS`. Use
+`docs/exec-plans/templates/phase29e-staging-evidence.json` for the later live
+evidence record; its gates intentionally start blocked.
+
+The preflight proves configuration structure only. It does not prove that a
+target is isolated staging, that two identities are distinct, that configured
+paths are approved deployment/backup/restore roots, or that any service works.
+Those remain human/live gates. Reviewers must validate the evidence document
+with `validate_staging_evidence` before accepting any `PASS_LIVE` entry; the
+validator requires qualification identity, reviewer/operator, timestamp,
+redacted command, exit status, artifact path, and artifact digest evidence and
+keeps payments human-blocked.
+
+Validate the evidence structure without printing its contents:
+
+```powershell
+python scripts/validate-phase29e-staging-evidence.py <evidence-json-path>
+```
+
 PhonePe and Razorpay must remain disabled. Do not request or load payment
 credentials. Do not invoke checkout, status, callback, webhook, reconciliation,
 capture, refund, or other provider paths. The development billing bypass is
@@ -210,8 +238,9 @@ Run these steps serially. Record a status for each gate using only
    payments, disabled development bypass, and an empty disposable restore
    target. Stop if any identity is ambiguous.
 2. **Configuration preflight, no provider request.** Start the deployment and
-   inspect only redacted readiness/configuration output. Verify exact host/CORS,
-   hybrid provider routing, timeouts, storage roots, and database identity.
+   run `python scripts/check-phase29e-staging-preflight.py`, then inspect only
+   redacted readiness/configuration output. Verify exact host/CORS, hybrid
+   provider routing, timeouts, storage roots, and database identity.
    Do not run `pnpm phase25:launch`: that production launch gate intentionally
    rejects disabled payments and is outside this non-payment qualification.
 3. **PostgreSQL/TLS inspection, read-only.** Verify TLS certificate validation,
