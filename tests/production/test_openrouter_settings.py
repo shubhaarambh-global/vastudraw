@@ -5,7 +5,11 @@ from pathlib import Path
 import pytest
 from tests.production.test_settings import base_environment
 
-from ai_vastu.openrouter_http import FALLBACK_REASONING_MODEL, PRIMARY_ARCHITECTURAL_MODEL
+from ai_vastu.nvidia_nim_http import (
+    NVIDIA_NIM_API_BASE,
+    PRIMARY_REASONING_MODEL,
+    VISION_PLAN_MODEL,
+)
 from ai_vastu.production.settings import (
     ProductionConfigurationError,
     load_production_settings,
@@ -16,26 +20,15 @@ def _environment(tmp_path: Path) -> dict[str, str]:
     return base_environment(tmp_path)
 
 
-def test_production_settings_accept_pinned_hybrid_stack(
-    tmp_path: Path,
-) -> None:
+def test_production_settings_accept_pinned_nvidia_nim_stack(tmp_path: Path) -> None:
     settings = load_production_settings(_environment(tmp_path))
 
-    assert settings.requirements_provider == "openrouter"
-    assert settings.openrouter_primary_model == PRIMARY_ARCHITECTURAL_MODEL
-    assert settings.openrouter_fallback_model == FALLBACK_REASONING_MODEL
-    assert settings.plan_recognition_provider == "gemini"
-    assert settings.plan_recognition_model == "gemini-3.1-flash-lite"
-    assert settings.openai_model is None
-    assert settings.gemini_model == "gemini-3.1-flash-lite"
-
-
-def test_production_settings_reject_paid_model_substitution(tmp_path: Path) -> None:
-    env = _environment(tmp_path)
-    env["AI_VASTU_OPENROUTER_PRIMARY_MODEL"] = "deepseek/deepseek-v4-flash-0731"
-
-    with pytest.raises(ProductionConfigurationError):
-        load_production_settings(env)
+    assert settings.requirements_provider == "nvidia_nim"
+    assert settings.nvidia_base_url == NVIDIA_NIM_API_BASE
+    assert settings.nvidia_primary_model == PRIMARY_REASONING_MODEL
+    assert settings.nvidia_vision_model == VISION_PLAN_MODEL
+    assert settings.plan_recognition_provider == "nvidia_nim"
+    assert settings.plan_recognition_model == VISION_PLAN_MODEL
 
 
 @pytest.mark.parametrize(
@@ -46,36 +39,54 @@ def test_production_settings_reject_paid_model_substitution(tmp_path: Path) -> N
         "AI_VASTU_VASTU_PROVIDER",
         "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER",
         "AI_VASTU_REVISION_PROVIDER",
+        "AI_VASTU_PLAN_RECOGNITION_PROVIDER",
     ],
 )
-@pytest.mark.parametrize("value", ["", "fixture", "gemini"])
-def test_production_settings_reject_text_provider_drift(
+@pytest.mark.parametrize(
+    "value",
+    ["", "fixture", "openrouter", "gemini", "ollama_local"],
+)
+def test_production_settings_reject_provider_drift(
     tmp_path: Path, name: str, value: str
 ) -> None:
-    env = _environment(tmp_path)
-    env[name] = value
+    environment = _environment(tmp_path)
+    environment[name] = value
+
     with pytest.raises(ProductionConfigurationError, match=name):
-        load_production_settings(env)
+        load_production_settings(environment)
 
 
 @pytest.mark.parametrize(
-    "name", [
-        "AI_VASTU_OPENROUTER_PRIMARY_MODEL",
-        "AI_VASTU_OPENROUTER_VISION_MODEL",
-        "AI_VASTU_OPENROUTER_FALLBACK_MODEL",
-    ]
+    "name",
+    [
+        "AI_VASTU_NVIDIA_PRIMARY_MODEL",
+        "AI_VASTU_NVIDIA_VISION_MODEL",
+    ],
 )
-def test_production_settings_require_explicit_pinned_openrouter_models(
+def test_production_settings_require_explicit_pinned_nvidia_models(
     tmp_path: Path, name: str
 ) -> None:
-    env = _environment(tmp_path)
-    env.pop(name)
+    environment = _environment(tmp_path)
+    environment.pop(name)
+
     with pytest.raises(ProductionConfigurationError, match=name):
-        load_production_settings(env)
+        load_production_settings(environment)
 
 
-def test_production_settings_require_openrouter_server_secret(tmp_path: Path) -> None:
-    env = _environment(tmp_path)
-    env["OPENROUTER_API_KEY"] = " "
-    with pytest.raises(ProductionConfigurationError, match="OPENROUTER_API_KEY"):
-        load_production_settings(env)
+def test_production_settings_require_nvidia_server_secret(tmp_path: Path) -> None:
+    environment = _environment(tmp_path)
+    environment["NVIDIA_API_KEY"] = " "
+
+    with pytest.raises(ProductionConfigurationError, match="NVIDIA_API_KEY"):
+        load_production_settings(environment)
+
+
+def test_legacy_credentials_are_not_required_or_exposed(tmp_path: Path) -> None:
+    environment = _environment(tmp_path)
+    environment.pop("OPENROUTER_API_KEY", None)
+    environment.pop("GEMINI_API_KEY", None)
+
+    summary = str(load_production_settings(environment).redacted_summary()).lower()
+
+    assert "openrouter" not in summary
+    assert "gemini" not in summary

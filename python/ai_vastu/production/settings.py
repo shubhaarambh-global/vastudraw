@@ -6,21 +6,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from ai_vastu.openrouter_http import (
-    OpenRouterConfigurationError,
-    OpenRouterModelPolicy,
+from ai_vastu.nvidia_nim_http import (
+    NVIDIA_NIM_API_BASE,
+    NvidiaNimConfigurationError,
+    NvidiaNimModelPolicy,
 )
 from ai_vastu.provider_runtime import (
-    DEFAULT_GEMINI_BUDGET,
-    DEFAULT_OPENROUTER_BUDGET,
+    DEFAULT_NVIDIA_NIM_BUDGET,
     ProviderBudget,
     ProviderBudgetConfigurationError,
     load_provider_budget,
 )
 
 EXPECTED_VASTU_BUNDLE_HASH = "b11b66be61d6436fcaa43c1c5b743c0090051154146d91caf904eb5108546667"
-QUALIFIED_GEMINI_PLAN_MODEL = "gemini-3.1-flash-lite"
-_OPENROUTER_PROVIDER_SWITCHES = (
+_NVIDIA_PROVIDER_SWITCHES = (
     "AI_VASTU_REQUIREMENTS_PROVIDER",
     "AI_VASTU_ARCHITECT_PROVIDER",
     "AI_VASTU_VASTU_PROVIDER",
@@ -137,12 +136,10 @@ class ProductionSettings:
     plan_recognition_provider: str
     plan_recognition_model: str
     openai_model: str | None
-    gemini_model: str | None
-    openrouter_primary_model: str | None
-    openrouter_vision_model: str | None
-    openrouter_fallback_model: str | None
-    openrouter_budget: ProviderBudget
-    gemini_budget: ProviderBudget
+    nvidia_base_url: str
+    nvidia_primary_model: str
+    nvidia_vision_model: str
+    nvidia_budget: ProviderBudget
     rate_limit_interpret_per_hour: int
     rate_limit_generation_per_hour: int
     rate_limit_plan_analysis_per_hour: int
@@ -171,22 +168,13 @@ class ProductionSettings:
             "plan_recognition_provider": self.plan_recognition_provider,
             "plan_recognition_model": self.plan_recognition_model,
             "openai_model": self.openai_model,
-            "gemini_model": self.gemini_model,
-            "openrouter_primary_model": self.openrouter_primary_model,
-            "openrouter_vision_model": self.openrouter_vision_model,
-            "openrouter_fallback_model": self.openrouter_fallback_model,
-            "openrouter_attempt_timeout_seconds": (
-                self.openrouter_budget.attempt_timeout_seconds
-            ),
-            "openrouter_total_timeout_seconds": self.openrouter_budget.total_timeout_seconds,
-            "openrouter_retry_delay_seconds": self.openrouter_budget.retry_delay_seconds,
-            "openrouter_max_retry_after_seconds": (
-                self.openrouter_budget.max_retry_after_seconds
-            ),
-            "gemini_attempt_timeout_seconds": self.gemini_budget.attempt_timeout_seconds,
-            "gemini_total_timeout_seconds": self.gemini_budget.total_timeout_seconds,
-            "gemini_retry_delay_seconds": self.gemini_budget.retry_delay_seconds,
-            "gemini_max_retry_after_seconds": self.gemini_budget.max_retry_after_seconds,
+            "nvidia_base_url": self.nvidia_base_url,
+            "nvidia_primary_model": self.nvidia_primary_model,
+            "nvidia_vision_model": self.nvidia_vision_model,
+            "nvidia_attempt_timeout_seconds": self.nvidia_budget.attempt_timeout_seconds,
+            "nvidia_total_timeout_seconds": self.nvidia_budget.total_timeout_seconds,
+            "nvidia_retry_delay_seconds": self.nvidia_budget.retry_delay_seconds,
+            "nvidia_max_retry_after_seconds": self.nvidia_budget.max_retry_after_seconds,
             "rate_limit_interpret_per_hour": self.rate_limit_interpret_per_hour,
             "rate_limit_generation_per_hour": self.rate_limit_generation_per_hour,
             "rate_limit_plan_analysis_per_hour": self.rate_limit_plan_analysis_per_hour,
@@ -363,50 +351,31 @@ def load_production_settings(
         monthly_plan_id = _required(env, "AI_VASTU_RAZORPAY_MONTHLY_PLAN_ID")
         yearly_plan_id = _required(env, "AI_VASTU_RAZORPAY_YEARLY_PLAN_ID")
 
-    for name in _OPENROUTER_PROVIDER_SWITCHES:
-        _qualified_provider(env, name, "openrouter")
-    _qualified_provider(env, "AI_VASTU_PLAN_RECOGNITION_PROVIDER", "gemini")
-    plan_recognition_model = _required(env, "AI_VASTU_PLAN_RECOGNITION_MODEL")
-    if plan_recognition_model != QUALIFIED_GEMINI_PLAN_MODEL:
-        raise ProductionConfigurationError(
-            f"AI_VASTU_PLAN_RECOGNITION_MODEL must be {QUALIFIED_GEMINI_PLAN_MODEL}."
-        )
-    gemini_model = _required(env, "AI_VASTU_GEMINI_MODEL")
-    if gemini_model != QUALIFIED_GEMINI_PLAN_MODEL:
-        raise ProductionConfigurationError(
-            f"AI_VASTU_GEMINI_MODEL must be {QUALIFIED_GEMINI_PLAN_MODEL}."
-        )
-    _required(env, "OPENROUTER_API_KEY")
-    _required(env, "GEMINI_API_KEY")
-
-    openai_model: str | None = None
-    openrouter_primary_model: str | None = None
-    openrouter_vision_model: str | None = None
-    openrouter_fallback_model: str | None = None
-
-    policy = OpenRouterModelPolicy(
-        primary=_required(env, "AI_VASTU_OPENROUTER_PRIMARY_MODEL"),
-        vision=_required(env, "AI_VASTU_OPENROUTER_VISION_MODEL"),
-        fallback=_required(env, "AI_VASTU_OPENROUTER_FALLBACK_MODEL"),
+    for name in _NVIDIA_PROVIDER_SWITCHES:
+        _qualified_provider(env, name, "nvidia_nim")
+    _qualified_provider(env, "AI_VASTU_PLAN_RECOGNITION_PROVIDER", "nvidia_nim")
+    _required(env, "NVIDIA_API_KEY")
+    nvidia_base_url = _https_url(
+        _required(env, "AI_VASTU_NVIDIA_BASE_URL"),
+        "AI_VASTU_NVIDIA_BASE_URL",
     )
+    if nvidia_base_url != NVIDIA_NIM_API_BASE:
+        raise ProductionConfigurationError(
+            f"AI_VASTU_NVIDIA_BASE_URL must be {NVIDIA_NIM_API_BASE}."
+        )
+
+    _required(env, "AI_VASTU_NVIDIA_PRIMARY_MODEL")
+    _required(env, "AI_VASTU_NVIDIA_VISION_MODEL")
     try:
-        policy.validate()
-    except OpenRouterConfigurationError as exc:
-        raise ProductionConfigurationError("OpenRouter model policy is invalid.") from exc
-    openrouter_primary_model = policy.primary
-    openrouter_vision_model = policy.vision
-    openrouter_fallback_model = policy.fallback
+        policy = NvidiaNimModelPolicy.from_environment(env)
+    except NvidiaNimConfigurationError as exc:
+        raise ProductionConfigurationError("NVIDIA NIM model policy is invalid.") from exc
 
     try:
-        openrouter_budget = load_provider_budget(
+        nvidia_budget = load_provider_budget(
             env,
-            prefix="AI_VASTU_OPENROUTER",
-            default=DEFAULT_OPENROUTER_BUDGET,
-        )
-        gemini_budget = load_provider_budget(
-            env,
-            prefix="AI_VASTU_GEMINI",
-            default=DEFAULT_GEMINI_BUDGET,
+            prefix="AI_VASTU_NVIDIA",
+            default=DEFAULT_NVIDIA_NIM_BUDGET,
         )
     except ProviderBudgetConfigurationError as exc:
         raise ProductionConfigurationError(
@@ -437,20 +406,18 @@ def load_production_settings(
         razorpay_webhook_secret=webhook_secret,
         razorpay_monthly_plan_id=monthly_plan_id,
         razorpay_yearly_plan_id=yearly_plan_id,
-        requirements_provider="openrouter",
-        architect_provider="openrouter",
-        vastu_provider="openrouter",
-        architectural_brain_provider="openrouter",
-        revision_provider="openrouter",
-        plan_recognition_provider="gemini",
-        plan_recognition_model=plan_recognition_model,
-        openai_model=openai_model,
-        gemini_model=gemini_model,
-        openrouter_primary_model=openrouter_primary_model,
-        openrouter_vision_model=openrouter_vision_model,
-        openrouter_fallback_model=openrouter_fallback_model,
-        openrouter_budget=openrouter_budget,
-        gemini_budget=gemini_budget,
+        requirements_provider="nvidia_nim",
+        architect_provider="nvidia_nim",
+        vastu_provider="nvidia_nim",
+        architectural_brain_provider="nvidia_nim",
+        revision_provider="nvidia_nim",
+        plan_recognition_provider="nvidia_nim",
+        plan_recognition_model=policy.vision,
+        openai_model=None,
+        nvidia_base_url=nvidia_base_url,
+        nvidia_primary_model=policy.primary,
+        nvidia_vision_model=policy.vision,
+        nvidia_budget=nvidia_budget,
         rate_limit_interpret_per_hour=_positive_int(
             env,
             "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR",

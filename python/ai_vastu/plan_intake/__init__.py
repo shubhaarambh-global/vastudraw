@@ -1,3 +1,4 @@
+from .apinex_provider import ApinexPlanRecognitionProvider
 from .audit import audit_recognized_plan, build_plan_analysis
 from .errors import (
     PlanAnalysisNotFoundError,
@@ -21,6 +22,8 @@ from .models import (
     PlanVastuAudit,
     PlanVastuRuleAudit,
 )
+from .nvidia_nim_provider import NvidiaNimPlanRecognitionProvider
+from .ollama_local_provider import OllamaLocalPlanRecognitionProvider
 from .provider import PlanRecognitionInput, PlanReferenceBlob
 from .service import (
     PlanIntakeService,
@@ -32,6 +35,9 @@ from .store import PlanAnalysisStore
 __all__ = [
     "PLAN_INTAKE_VERSION",
     "AlternatePlanEnvelope",
+    "ApinexPlanRecognitionProvider",
+    "NvidiaNimPlanRecognitionProvider",
+    "OllamaLocalPlanRecognitionProvider",
     "PlanAnalysisNotFoundError",
     "PlanAnalysisResult",
     "PlanAnalysisStore",

@@ -10,9 +10,9 @@ import httpx
 import psycopg
 import pytest
 
-from ai_vastu.openrouter_http import (
-    FALLBACK_REASONING_MODEL,
-    PRIMARY_ARCHITECTURAL_MODEL,
+from ai_vastu.nvidia_nim_http import (
+    NVIDIA_NIM_API_BASE,
+    PRIMARY_REASONING_MODEL,
     VISION_PLAN_MODEL,
 )
 from ai_vastu.production.staging_preflight import (
@@ -46,25 +46,19 @@ def _environment(tmp_path: Path) -> dict[str, str]:
         "AI_VASTU_GENERATION_UPLOAD_ROOT": str(uploads.resolve()),
         "AI_VASTU_PAYMENT_GATEWAY": "disabled",
         "AI_VASTU_DEV_BILLING_BYPASS": "0",
-        "AI_VASTU_REQUIREMENTS_PROVIDER": "openrouter",
-        "AI_VASTU_ARCHITECT_PROVIDER": "openrouter",
-        "AI_VASTU_VASTU_PROVIDER": "openrouter",
-        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER": "openrouter",
-        "AI_VASTU_REVISION_PROVIDER": "openrouter",
-        "AI_VASTU_PLAN_RECOGNITION_PROVIDER": "gemini",
-        "AI_VASTU_PLAN_RECOGNITION_MODEL": "gemini-3.1-flash-lite",
-        "AI_VASTU_GEMINI_MODEL": "gemini-3.1-flash-lite",
-        "AI_VASTU_OPENROUTER_PRIMARY_MODEL": PRIMARY_ARCHITECTURAL_MODEL,
-        "AI_VASTU_OPENROUTER_VISION_MODEL": VISION_PLAN_MODEL,
-        "AI_VASTU_OPENROUTER_FALLBACK_MODEL": FALLBACK_REASONING_MODEL,
-        "AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS": "120",
-        "AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS": "240",
-        "AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS": "0",
-        "AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS": "0",
-        "AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS": "90",
-        "AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS": "181",
-        "AI_VASTU_GEMINI_RETRY_DELAY_SECONDS": "1",
-        "AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS": "5",
+        "AI_VASTU_REQUIREMENTS_PROVIDER": "nvidia_nim",
+        "AI_VASTU_ARCHITECT_PROVIDER": "nvidia_nim",
+        "AI_VASTU_VASTU_PROVIDER": "nvidia_nim",
+        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER": "nvidia_nim",
+        "AI_VASTU_REVISION_PROVIDER": "nvidia_nim",
+        "AI_VASTU_PLAN_RECOGNITION_PROVIDER": "nvidia_nim",
+        "AI_VASTU_NVIDIA_BASE_URL": NVIDIA_NIM_API_BASE,
+        "AI_VASTU_NVIDIA_PRIMARY_MODEL": PRIMARY_REASONING_MODEL,
+        "AI_VASTU_NVIDIA_VISION_MODEL": VISION_PLAN_MODEL,
+        "AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS": "120",
+        "AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS": "240",
+        "AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS": "0",
+        "AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS": "0",
         "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR": "20",
         "AI_VASTU_RATE_LIMIT_GENERATION_PER_HOUR": "10",
         "AI_VASTU_RATE_LIMIT_PLAN_ANALYSIS_PER_HOUR": "10",
@@ -77,8 +71,7 @@ def _environment(tmp_path: Path) -> dict[str, str]:
         "NEXT_PUBLIC_AI_VASTU_AUTH_MODE": "supabase",
         "NEXT_PUBLIC_SUPABASE_URL": "https://phase29e-staging.supabase.invalid",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sentinel-publishable-key",
-        "OPENROUTER_API_KEY": "sentinel-openrouter-secret",
-        "GEMINI_API_KEY": "sentinel-gemini-secret",
+        "NVIDIA_API_KEY": "sentinel-nvidia-secret",
     }
 
 
@@ -105,8 +98,7 @@ def test_complete_structural_configuration_is_pass_local_and_redacted(
     for sentinel in (
         "sentinel-database-secret",
         "sentinel-publishable-key",
-        "sentinel-openrouter-secret",
-        "sentinel-gemini-secret",
+        "sentinel-nvidia-secret",
     ):
         assert sentinel not in serialized
 
@@ -195,8 +187,9 @@ def test_evidence_template_defaults_live_gates_to_blocked() -> None:
     assert {gate["id"] for gate in template["gates"]} == {
         "postgres_tls_migrations_grants_rls",
         "supabase_jwt_jwks_ownership_cors_rate_limit",
-        "openrouter_text_reasoning",
-        "gemini_jpg_png_pdf_recognition",
+        "nvidia_text",
+        "nvidia_vision",
+        "nvidia_nim_production_entitlement",
         "backup_database_requirements_uploads",
         "disposable_restore",
         "non_payment_end_to_end",
@@ -217,14 +210,19 @@ def test_evidence_validator_rejects_unsupported_live_claim() -> None:
         validate_staging_evidence(template)
 
 
-def test_evidence_validator_keeps_payments_human_blocked() -> None:
+def test_evidence_validator_keeps_human_action_gates_blocked() -> None:
     template_path = (
         ROOT / "docs" / "exec-plans" / "templates" / "phase29e-staging-evidence.json"
     )
     template = json.loads(template_path.read_text(encoding="utf-8"))
-    template["gates"][-1]["status"] = "PASS_LOCAL"
+    gate = next(
+        item
+        for item in template["gates"]
+        if item["id"] == "nvidia_nim_production_entitlement"
+    )
+    gate["status"] = "PASS_LOCAL"
 
-    with pytest.raises(ValueError, match="Payment live qualification"):
+    with pytest.raises(ValueError, match="must remain human-blocked"):
         validate_staging_evidence(template)
 
 

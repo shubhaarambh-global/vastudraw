@@ -36,7 +36,7 @@
       "notes": ""
     },
     {
-      "id": "openrouter_text_reasoning",
+      "id": "nvidia_text",
       "status": "BLOCKED_CREDENTIALS",
       "check_ids": [],
       "commands": [],
@@ -49,7 +49,7 @@
       "notes": ""
     },
     {
-      "id": "gemini_jpg_png_pdf_recognition",
+      "id": "nvidia_vision",
       "status": "BLOCKED_CREDENTIALS",
       "check_ids": [],
       "commands": [],
@@ -60,6 +60,20 @@
       "operator": "",
       "cleanup_result": "",
       "notes": ""
+    },
+    {
+      "id": "nvidia_nim_production_entitlement",
+      "status": "BLOCKED_HUMAN_ACTION",
+      "check_ids": [],
+      "commands": [],
+      "exit_codes": [],
+      "artifact_paths": [],
+      "artifact_sha256": [],
+      "evidence_collected_at_utc": "",
+      "operator": "",
+      "authorization_reference": "",
+      "cleanup_result": "",
+      "notes": "Hosted API Catalog qualification is development/staging evidence only."
     },
     {
       "id": "backup_database_requirements_uploads",

@@ -69,18 +69,24 @@ def read_limited_provider_response(
             )
 
     content = bytearray()
-    for chunk in response.iter_bytes():
-        if deadline is not None and monotonic() >= deadline:
-            raise ProviderRuntimeError(
-                ProviderFailureCategory.TIMEOUT,
-                provider,
-            )
-        if len(content) + len(chunk) > max_bytes:
-            raise ProviderRuntimeError(
-                ProviderFailureCategory.INVALID_RESPONSE,
-                provider,
-            )
-        content.extend(chunk)
+    try:
+        for chunk in response.iter_bytes():
+            if deadline is not None and monotonic() >= deadline:
+                raise ProviderRuntimeError(
+                    ProviderFailureCategory.TIMEOUT,
+                    provider,
+                )
+            if len(content) + len(chunk) > max_bytes:
+                raise ProviderRuntimeError(
+                    ProviderFailureCategory.INVALID_RESPONSE,
+                    provider,
+                )
+            content.extend(chunk)
+    except httpx.DecodingError:
+        raise ProviderRuntimeError(
+            ProviderFailureCategory.INVALID_RESPONSE,
+            provider,
+        ) from None
     if deadline is not None and monotonic() >= deadline:
         raise ProviderRuntimeError(
             ProviderFailureCategory.TIMEOUT,
@@ -140,6 +146,13 @@ DEFAULT_GEMINI_BUDGET = ProviderBudget(
     total_timeout_seconds=181.0,
     retry_delay_seconds=1.0,
     max_retry_after_seconds=5.0,
+)
+
+DEFAULT_NVIDIA_NIM_BUDGET = ProviderBudget(
+    attempt_timeout_seconds=120.0,
+    total_timeout_seconds=240.0,
+    retry_delay_seconds=0.0,
+    max_retry_after_seconds=0.0,
 )
 
 

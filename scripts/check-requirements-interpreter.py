@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
 from uuid import UUID
+
+from workspace_temp import workspace_temporary_directory
 
 from ai_vastu.requirements.models import ConfirmedRequirements, Direction
 from ai_vastu.requirements.providers import FixtureRequirementsProvider
@@ -12,10 +12,10 @@ from ai_vastu.requirements.store import RequirementsStore
 USER = UUID("11111111-1111-1111-1111-111111111111")
 PROJECT = UUID("22222222-2222-2222-2222-222222222222")
 
-with tempfile.TemporaryDirectory() as directory:
+with workspace_temporary_directory("requirements-check") as directory:
     service = RequirementsService(
         FixtureRequirementsProvider(),
-        RequirementsStore(Path(directory)),
+        RequirementsStore(directory),
     )
     draft = service.interpret(
         user_id=USER,

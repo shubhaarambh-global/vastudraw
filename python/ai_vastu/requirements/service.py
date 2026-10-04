@@ -8,10 +8,16 @@ from ai_vastu.provider_runtime import ProviderRuntimeError
 from .errors import RequirementsConfigurationError, RequirementsProviderError
 from .models import ConfirmedRequirements, RequirementDraft
 from .providers import (
+    ApinexRequirementsConfigurationError,
+    ApinexRequirementsProvider,
     FixtureRequirementsProvider,
     GeminiGenerateContentRequirementsProvider,
     GeminiRequirementsConfigurationError,
     InterpretationInput,
+    NvidiaNimRequirementsConfigurationError,
+    NvidiaNimRequirementsProvider,
+    OllamaLocalRequirementsConfigurationError,
+    OllamaLocalRequirementsProvider,
     OpenAIRequirementsConfigurationError,
     OpenAIResponsesRequirementsProvider,
     OpenRouterRequirementsConfigurationError,
@@ -41,10 +47,19 @@ def create_provider() -> RequirementsProvider:
             return GeminiGenerateContentRequirementsProvider.from_environment()
         if provider_name == "openrouter":
             return OpenRouterRequirementsProvider.from_environment()
+        if provider_name == "nvidia_nim":
+            return NvidiaNimRequirementsProvider.from_environment()
+        if provider_name == "ollama_local":
+            return OllamaLocalRequirementsProvider.from_environment()
+        if provider_name == "apinex":
+            return ApinexRequirementsProvider.from_environment()
     except (
         GeminiRequirementsConfigurationError,
         OpenAIRequirementsConfigurationError,
         OpenRouterRequirementsConfigurationError,
+        NvidiaNimRequirementsConfigurationError,
+        OllamaLocalRequirementsConfigurationError,
+        ApinexRequirementsConfigurationError,
     ) as exc:
         raise RequirementsConfigurationError(
             "Requirements interpretation provider is not configured."

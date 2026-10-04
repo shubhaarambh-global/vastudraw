@@ -1,7 +1,11 @@
 # Vastudraw Model Routing Policy
 
-This policy governs development agents and skills. It does not change
-Vastudraw's product runtime providers (OpenRouter and direct Gemini).
+This policy governs development agents and skills. It does not select or change
+Vastudraw's product runtime providers. The Phase 29 local-development default is
+the qualified `ollama_local` Qwen3-VL profile; APINEX is optional, explicit,
+development-only, and not qualified. NVIDIA NIM is the separately configured
+hosted staging/production-shaped profile, with production entitlement still
+blocked and no silent fallback to Ollama or APINEX.
 
 ## Required profile
 

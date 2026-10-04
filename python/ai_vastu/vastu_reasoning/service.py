@@ -17,8 +17,11 @@ from .models import (
     VastuRuleReasoning,
 )
 from .providers import (
+    ApinexVastuReasoningProvider,
     FixtureVastuReasoningProvider,
     GeminiVastuReasoningProvider,
+    NvidiaNimVastuReasoningProvider,
+    OllamaLocalVastuReasoningProvider,
     OpenAIVastuReasoningProvider,
     OpenRouterVastuReasoningProvider,
     VastuReasoningInput,
@@ -50,9 +53,16 @@ def create_vastu_reasoning_provider() -> VastuReasoningProvider:
         return OpenAIVastuReasoningProvider.from_environment()
     if name == "openrouter":
         return OpenRouterVastuReasoningProvider.from_environment()
+    if name == "nvidia_nim":
+        return NvidiaNimVastuReasoningProvider.from_environment()
+    if name == "ollama_local":
+        return OllamaLocalVastuReasoningProvider.from_environment()
+    if name == "apinex":
+        return ApinexVastuReasoningProvider.from_environment()
     raise VastuReasoningConfigurationError(
         "Unsupported AI_VASTU_VASTU_PROVIDER: "
-        f"{name or '<blank>'}. Use disabled, fixture, gemini, openai, or openrouter."
+        f"{name or '<blank>'}. Use disabled, fixture, gemini, nvidia_nim, "
+        "ollama_local, apinex, openai, or openrouter."
     )
 
 

@@ -112,6 +112,7 @@ def post_json_with_retry(
                 "POST",
                 url,
                 json=json_payload,
+                headers={"Accept-Encoding": "identity"},
                 timeout=min(active_budget.attempt_timeout_seconds, remaining),
             ) as streamed_response:
                 response = streamed_response

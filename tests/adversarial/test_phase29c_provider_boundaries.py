@@ -19,7 +19,6 @@ from ai_vastu.generation_intake import (
 from ai_vastu.openrouter_http import (
     FALLBACK_REASONING_MODEL,
     PRIMARY_ARCHITECTURAL_MODEL,
-    VISION_PLAN_MODEL,
     OpenRouterClient,
     OpenRouterModelPolicy,
     OpenRouterRequestError,
@@ -90,24 +89,24 @@ def _production_environment(tmp_path: Path) -> dict[str, str]:
         "AI_VASTU_PHONEPE_WEBHOOK_USERNAME": "offline-phonepe-webhook",
         "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD": "offline-phonepe-password",
         "AI_VASTU_PHONEPE_REDIRECT_URL": "https://app.example.com/billing",
-        "AI_VASTU_REQUIREMENTS_PROVIDER": "openrouter",
-        "AI_VASTU_ARCHITECT_PROVIDER": "openrouter",
-        "AI_VASTU_VASTU_PROVIDER": "openrouter",
-        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER": "openrouter",
-        "AI_VASTU_REVISION_PROVIDER": "openrouter",
-        "AI_VASTU_PLAN_RECOGNITION_PROVIDER": "gemini",
-        "AI_VASTU_PLAN_RECOGNITION_MODEL": "gemini-3.1-flash-lite",
-        "AI_VASTU_GEMINI_MODEL": "gemini-3.1-flash-lite",
-        "AI_VASTU_OPENROUTER_PRIMARY_MODEL": PRIMARY_ARCHITECTURAL_MODEL,
-        "AI_VASTU_OPENROUTER_VISION_MODEL": VISION_PLAN_MODEL,
-        "AI_VASTU_OPENROUTER_FALLBACK_MODEL": FALLBACK_REASONING_MODEL,
-        "OPENROUTER_API_KEY": "offline-openrouter-placeholder",
-        "GEMINI_API_KEY": "offline-gemini-placeholder",
+        "AI_VASTU_REQUIREMENTS_PROVIDER": "nvidia_nim",
+        "AI_VASTU_ARCHITECT_PROVIDER": "nvidia_nim",
+        "AI_VASTU_VASTU_PROVIDER": "nvidia_nim",
+        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER": "nvidia_nim",
+        "AI_VASTU_REVISION_PROVIDER": "nvidia_nim",
+        "AI_VASTU_PLAN_RECOGNITION_PROVIDER": "nvidia_nim",
+        "AI_VASTU_NVIDIA_BASE_URL": "https://integrate.api.nvidia.com/v1",
+        "AI_VASTU_NVIDIA_PRIMARY_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
+        "AI_VASTU_NVIDIA_VISION_MODEL": (
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+        ),
+        "NVIDIA_API_KEY": "offline-nvidia-placeholder",
     }
 
 
 def test_frontend_sources_cannot_reference_server_provider_keys() -> None:
     forbidden = (
+        "NVIDIA_API_KEY",
         "OPENROUTER_API_KEY",
         "GEMINI_API_KEY",
         "AI_VASTU_PHONEPE_CLIENT_SECRET",
@@ -435,9 +434,10 @@ def test_missing_provider_credentials_do_not_cross_fallback(
         ("AI_VASTU_REQUIREMENTS_PROVIDER", "fixture"),
         ("AI_VASTU_ARCHITECT_PROVIDER", "gemini"),
         ("AI_VASTU_PLAN_RECOGNITION_PROVIDER", "openrouter"),
-        ("AI_VASTU_PLAN_RECOGNITION_MODEL", "gemini-latest"),
-        ("OPENROUTER_API_KEY", ""),
-        ("GEMINI_API_KEY", ""),
+        ("AI_VASTU_NVIDIA_BASE_URL", "https://example.invalid/v1"),
+        ("AI_VASTU_NVIDIA_PRIMARY_MODEL", "nvidia/random-model"),
+        ("AI_VASTU_NVIDIA_VISION_MODEL", "nvidia/random-vision"),
+        ("NVIDIA_API_KEY", ""),
     ],
 )
 def test_production_rejects_dev_or_cross_provider_confusion(
@@ -456,12 +456,14 @@ def test_production_summary_never_contains_provider_credentials(tmp_path: Path) 
     environment = _production_environment(tmp_path)
     environment["OPENROUTER_API_KEY"] = f"openrouter-{SENTINEL_SECRET}"
     environment["GEMINI_API_KEY"] = f"gemini-{SENTINEL_SECRET}"
+    environment["NVIDIA_API_KEY"] = f"nvidia-{SENTINEL_SECRET}"
 
     summary = json.dumps(load_production_settings(environment).redacted_summary())
 
     assert SENTINEL_SECRET not in summary
     assert "OPENROUTER_API_KEY" not in summary
     assert "GEMINI_API_KEY" not in summary
+    assert "NVIDIA_API_KEY" not in summary
 
 
 def test_provider_runtime_failures_do_not_echo_hostile_provider_names() -> None:

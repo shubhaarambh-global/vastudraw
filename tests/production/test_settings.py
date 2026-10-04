@@ -4,16 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from ai_vastu.openrouter_http import (
-    FALLBACK_REASONING_MODEL,
-    PRIMARY_ARCHITECTURAL_MODEL,
+from ai_vastu.nvidia_nim_http import (
+    NVIDIA_NIM_API_BASE,
+    PRIMARY_REASONING_MODEL,
     VISION_PLAN_MODEL,
 )
 from ai_vastu.production.settings import (
     ProductionConfigurationError,
     load_production_settings,
 )
-from ai_vastu.provider_runtime import DEFAULT_GEMINI_BUDGET, DEFAULT_OPENROUTER_BUDGET
+from ai_vastu.provider_runtime import DEFAULT_NVIDIA_NIM_BUDGET
 
 
 def base_environment(tmp_path: Path) -> dict[str, str]:
@@ -35,27 +35,20 @@ def base_environment(tmp_path: Path) -> dict[str, str]:
         "AI_VASTU_PHONEPE_WEBHOOK_USERNAME": "phonepe-webhook-user",
         "AI_VASTU_PHONEPE_WEBHOOK_PASSWORD": "phonepe-webhook-password",
         "AI_VASTU_PHONEPE_REDIRECT_URL": "https://app.example.com/billing/return",
-        "AI_VASTU_REQUIREMENTS_PROVIDER": "openrouter",
-        "AI_VASTU_ARCHITECT_PROVIDER": "openrouter",
-        "AI_VASTU_VASTU_PROVIDER": "openrouter",
-        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER": "openrouter",
-        "AI_VASTU_REVISION_PROVIDER": "openrouter",
-        "AI_VASTU_PLAN_RECOGNITION_PROVIDER": "gemini",
-        "AI_VASTU_PLAN_RECOGNITION_MODEL": "gemini-3.1-flash-lite",
-        "AI_VASTU_GEMINI_MODEL": "gemini-3.1-flash-lite",
-        "AI_VASTU_OPENROUTER_PRIMARY_MODEL": PRIMARY_ARCHITECTURAL_MODEL,
-        "AI_VASTU_OPENROUTER_VISION_MODEL": VISION_PLAN_MODEL,
-        "AI_VASTU_OPENROUTER_FALLBACK_MODEL": FALLBACK_REASONING_MODEL,
-        "AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS": "120",
-        "AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS": "240",
-        "AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS": "0",
-        "AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS": "0",
-        "AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS": "90",
-        "AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS": "181",
-        "AI_VASTU_GEMINI_RETRY_DELAY_SECONDS": "1",
-        "AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS": "5",
-        "OPENROUTER_API_KEY": "openrouter-test-secret",
-        "GEMINI_API_KEY": "gemini-test-secret",
+        "AI_VASTU_REQUIREMENTS_PROVIDER": "nvidia_nim",
+        "AI_VASTU_ARCHITECT_PROVIDER": "nvidia_nim",
+        "AI_VASTU_VASTU_PROVIDER": "nvidia_nim",
+        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER": "nvidia_nim",
+        "AI_VASTU_REVISION_PROVIDER": "nvidia_nim",
+        "AI_VASTU_PLAN_RECOGNITION_PROVIDER": "nvidia_nim",
+        "AI_VASTU_NVIDIA_BASE_URL": NVIDIA_NIM_API_BASE,
+        "AI_VASTU_NVIDIA_PRIMARY_MODEL": PRIMARY_REASONING_MODEL,
+        "AI_VASTU_NVIDIA_VISION_MODEL": VISION_PLAN_MODEL,
+        "AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS": "120",
+        "AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS": "240",
+        "AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS": "0",
+        "AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS": "0",
+        "NVIDIA_API_KEY": "nvidia-test-secret",
     }
 
 
@@ -76,21 +69,24 @@ def test_production_settings_accept_qualified_phonepe_configuration(tmp_path: Pa
     assert settings.rate_limit_generation_per_hour == 10
     assert settings.rate_limit_plan_analysis_per_hour == 10
     assert settings.rate_limit_payment_status_per_hour == 30
-    assert settings.openrouter_budget == DEFAULT_OPENROUTER_BUDGET
-    assert settings.gemini_budget == DEFAULT_GEMINI_BUDGET
+    assert settings.nvidia_budget == DEFAULT_NVIDIA_NIM_BUDGET
+
+
+def test_production_settings_reject_inactive_nvidia_fallback(tmp_path: Path) -> None:
+    env = base_environment(tmp_path)
+    env["AI_VASTU_NVIDIA_FALLBACK_MODEL"] = "nvidia/nemotron-3.5-lightning-30b-a3b"
+
+    with pytest.raises(ProductionConfigurationError, match="model policy"):
+        load_production_settings(env)
 
 
 @pytest.mark.parametrize(
     ("name", "value"),
     [
-        ("AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS", "0"),
-        ("AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS", "119"),
-        ("AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS", "-1"),
-        ("AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS", "nan"),
-        ("AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS", "inf"),
-        ("AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS", "89"),
-        ("AI_VASTU_GEMINI_RETRY_DELAY_SECONDS", "-0.1"),
-        ("AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS", "not-a-number"),
+        ("AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS", "0"),
+        ("AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS", "119"),
+        ("AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS", "-1"),
+        ("AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS", "nan"),
     ],
 )
 def test_production_settings_reject_invalid_provider_budgets(
@@ -107,19 +103,17 @@ def test_production_settings_reject_invalid_provider_budgets(
 
 def test_production_settings_use_shared_provider_budget_defaults(tmp_path: Path) -> None:
     env = base_environment(tmp_path)
-    for prefix in ("AI_VASTU_OPENROUTER", "AI_VASTU_GEMINI"):
-        for suffix in (
+    for suffix in (
             "ATTEMPT_TIMEOUT_SECONDS",
             "TOTAL_TIMEOUT_SECONDS",
             "RETRY_DELAY_SECONDS",
             "MAX_RETRY_AFTER_SECONDS",
         ):
-            env.pop(f"{prefix}_{suffix}")
+        env.pop(f"AI_VASTU_NVIDIA_{suffix}")
 
     settings = load_production_settings(env)
 
-    assert settings.openrouter_budget == DEFAULT_OPENROUTER_BUDGET
-    assert settings.gemini_budget == DEFAULT_GEMINI_BUDGET
+    assert settings.nvidia_budget == DEFAULT_NVIDIA_NIM_BUDGET
 
 
 @pytest.mark.parametrize("mode", ["", "production", "development"])
@@ -343,15 +337,13 @@ def test_redacted_summary_excludes_secrets(tmp_path: Path) -> None:
         }
     )
     redacted = load_production_settings(env).redacted_summary()
-    assert redacted["openrouter_attempt_timeout_seconds"] == 120.0
-    assert redacted["openrouter_total_timeout_seconds"] == 240.0
-    assert redacted["gemini_attempt_timeout_seconds"] == 90.0
-    assert redacted["gemini_total_timeout_seconds"] == 181.0
+    assert redacted["nvidia_attempt_timeout_seconds"] == 120.0
+    assert redacted["nvidia_total_timeout_seconds"] == 240.0
     assert redacted["rate_limit_plan_analysis_per_hour"] == 10
     assert redacted["rate_limit_payment_status_per_hour"] == 30
     summary = str(redacted)
     for secret in (
-        "user:pass", "openrouter-test-secret", "gemini-test-secret",
+        "user:pass", "nvidia-test-secret",
         "razorpay-test-secret", "webhook-test-secret", "rzp_live_example",
         "phonepe-client-secret", "phonepe-webhook-password",
     ):

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Development-agent role and workflow routing; does not modify Vastudraw runtime AI providers.",
+  "purpose": "Development-agent role and workflow routing; does not modify product runtime providers. Local development defaults to qualified ollama_local; APINEX is optional and not qualified; NVIDIA NIM is the separate hosted staging/production-shaped profile with no silent local/APINEX fallback.",
   "required_profile": {
     "model": "gpt-5.6-sol",
     "effort": "medium",

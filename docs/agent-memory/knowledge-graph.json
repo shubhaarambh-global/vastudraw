@@ -62,20 +62,82 @@
       "id": "provider:openrouter-reasoning",
       "type": "provider",
       "title": "OpenRouter reasoning/text",
-      "status": "qualified-development",
+      "status": "legacy-inactive",
       "value": "deepseek/deepseek-v4-flash-0731:free",
       "provenance": [
-        "qualified project handoff"
+        "qualified project handoff",
+        "docs/CURRENT_HANDOFF.md (Phase 29E provider qualification - 2026-09-30)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E rotated-provider requalification - 2026-10-01)",
+        "docs/CURRENT_HANDOFF.md (Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01)"
       ]
     },
     {
       "id": "provider:gemini-vision",
       "type": "provider",
       "title": "Direct Gemini plan recognition",
-      "status": "qualified-development",
+      "status": "legacy-inactive",
       "value": "gemini-3.1-flash-lite",
       "provenance": [
-        "qualified project handoff"
+        "qualified project handoff",
+        "docs/CURRENT_HANDOFF.md (Phase 29E provider qualification - 2026-09-30): PNG/JPEG/PDF PASS_LIVE",
+        "docs/CURRENT_HANDOFF.md (Phase 29E rotated-provider requalification - 2026-10-01): current credential authentication failure",
+        "docs/CURRENT_HANDOFF.md (Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01)"
+      ]
+    },
+    {
+      "id": "provider:nvidia-nim-text",
+      "type": "provider",
+      "title": "NVIDIA NIM text and reasoning",
+      "status": "partial-live-not-qualified",
+      "value": "sole active primary nvidia/nemotron-3-ultra-550b-a55b; no automatic text fallback; nvidia/nemotron-3.5-lightning-30b-a3b is inactive and NOT_QUALIFIED_TIMEOUT; fixed base https://integrate.api.nvidia.com/v1",
+      "provenance": [
+        "docs/architecture/phase29-nvidia-nim-runtime.md",
+        "docs/CURRENT_HANDOFF.md (Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E NVIDIA live-evidence policy correction - 2026-10-01)"
+      ]
+    },
+    {
+      "id": "provider:nvidia-nim-vision",
+      "type": "provider",
+      "title": "NVIDIA NIM plan recognition",
+      "status": "partial-live-not-qualified",
+      "value": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning; direct PNG PASS_LIVE; JPEG BLOCKED_PROVIDER_UNAVAILABLE; PDF local PNG render PASS_LOCAL; rendered-PDF inference NOT_QUALIFIED",
+      "provenance": [
+        "docs/architecture/phase29-nvidia-nim-runtime.md",
+        "docs/CURRENT_HANDOFF.md (Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E NVIDIA live-evidence policy correction - 2026-10-01)"
+      ]
+    },
+    {
+      "id": "gate:nvidia-nim-production-entitlement",
+      "type": "gate",
+      "title": "NVIDIA NIM production entitlement",
+      "status": "blocked-human-action",
+      "value": "Hosted API Catalog development/staging evidence cannot qualify production; an appropriate NVIDIA AI Enterprise or production endpoint arrangement is required.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01)"
+      ]
+    },
+    {
+      "id": "provider:ollama-local",
+      "type": "provider",
+      "title": "Ollama local-development AI",
+      "status": "qualified-local-development",
+      "value": "Local-development default ollama_local at exact loopback http://127.0.0.1:11434 with qwen3-vl:8b-instruct-q4_K_M; three consecutive canonical RequirementDraft and PNG/JPEG/PDF-path PlanRecognitionDraft runs passed strict JSON, provenance, confirmation-required semantics, reference identity, and canonical content hash. One attempt, no model/provider fallback; never selected by staging or production.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29E Ollama local reproducibility requalification - 2026-10-03)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E local-development AI qualification checkpoint - 2026-10-04)"
+      ]
+    },
+    {
+      "id": "provider:apinex",
+      "type": "provider",
+      "title": "Optional APINEX development provider",
+      "status": "not-qualified-provider-http-402",
+      "value": "Optional explicit development-only provider at https://api.apinex.bond/v1 with free/gpt-6-luna. Implementation/offline tests PASS_LOCAL and endpoint/model inventory PASS_LIVE. Two latest canonical runs rejected every inference stage at provider_transport_http with HTTP 402; provenance/hash were blocked dependencies. Exact billing/quota/account cause is unknown. Staging and production reject APINEX before HTTP.",
+      "provenance": [
+        "docs/CURRENT_HANDOFF.md (Phase 29E optional APINEX development provider - 2026-10-03)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E local-development AI qualification checkpoint - 2026-10-04)"
       ]
     },
     {
@@ -124,12 +186,27 @@
       "id": "subsystem:phase29c-hybrid-ai",
       "type": "subsystem",
       "title": "Phase 29C hybrid AI production integration",
-      "status": "locally-validated-live-blocked",
-      "value": "Production requires OpenRouter for text/reasoning and direct Gemini for persisted plan recognition. Provider retries, deadlines, response sizes, errors, uploads, environment selection, and rate-limit boundaries fail closed. AI observations remain advisory. Both live provider checks are blocked by absent credentials; visual requirements compatibility routing remains unresolved.",
+      "status": "superseded",
+      "value": "Production requires OpenRouter for text/reasoning and direct Gemini for persisted plan recognition. Historical direct-Gemini plan intake passed for PNG, JPEG, and PDF, but the current rotated Gemini credential fails authentication. The canonical Phase 29C live gate also fails because OpenRouter returns request_rejected. No replacement primary was selected; Nemotron Ultra remains fallback after repeated successful standalone compatibility probes.",
       "provenance": [
         "docs/CURRENT_HANDOFF.md (Phase 29C - Hybrid AI Production Integration)",
         "pnpm validate on phase29, 2026-09-27: 830 Python, 26 web, 1 contract",
-        "commit:6b770bca1cfa88f8be55ad526d2681c155fe606a"
+        "commit:6b770bca1cfa88f8be55ad526d2681c155fe606a",
+        "docs/CURRENT_HANDOFF.md (Phase 29E provider qualification - 2026-09-30)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E rotated-provider requalification - 2026-10-01)"
+      ]
+    },
+    {
+      "id": "subsystem:phase29c-nvidia-nim",
+      "type": "subsystem",
+      "title": "Phase 29C/29E NVIDIA NIM-only AI runtime",
+      "status": "partial-live-not-qualified",
+      "value": "All six production-profile runtime switches use nvidia_nim with NVIDIA_API_KEY only. Ultra is the sole active text primary and there is no automatic cross-model fallback. One same-model retry is allowed only for unavailable/timeout within the total deadline. Plan recognition remains Nano Omni with local bounded PDF-to-PNG rendering. Manual evidence is Ultra RequirementDraft PASS_LIVE and Nano Omni PNG PASS_LIVE; Lightning timed out, JPEG was unavailable, and rendered-PDF inference is not qualified. The canonical live gate inventories the two active IDs, requires exact response-model provenance, and stops on the first failure. AI outputs remain advisory and confirmation-required. OpenRouter and Gemini adapters are legacy/inactive. Production entitlement remains human-action-blocked.",
+      "provenance": [
+        "docs/architecture/phase29-nvidia-nim-runtime.md",
+        "docs/CURRENT_HANDOFF.md (Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E NVIDIA qualification continuation - 2026-10-01)",
+        "docs/CURRENT_HANDOFF.md (Phase 29E NVIDIA live-evidence policy correction - 2026-10-01)"
       ]
     },
     {
@@ -189,13 +266,38 @@
     },
     {
       "from": "branch:phase29",
-      "rel": "uses",
+      "rel": "retains_legacy_adapter",
       "to": "provider:openrouter-reasoning"
     },
     {
       "from": "branch:phase29",
-      "rel": "uses",
+      "rel": "retains_legacy_adapter",
       "to": "provider:gemini-vision"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "uses",
+      "to": "provider:nvidia-nim-text"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "uses",
+      "to": "provider:nvidia-nim-vision"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "uses_local_development_default",
+      "to": "provider:ollama-local"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "retains_optional_development_provider",
+      "to": "provider:apinex"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "blocked_by",
+      "to": "gate:nvidia-nim-production-entitlement"
     },
     {
       "from": "branch:phase29",
@@ -226,6 +328,11 @@
       "from": "branch:phase29",
       "rel": "hardens",
       "to": "subsystem:phase29c-hybrid-ai"
+    },
+    {
+      "from": "branch:phase29",
+      "rel": "hardens",
+      "to": "subsystem:phase29c-nvidia-nim"
     },
     {
       "from": "branch:phase29",

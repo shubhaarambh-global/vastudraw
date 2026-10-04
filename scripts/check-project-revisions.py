@@ -1,16 +1,15 @@
 from datetime import UTC, datetime
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from project_smoke_fixture import PROJECT_ID, REVISION_1, REVISION_2, sample_plan
+from workspace_temp import workspace_temporary_directory
 
 from ai_vastu.projects import AppendRevisionCommand, ProjectRevisionService, SqliteProjectRepository
 
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 
 
-with TemporaryDirectory() as temporary_directory:
-    database_path = Path(temporary_directory) / "projects.sqlite3"
+with workspace_temporary_directory("projects-check") as temporary_directory:
+    database_path = temporary_directory / "projects.sqlite3"
     repository = SqliteProjectRepository(database_path)
     service = ProjectRevisionService(repository, clock=lambda: FIXED_TIME)
     project = service.create_project("Smoke Project", PROJECT_ID)

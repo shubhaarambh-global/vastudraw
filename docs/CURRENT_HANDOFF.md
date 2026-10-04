@@ -1077,3 +1077,1150 @@ Phase 29E files changed:
 
 No gate is `PASS_LIVE`. No production-qualified tag is justified. Git metadata
 remains intentionally untouched in the managed read-only sandbox.
+
+### Phase 29E staging preparation after checkpoint
+
+- Phase 29D authoritative local checkpoint: `63d7a68`.
+- Phase 29E authoritative local checkpoint:
+  `e6b0d1266d6803964255dc86c9dd66527e317486`.
+- Added an offline-only staging preflight that validates configuration shape,
+  verified-TLS intent, isolated durable roots, production-profile guards,
+  disabled payments, absent payment-provider configuration, and browser/API
+  target consistency without DNS, HTTP, database, JWKS, or provider calls.
+- The preflight output contains variable names and fixed findings only, never
+  configured values, and can report at most `PASS_LOCAL`.
+- The preflight is configuration-structure evidence only; target isolation,
+  distinct test identities, approved backup/restore roots, and service behavior
+  remain human/live gates. An evidence validator rejects unsupported
+  `PASS_LIVE` entries and keeps payments `BLOCKED_HUMAN_ACTION`.
+- Added a blocked-by-default staging evidence template covering database/auth,
+  AI, backup/restore, non-payment E2E, cleanup, and deferred payments.
+- No local Phase 29A-29E suite was rerun for this preparation. Only the new
+  focused preflight tests and targeted static checks were run.
+- Post-checkpoint preparation files:
+  - `python/ai_vastu/production/staging_preflight.py`
+  - `scripts/check-phase29e-staging-preflight.py`
+  - `scripts/validate-phase29e-staging-evidence.py`
+  - `tests/production/test_phase29e_staging_preflight.py`
+  - `docs/exec-plans/templates/phase29e-staging-evidence.json`
+  - `docs/exec-plans/active/phase29e-staging-setup.md`
+  - `docs/CURRENT_HANDOFF.md`
+- Focused preflight tests: **14 passed**.
+- Targeted Ruff: **PASS**.
+- Targeted mypy: **PASS across 4 source files**.
+- The egress tripwire forbids socket, DNS, HTTP-client, and PostgreSQL connection
+  entry points while exercising the complete structural preflight.
+- No external service or payment provider was contacted. Protected solver,
+  Vastu, geometry, canonical-unit, revision, and AI-authority contracts were
+  unchanged.
+- Live database/Supabase/OpenRouter/Gemini/backup gates remain
+  `BLOCKED_CREDENTIALS`; deployment, restore, and payment gates remain
+  `BLOCKED_HUMAN_ACTION`; no `PASS_LIVE` claim is made.
+
+### Phase 29E provider qualification - 2026-09-30
+
+Status: **DIRECT GEMINI PASS_LIVE; OPENROUTER FAIL; PHASE 29C NOT LIVE-QUALIFIED**
+
+- `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, and all Phase 29E hybrid-provider
+  switches were present. Secret values were not printed or persisted.
+- The recovered execution history contained no completed candidate request, so
+  each bounded OpenRouter candidate was submitted exactly once with the real
+  `RequirementDraft` schema and advisory/confirmation-required checks.
+- Compatibility results:
+  - `nvidia/nemotron-3-super-120b-a12b:free`: rejected after 33,813 ms;
+    OpenRouter accepted the request, but the result failed `RequirementDraft`
+    validation.
+  - `qwen/qwen3.8-27b:free`: rejected after 70,796 ms; JSON and schema parsing
+    completed, but the plot-width advisory contract was incorrect.
+  - `google/gemma-4-31b-it:free`: rejected after 1,360 ms with sanitized HTTP
+    502 / unavailable evidence.
+  - `nvidia/nemotron-3-ultra-550b-a55b:free`: `PASS_LIVE` after 114,390 ms;
+    real schema validation, unfenced JSON, advisory semantics, and required
+    confirmations passed.
+- No evidence-qualified replacement primary emerged from the three primary
+  candidates. The DeepSeek primary pin was therefore not changed. Nemotron
+  Ultra remains the pinned fallback based on its successful live probe; no
+  paid or random fallback was used.
+- The canonical `python scripts/check-phase29c-live.py` command was run exactly
+  once. Direct Gemini passed, while OpenRouter returned sanitized
+  `request_rejected`; the current primary-to-fallback path did not complete.
+  The canonical Phase 29C live gate is therefore `FAIL`, not `PASS_LIVE`.
+- A separate direct-Gemini plan-intake matrix passed exactly once per format:
+  PNG in 6,218 ms, JPEG in 7,641 ms, and PDF in 6,078 ms. Each used
+  `gemini-3.1-flash-lite`, recognized four synthetic rooms, retained reference
+  identity, and kept envelope, orientation, and room geometry confirmation-
+  required.
+- Focused provider/runtime/error-boundary pytest passed using the established
+  workspace-local `tmp_path` fixture. Initial setup attempts encountered only
+  the documented managed-Windows pytest temp ACL failure. Ruff passed, mypy
+  passed for the three affected provider/runtime modules, and `git diff
+  --check` passed with LF/CRLF notices only.
+- The previously validated OpenRouter model-unavailable fallback patch and
+  Gemini identity-content-encoding/decoding patch remain intact. No payment,
+  Supabase, deployment, CORS, backup, restore, Git-index, commit, or tag action
+  was performed.
+
+Next action: do not change the production primary without a new bounded live
+candidate that passes the full compatibility contract. Investigate the single
+canonical OpenRouter `request_rejected` result only in a separately authorized
+provider-debugging pass; do not infer Phase 29C qualification from the
+successful standalone Nemotron Ultra or Gemini evidence.
+
+### Phase 29E rotated-provider requalification - 2026-10-01
+
+Status: **FAIL - OPENROUTER REQUEST REJECTED; GEMINI AUTHENTICATION FAILED**
+
+- The rotated `OPENROUTER_API_KEY` and `GEMINI_API_KEY` were present, and all
+  seven hybrid-provider switches retained the required OpenRouter text/reasoning
+  and direct-Gemini plan-recognition routing. No credential value or derivative
+  was printed or persisted.
+- Each bounded OpenRouter model received exactly one fresh schema-realistic
+  compatibility request under the rotated credential:
+  - `nvidia/nemotron-3-super-120b-a12b:free`: rejected after 111,875 ms because
+    the response failed real `RequirementDraft` validation;
+  - `qwen/qwen3.8-27b:free`: rejected after 640 ms with HTTP 429 /
+    `rate_limited`;
+  - `google/gemma-4-31b-it:free`: rejected after 860 ms with HTTP 401 /
+    `authentication`;
+  - `nvidia/nemotron-3-ultra-550b-a55b:free`: `PASS_LIVE` after 71,437 ms with
+    unfenced JSON, real schema validation, advisory semantics, five questions,
+    three warnings, and confirmation-required observations.
+- No replacement-primary candidate qualified. The DeepSeek primary pin remains
+  unchanged, and Nemotron Ultra remains the only live-compatible pinned
+  fallback. No paid or random route was used.
+- The canonical `python scripts/check-phase29c-live.py` command was run exactly
+  once under the rotated credentials. OpenRouter returned sanitized
+  `request_rejected`; direct Gemini returned sanitized `authentication`.
+  Phase 29C remains `FAIL` and is not live-qualified.
+- The PNG/JPEG/PDF Gemini matrix was not repeated after the canonical direct-
+  Gemini call conclusively failed authentication. The 2026-09-30 media evidence
+  remains valid historical model/path evidence, but it does not qualify the
+  current rotated Gemini credential.
+- No source, model pin, test, payment, Supabase, deployment, CORS, backup,
+  restore, or Git metadata was changed by this requalification. The existing
+  OpenRouter fallback and Gemini decoding patches remain intact.
+
+Next action: verify or rotate the current Gemini credential through the approved
+secret mechanism, then run one minimal direct-Gemini call before any media
+matrix. Investigate OpenRouter's canonical `request_rejected` result in a
+separately bounded provider-debugging pass; do not promote any rejected primary
+candidate.
+
+### Phase 29C/29E NVIDIA NIM-only migration - 2026-10-01
+
+Status: **PASS_LOCAL; LIVE QUALIFICATION BLOCKED_CREDENTIALS; PRODUCTION
+ENTITLEMENT BLOCKED_HUMAN_ACTION**
+
+- The user explicitly superseded the Phase 29C hybrid provider architecture.
+  All six active runtime switches now use `nvidia_nim`; OpenRouter and direct
+  Gemini remain source-available legacy adapters but are inactive and rejected
+  by the production profile.
+- Active contract: `NVIDIA_API_KEY` and fixed base URL
+  `https://integrate.api.nvidia.com/v1`. The production/staging profile does not
+  require `OPENROUTER_API_KEY` or `GEMINI_API_KEY`.
+- Exact pins: primary `nvidia/nemotron-3.5-lightning-30b-a3b`, fallback
+  `nvidia/nemotron-3-ultra-550b-a55b`, and vision
+  `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`.
+- Added a fixed-host NVIDIA client with exact model allowlists, bounded total
+  budget and response size, sanitized authentication/rate-limit/timeout/
+  invalid-response errors, and an exact primary-to-fallback chain with no
+  random or paid routing.
+- Added NVIDIA adapters for requirements, architectural intelligence, soft
+  Vastu reasoning, Architectural Brain, revisions, and plan intake. Provider
+  identity and content hashes are application-owned. AI-derived envelope,
+  orientation, and room observations remain confirmation-required.
+- PNG and JPEG use the pinned NVIDIA vision model. PDF is rendered locally with
+  bounded `pypdfium2` page/dimension/pixel/byte/deadline limits; raw PDFs are
+  never sent to a cloud provider. `/requirements/interpret` reference files are
+  filename context only in the NVIDIA text adapter; persisted Analyze Plan is
+  the visual-recognition path.
+- Deterministic geometry, frozen Vastu, validators, PlanDocument, project/
+  revision semantics, auth/ownership, Supabase, exports, billing/payments,
+  production security boundaries, and soft wet-stack behavior were unchanged.
+- Official NVIDIA hosted catalog metadata was checked on 2026-10-01 for all
+  three exact IDs. Hosted availability does not prove Vastudraw schema
+  compatibility and does not grant production entitlement.
+
+Validation evidence:
+
+- NVIDIA client/adapters/media/plan-intake: **80 passed**.
+- Adversarial Phase 29C provider boundaries: **26 passed**.
+- Production settings/preflight/operations: **171 passed**.
+- Affected requirements, Architectural Brain/intelligence, plan intake,
+  provider runtime, soft-Vastu, and API error mapping: **153 passed**.
+- Phase 29C API provider error mapping alone: **13 passed**.
+- Complete Python suite, including both Phase 29E development E2E tests:
+  **1,047 passed** with five deprecation warnings.
+- `pnpm phase29c:check`: **PASS_LOCAL**, including local PDF rendering, factory
+  routing, secret redaction, and zero network calls.
+- Phase 29E staging preflight: **BLOCKED_CREDENTIALS** in the unloaded local
+  environment; it reports `nvidia_text` and `nvidia_vision`, not legacy live
+  gates. Payments, restore/deployment, and NVIDIA production entitlement remain
+  `BLOCKED_HUMAN_ACTION`.
+- Phase 29E evidence-template validator: **PASS_LOCAL**.
+- Phase 27 current-production gate, Phase 28 historical hybrid gate, Phase 29C
+  NVIDIA gate, Phase 29D offline gate, and the Phase 26 historical Python gates:
+  **PASS**.
+- Ruff across Python/API/tests/scripts: **PASS**. Full mypy: **PASS across 217
+  source files**. `git diff --check`: **PASS** with only existing LF/CRLF
+  notices.
+- `pnpm validate` passed Python lint, full mypy, all 1,047 Python tests,
+  contracts, frozen Vastu, deterministic solver/geometry/validation/scoring,
+  revision, web/editor (32 tests), export, intake, requirements, Phase 24/25/26,
+  billing, UI, persistence, auth, MVP, and Phase 27/28/29C/29D checks. Its
+  remaining recursive workspace tail stopped at `format:check` because the host
+  has Node 20.11.1 (the repository requires Node >=24) and pnpm child-process
+  spawn returned Windows `EPERM`; this is an environment blocker, not a passing
+  full `pnpm validate` claim.
+
+Live evidence:
+
+- `NVIDIA_API_KEY` was not visible to the process. The canonical checker made no
+  provider call and reported `BLOCKED_CREDENTIALS` for text primary, text
+  fallback, vision PNG, vision JPEG, vision PDF path, and the aggregate Phase
+  29C gate. No `PASS_LIVE` claim is made.
+- No OpenRouter, Gemini, PhonePe, or Razorpay request was made.
+- The project `.venv` does not yet contain newly declared `pypdfium2==5.13.0`;
+  a bounded pip attempt produced no output and was interrupted. Deterministic
+  tests ran with the already-installed system package. A normal dependency
+  sync is required before using the project `.venv` directly.
+- `NVIDIA_NIM_PRODUCTION_ENTITLEMENT = BLOCKED_HUMAN_ACTION` until an
+  appropriate NVIDIA AI Enterprise or production endpoint arrangement is
+  explicitly available, irrespective of any future hosted development pass.
+
+No commit, tag, Git index, payment configuration, or payment workflow was
+created or modified by this migration.
+
+### Phase 29E NVIDIA qualification continuation - 2026-10-01
+
+Status: **PASS_LOCAL; LIVE QUALIFICATION BLOCKED_CREDENTIALS; PRODUCTION
+ENTITLEMENT BLOCKED_HUMAN_ACTION**
+
+- Reverified the three exact model pins against current official NVIDIA catalog
+  evidence before application qualification. All remain advertised as hosted
+  endpoints; this is availability evidence only.
+- Added a fixed-host, bearer-authenticated, bounded `/v1/models` inventory gate
+  to the canonical NVIDIA client. The live checker now requires all three exact
+  IDs before making any completion request. Missing, aliased, malformed,
+  oversized, authentication, timeout, rate-limit, and availability failures
+  fail closed with sanitized categories.
+- Completion responses must report the exact requested model ID in NVIDIA's
+  response envelope. Missing IDs and uppercase, suffix, alias, or different-
+  model responses fail closed instead of receiving application-owned
+  provenance for a model that was not actually reported.
+- The live sequence is now inventory -> primary requirements text -> exact
+  fallback text -> PNG -> JPEG -> locally rendered PDF. It stops on the first
+  failure. Primary text and vision use the actual runtime factories, so the
+  qualification exercises the active `nvidia_nim` routing rather than only
+  directly constructed adapters.
+- Updated the two active Phase 29E operator plans to require the NVIDIA-only
+  profile and to keep OpenRouter/Gemini credentials out of the qualification
+  child process. Legacy adapters remain source-available but inactive.
+- The exact `pypdfium2==5.13.0` package is available in the system Python site
+  packages. Two bounded installation attempts into `.venv` hung without
+  download output and were interrupted. Local qualification therefore used
+  the project venv with that exact system package appended to `PYTHONPATH`; a
+  normal venv dependency sync remains required.
+- Focused NVIDIA client/adapter, provider-media, plan-intake, adversarial
+  provider-boundary, production settings/operations/preflight, and provider
+  runtime tests: **261 passed**.
+- `pnpm phase29c:check`: **PASS_LOCAL**, with real NVIDIA factory routing,
+  local PDF rendering, secret redaction, and zero network calls.
+- Ruff across Python/API/tests/scripts: **PASS**. Full mypy: **PASS across 217
+  source files**. The PDFium dependency is isolated with a narrow
+  `ignore_missing_imports` override because upstream does not publish typing
+  metadata; no other module is relaxed.
+- Repository-wide `pnpm validate` passed Ruff, full mypy, all **1,064 Python
+  tests** (five deprecation warnings), schema generation/drift, frozen Vastu,
+  constraints, planner, geometry, validation, and scoring. It then stopped at
+  `projects:check` because this managed Windows account cannot open or clean a
+  Python `TemporaryDirectory`, even when TEMP/TMP points inside the workspace.
+  The same revision surface passed within the 1,064-test suite. The remaining
+  validation tail was not reached, so this is not a full `pnpm validate` pass.
+- `git diff --check`: **PASS** with existing LF/CRLF notices only. Durable
+  memory JSON parses successfully.
+- The execution environment inherited by commands still has the six legacy
+  provider switches (`openrouter` text/reasoning and `gemini` plan recognition)
+  and does not expose `NVIDIA_API_KEY`. The canonical live checker was invoked
+  in an explicit NVIDIA-only child environment with legacy credentials removed;
+  it made zero provider calls and reported `BLOCKED_CREDENTIALS` for inventory,
+  requirements text, vision, and PDF-path qualification. No `PASS_LIVE` claim
+  is made. A future aggregate success label is explicitly scoped to
+  `REQUIREMENTS_VISION`; it does not claim live schema qualification for every
+  NVIDIA-backed advisory adapter.
+- OpenRouter, Gemini, payments, Git metadata, canonical geometry, frozen Vastu,
+  revisions, auth/ownership, and deterministic authority were not modified or
+  exercised.
+
+Next action: make `NVIDIA_API_KEY` visible to the command execution environment,
+synchronize `.venv`, and run the canonical live checker once in an explicit
+NVIDIA-only child environment. Keep NVIDIA production entitlement separately
+`BLOCKED_HUMAN_ACTION` even if every hosted development/staging probe passes.
+
+### Phase 29E NVIDIA bounded live qualification attempt - 2026-10-01
+
+Status: **BLOCKED_CREDENTIALS; NO PASS_LIVE CLAIM; PRODUCTION ENTITLEMENT
+BLOCKED_HUMAN_ACTION**
+
+- Attempt timestamp: `2026-10-01T17:21:10.7038203+05:30`.
+- The project `.venv` now imports exactly `pypdfium2==5.13.0`; the previous
+  dependency-sync blocker is resolved.
+- Before the live command, process, Windows user, and Windows machine
+  environment scopes were checked without printing any secret value. None
+  exposed a non-empty `NVIDIA_API_KEY`. The command process still inherited
+  the six legacy provider-switch values rather than the NVIDIA-only profile.
+- The canonical checker was run once with the fixed NVIDIA base URL, all three
+  exact model pins, and all six provider switches explicitly set to
+  `nvidia_nim`. `OPENROUTER_API_KEY` and `GEMINI_API_KEY` were removed from the
+  child environment before execution.
+- Guarded result, exit code `2`:
+  - model inventory: `BLOCKED_CREDENTIALS`;
+  - primary requirements text: `BLOCKED_CREDENTIALS`;
+  - exact fallback requirements text: `BLOCKED_CREDENTIALS`;
+  - vision PNG: `BLOCKED_CREDENTIALS`;
+  - vision JPEG: `BLOCKED_CREDENTIALS`;
+  - locally rendered PDF path: `BLOCKED_CREDENTIALS`;
+  - aggregate `PHASE29C NVIDIA_NIM`: `BLOCKED_CREDENTIALS`.
+- The credential guard stopped before the NVIDIA inventory request, so zero
+  NVIDIA completion or inventory calls were made. OpenRouter, Gemini, PhonePe,
+  Razorpay, deployment, database, backup, and restore paths were not called.
+- No model-specific diagnosis is applicable because no live model was reached.
+  No source, architecture, model pin, or Git metadata was changed.
+
+Next action: expose the reviewed `NVIDIA_API_KEY` to the same command execution
+environment, confirm the NVIDIA-only switches are visible there, and rerun the
+same canonical checker. Do not broaden the run or change architecture if an
+individual live model then fails; diagnose only that exact model.
+
+### Phase 29E NVIDIA live-evidence policy correction - 2026-10-01
+
+Status: **PASS_LOCAL; PARTIAL_LIVE / NOT YET QUALIFIED; PRODUCTION ENTITLEMENT
+BLOCKED_HUMAN_ACTION**
+
+This continuation records manual PowerShell evidence supplied by the human
+operator. Codex did not receive `NVIDIA_API_KEY` and made no NVIDIA, OpenRouter,
+Gemini, payment, Supabase, database, or other live-service request.
+
+Exact evidence classification:
+
+| Gate | Status |
+|---|---|
+| NVIDIA inventory | `PASS_LIVE` |
+| NVIDIA Ultra text | `PASS_LIVE` |
+| NVIDIA Lightning text | `NOT_QUALIFIED_TIMEOUT` |
+| NVIDIA Nano Omni PNG | `PASS_LIVE` |
+| NVIDIA Nano Omni JPEG | `BLOCKED_PROVIDER_UNAVAILABLE` |
+| NVIDIA Nano Omni PDF local render | `PASS_LOCAL` |
+| NVIDIA Nano Omni PDF inference | `NOT_QUALIFIED` |
+| PHASE29C NVIDIA_NIM | `PARTIAL_LIVE / NOT YET QUALIFIED` |
+| Production NVIDIA entitlement | `BLOCKED_HUMAN_ACTION` |
+
+Root cause and policy correction:
+
+- The old `NVIDIA TEXT PRIMARY` probe called the ordinary requirements factory,
+  whose policy was Lightning followed by Ultra. A Lightning failure could
+  therefore call Ultra under the primary label and only fail afterward at the
+  provenance assertion. The label did not isolate the selected primary.
+- Ultra is now the sole active text/reasoning primary:
+  `nvidia/nemotron-3-ultra-550b-a55b`. The active text chain is a singleton.
+- Lightning is retained only as historical `NOT_QUALIFIED_TIMEOUT` evidence.
+  It is excluded from the active allowlist, inventory requirement, production
+  settings, examples, runtime chain, and live completion sequence. A populated
+  legacy `AI_VASTU_NVIDIA_FALLBACK_MODEL` fails configuration closed.
+- The canonical live checker inventories only the two active IDs (Ultra and
+  Nano Omni), then probes Ultra requirements, Nano Omni PNG, Nano Omni JPEG,
+  local PDF-to-PNG rendering, and Nano Omni rendered-PDF inference. It has no
+  text-fallback probe and stops on the first failure.
+- Ultra keeps the request shape that passed the real `RequirementDraft`
+  contract: strict JSON prompting and application schema validation without the
+  Lightning-only/unsupported `response_format` request field.
+
+Retry and diagnostics:
+
+- NVIDIA hosted inference permits at most one immediate retry of the exact same
+  model, for two total attempts, only after `unavailable` or `timeout`.
+- Both attempts share the existing 240-second total deadline; every attempt is
+  capped by the remaining total budget. Deadline exhaustion stops before a
+  second call.
+- Authentication, request rejection, rate limiting, malformed/oversized output,
+  strict-JSON failure, application/schema validation failure, and returned-model
+  provenance failure are never retried. No model or provider substitution is
+  possible.
+- Qualification failures emit only fixed role, exact attempted model ID,
+  `ProviderFailureCategory`, allowlisted stage, attempt count, and a validated
+  numeric HTTP status when present. Prompts, user content, credentials,
+  authorization headers, raw response bodies, and parsed model output are not
+  emitted.
+- HTTPX exposes per-operation transport timeouts rather than an asynchronously
+  preemptible whole-request wall clock. The application total deadline remains
+  authoritative for retry admission, streaming checks, validation, and final
+  acceptance; an in-flight OS transport operation is separately bounded by the
+  120-second attempt timeout.
+- The PDF architecture is unchanged: bounded local `pypdfium2` rendering emits
+  PNG pages and raw PDF bytes never cross the provider boundary. The verified
+  renderer pass is not classified as a provider-inference pass or defect.
+
+Files changed by this continuation:
+
+- provider/policy: `python/ai_vastu/nvidia_nim_http.py`,
+  `python/ai_vastu/production/settings.py`,
+  `python/ai_vastu/production/staging_preflight.py`;
+- gates/profiles: `scripts/check-phase29c-live.py`,
+  `scripts/check-phase29c-hybrid.py`, `scripts/check-phase27-final-release.py`,
+  `.env.example`, `.env.production.example`,
+  `phase29-nvidia-nim.env.example`;
+- tests: `tests/nvidia_nim/test_http.py`,
+  `tests/nvidia_nim/test_nvidia_nim_http.py`,
+  `tests/production/test_phase29c_operations.py`,
+  `tests/production/test_settings.py`,
+  `tests/production/test_openrouter_settings.py`,
+  `tests/production/test_phase29e_staging_preflight.py`, and
+  `tests/adversarial/test_phase29c_provider_boundaries.py`;
+- operator/architecture records:
+  `docs/architecture/phase29-nvidia-nim-runtime.md`,
+  `docs/runbooks/production-launch.md`,
+  `docs/exec-plans/active/phase29c-nvidia-nim-only.md`,
+  `docs/exec-plans/active/phase29e-live-deployment-qualification.md`,
+  `docs/exec-plans/active/phase29e-staging-setup.md`,
+  `docs/agent-memory/knowledge-graph.json`, and this handoff.
+
+No change was made to `pdf_render_adapter.py`, frozen Vastu rules, deterministic
+OR-Tools geometry, canonical `PlanDocument` contracts, billing production
+security, payments, Supabase, or Git metadata.
+
+Local validation:
+
+- focused NVIDIA/provider-media/plan-intake/settings/preflight/release wiring:
+  **225 passed** after independent review added three explicit one-attempt
+  strict-JSON/provenance regression cases;
+- broader affected requirements, plan-intake, Architectural Brain,
+  architectural-intelligence, soft-Vastu, adversarial provider-boundary, API
+  error, and production suites: **385 passed**, two deprecation warnings;
+- full Python application suite before those three test-only review additions:
+  **1,072 passed**, five deprecation warnings; the final 225-test focused gate
+  passed all three additions without an implementation change;
+- `pnpm phase29c:check`: **PASS_LOCAL**, factory routing and local PDF rendering
+  exercised with zero network calls and secret redaction;
+- Ruff across `python`, `apps/api`, `tests`, and `scripts`: **PASS**;
+- mypy across `python` and `apps/api/app`: **PASS across 217 source files**;
+- `git diff --check`: **PASS**, with existing LF/CRLF notices only;
+- memory graph validation: **PASS**, 20 nodes and 17 edges;
+- `pnpm validate`: Python lint, mypy, all **1,072** Python tests, contract
+  generation/drift, frozen Vastu, constraints, planner, geometry, validation,
+  and scoring passed. The gate then stopped at `projects:check` because the
+  managed Windows account cannot open/clean its SQLite `TemporaryDirectory`,
+  including with workspace-local `TEMP/TMP`. The remaining recursive tail was
+  not reached, so this is not a full `pnpm validate` pass. Node is also
+  v20.11.1 while the repository requires Node >=24.
+
+Manual final bounded live command (run only from the operator shell that already
+holds the reviewed NVIDIA credential; the command neither reads nor prints its
+value):
+
+```powershell
+$env:AI_VASTU_REQUIREMENTS_PROVIDER = "nvidia_nim"
+$env:AI_VASTU_ARCHITECT_PROVIDER = "nvidia_nim"
+$env:AI_VASTU_VASTU_PROVIDER = "nvidia_nim"
+$env:AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER = "nvidia_nim"
+$env:AI_VASTU_REVISION_PROVIDER = "nvidia_nim"
+$env:AI_VASTU_PLAN_RECOGNITION_PROVIDER = "nvidia_nim"
+$env:AI_VASTU_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+$env:AI_VASTU_NVIDIA_PRIMARY_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+$env:AI_VASTU_NVIDIA_VISION_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+$env:AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS = "120"
+$env:AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS = "240"
+$env:AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS = "0"
+$env:AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS = "0"
+Remove-Item Env:AI_VASTU_NVIDIA_FALLBACK_MODEL -ErrorAction SilentlyContinue
+Remove-Item Env:OPENROUTER_API_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:GEMINI_API_KEY -ErrorAction SilentlyContinue
+& .\.venv\Scripts\python.exe scripts\check-phase29c-live.py
+```
+
+Do not infer overall NVIDIA or production qualification from a partial rerun.
+Every required completion stage must pass in the canonical sequence, while
+production entitlement remains independently `BLOCKED_HUMAN_ACTION`.
+
+### Phase 29E Nano Omni strict-JSON request hardening - 2026-10-02
+
+Status: **PASS_LOCAL; PARTIAL_LIVE / NOT YET QUALIFIED; PRODUCTION ENTITLEMENT
+BLOCKED_HUMAN_ACTION**
+
+Codex made no NVIDIA, OpenRouter, Gemini, payment, Supabase, database, or other
+live-service call. `NVIDIA_API_KEY` remained unavailable and was not inspected.
+
+Latest operator-supplied canonical live classification remains:
+
+| Gate | Status |
+|---|---|
+| NVIDIA model inventory | `PASS_LIVE` |
+| NVIDIA Ultra text | `PASS_LIVE` |
+| NVIDIA Nano Omni PNG | `NOT_QUALIFIED_STRICT_JSON` |
+| NVIDIA Nano Omni JPEG | `BLOCKED_PROVIDER_503` |
+| NVIDIA Nano Omni PDF local render | `PASS_LOCAL` |
+| NVIDIA Nano Omni PDF inference | `NOT_QUALIFIED` |
+| PHASE29C NVIDIA_NIM | `PARTIAL_LIVE` |
+| Production NVIDIA entitlement | `BLOCKED_HUMAN_ACTION` |
+
+Root cause and bounded correction:
+
+- The current Nano Omni plan-recognition call omitted
+  `chat_template_kwargs.enable_thinking`. NVIDIA documents reasoning as enabled
+  by default for this model; reasoning/prose could therefore precede the final
+  answer in `message.content`, which Vastudraw correctly rejected at the
+  `strict_json` stage after one attempt.
+- `NvidiaNimClient.complete_validated_json` now exposes only a dedicated
+  `disable_thinking: bool` option. Non-booleans fail before HTTP, and `True` is
+  permitted only for the exact pinned Nano Omni vision singleton chain. There
+  is no arbitrary `extra_body` or `chat_template_kwargs` mapping passthrough.
+- NVIDIA Nano Omni plan recognition explicitly opts in. The exact added request
+  field is `"chat_template_kwargs":{"enable_thinking":false}`. No secrets,
+  prompts, user content, or raw plan bytes are part of this fixed field.
+- Ultra and every default text request retain their prior body shape. No output
+  stripping, Markdown/prose cleanup, INVALID_RESPONSE retry, timeout expansion,
+  model fallback, or provider fallback was added.
+- Strict JSON parsing, `PlanRecognitionDraft` validation, returned-model
+  provenance, project/intake identity, content hashing, confirmation-required
+  normalization, sanitized diagnostics, PNG/JPEG data URIs, and bounded local
+  PDF-to-PNG rendering remain unchanged.
+
+`response_format` decision:
+
+- Current official NVIDIA Nano Omni model/API documentation establishes the
+  request-side `chat_template_kwargs.enable_thinking=false` control and shows
+  JSON prompting examples, but the hosted Nano Omni endpoint documentation
+  reviewed on 2026-10-02 does not establish support for
+  `response_format={"type":"json_object"}`. Searches within the official model
+  card, hosted endpoint page, and Nano Omni API page found no `response_format`
+  contract. Lightning behavior was not generalized to Nano Omni.
+- Consequently no Nano Omni `response_format` field was added. Strict JSON
+  remains an application prompt/parser/schema contract and fails closed.
+
+Files changed by this continuation:
+
+- `python/ai_vastu/nvidia_nim_http.py`;
+- `python/ai_vastu/plan_intake/nvidia_nim_provider.py`;
+- `tests/nvidia_nim/test_nvidia_nim_http.py`;
+- `tests/plan_intake/test_nvidia_nim_provider.py`;
+- `docs/CURRENT_HANDOFF.md`.
+
+No payment, Supabase, Vastu, deterministic geometry, `PlanDocument`, PDF
+renderer, or Git metadata file was changed by this continuation.
+
+Offline validation:
+
+- focused NVIDIA HTTP/client and plan-recognition tests: **96 passed**, one
+  existing pytest cache warning;
+- NVIDIA, plan-intake, and provider-media affected suites: **131 passed**, one
+  existing pytest cache warning;
+- independent regression review: **107 passed**, no material finding;
+- independent adversarial review: **95 passed**, no material finding;
+- `pnpm phase29c:check`: **PASS_LOCAL**, factories, bounded local PDF rendering,
+  zero network calls, and secret redaction exercised;
+- full Python suite with the established workspace-local `tmp_path` fixture:
+  **1,081 passed**, six warnings;
+- Ruff across `python`, `apps/api`, `tests`, and `scripts`: **PASS**;
+- mypy across `python` and `apps/api/app`: **PASS across 217 source files**;
+- `git diff --check`: **PASS**, with existing LF/CRLF notices only.
+
+The required `pnpm validate` wrapper was attempted with the repository venv on
+`PATH`. Ruff and mypy passed, then the wrapper's bare Windows `pytest`
+entrypoint stopped during collection with 134 `ModuleNotFoundError` errors for
+the repository-local `tests.*` package. The direct, authoritative
+`.venv\Scripts\python.exe -m pytest` invocation from the same worktree passed
+all 1,081 tests. The wrapper tail was not reached, so this is not a
+`pnpm validate` pass. Node remains v20.11.1 while the repository declares
+Node >=24.
+
+Operator rerun command (one PowerShell command; run only in the reviewed shell
+that already holds `NVIDIA_API_KEY`):
+
+```powershell
+& { $env:AI_VASTU_REQUIREMENTS_PROVIDER = "nvidia_nim"; $env:AI_VASTU_ARCHITECT_PROVIDER = "nvidia_nim"; $env:AI_VASTU_VASTU_PROVIDER = "nvidia_nim"; $env:AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER = "nvidia_nim"; $env:AI_VASTU_REVISION_PROVIDER = "nvidia_nim"; $env:AI_VASTU_PLAN_RECOGNITION_PROVIDER = "nvidia_nim"; $env:AI_VASTU_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"; $env:AI_VASTU_NVIDIA_PRIMARY_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"; $env:AI_VASTU_NVIDIA_VISION_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"; $env:AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS = "120"; $env:AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS = "240"; $env:AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS = "0"; $env:AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS = "0"; Remove-Item Env:AI_VASTU_NVIDIA_FALLBACK_MODEL -ErrorAction SilentlyContinue; Remove-Item Env:OPENROUTER_API_KEY -ErrorAction SilentlyContinue; Remove-Item Env:GEMINI_API_KEY -ErrorAction SilentlyContinue; & .\.venv\Scripts\python.exe scripts\check-phase29c-live.py }
+```
+
+Do not claim Nano Omni PNG, rendered-PDF inference, Phase29C NVIDIA NIM, or
+production NVIDIA entitlement qualified until new operator evidence satisfies
+the canonical sequence.
+
+### Phase 29E NVIDIA PNG-canonical plan intake - 2026-10-02
+
+Status: **PASS_LOCAL; PARTIAL_LIVE / NOT YET QUALIFIED; PRODUCTION ENTITLEMENT
+BLOCKED_HUMAN_ACTION**
+
+Codex made no NVIDIA, OpenRouter, Gemini, payment, Supabase, database, or other
+live-service call. `NVIDIA_API_KEY` remained unavailable and was not inspected.
+
+Latest operator-supplied canonical live evidence:
+
+| Gate | Status |
+|---|---|
+| NVIDIA model inventory | `PASS_LIVE` |
+| NVIDIA Ultra text | `PASS_LIVE` |
+| NVIDIA Nano Omni PNG with `enable_thinking=false` | `PASS_LIVE` |
+| NVIDIA Nano Omni JPEG | `FAIL unavailable`, HTTP 503 after 2 bounded attempts |
+| NVIDIA Nano Omni PDF local render | `PASS_LOCAL` |
+| NVIDIA Nano Omni PDF inference | `NOT_REACHED` in the latest legacy-sequential run |
+| PHASE29C NVIDIA_NIM | `PARTIAL_LIVE` |
+| Production NVIDIA entitlement | `BLOCKED_HUMAN_ACTION` |
+
+Root cause and provider-facing media policy:
+
+- NVIDIA officially documents JPEG/JPG and PNG support for hosted Nano Omni.
+  The repeated JPEG HTTP 503 is therefore recorded as an operational hosted-
+  endpoint observation, not as evidence that NVIDIA lacks JPEG support.
+- Vastudraw now makes NVIDIA plan-recognition raster input PNG-canonical:
+  validated PNG uploads remain byte-for-byte PNG; an actual JPG/JPEG upload is
+  decoded locally, EXIF orientation is applied, pixels are converted to RGB,
+  and a deterministic metadata-free PNG is sent to Nano Omni; PDFs continue
+  through the existing bounded local page renderer and its PNG output. The PDF
+  renderer itself was not changed.
+- User-facing JPG/JPEG support and the original reference filename/content
+  provenance remain intact. Only the provider-facing media representation is
+  normalized; no architectural geometry or inferred plan data is mutated.
+- The raster boundary permits only `image/png` and `image/jpeg`, checks exact
+  magic bytes and decoded Pillow format, requires one frame and a complete
+  decode, and fails closed for malformed, truncated, MIME-mismatched, or
+  unsupported data. Input is capped at 20 MiB, each dimension at 4,096 pixels,
+  decoded area at 16,000,000 pixels, and normalized PNG output at 12 MiB.
+  Pillow decompression-bomb warnings and errors are rejected. Errors are fixed,
+  sanitized messages and do not include filenames, image bytes, prompts,
+  secrets, or raw model responses.
+- JPEG output uses `ImageOps.exif_transpose`, RGB conversion, and Pillow PNG
+  encoding with `optimize=False` and `compress_level=9`; repeated normalization
+  of the same accepted input is byte-deterministic. Supported JPEG modes,
+  including grayscale and CMYK, normalize safely to provider-facing RGB PNG.
+- Nano Omni plan recognition still sends the fixed allowlisted request field
+  `"chat_template_kwargs":{"enable_thinking":false}`. Ultra text request bodies
+  remain unchanged. Strict JSON and `PlanRecognitionDraft` validation remain
+  fail-closed; no reasoning/prose stripping, `INVALID_RESPONSE` retry, or retry
+  expansion was added. Existing one-retry behavior for bounded transient
+  `TIMEOUT`/`UNAVAILABLE` failures remains unchanged.
+- Official Nano Omni documentation reviewed for this work still does not
+  establish hosted support for `response_format={"type":"json_object"}`.
+  Lightning behavior was not generalized, and no speculative
+  `response_format` field was added.
+
+Canonical live-checker behavior:
+
+- The local PDF-render probe runs and reports independently before credential
+  and inventory checks. Inventory remains the safety prerequisite for hosted
+  completions.
+- After inventory succeeds, Ultra text, PNG intake, actual-JPEG production
+  intake, and rendered-PDF intake each run and report independently. A JPEG
+  failure no longer prevents the PDF-path probe from running.
+- The JPEG probe begins with real JPEG bytes and calls the production
+  `PlanIntakeService`; it can report `PASS_LIVE` only after the production
+  normalizer supplies PNG to Nano Omni and strict JSON, application,
+  provenance, and content-hash validation all pass.
+- The aggregate reports `PHASE29C NVIDIA_NIM PASS_LIVE` only when every required
+  stage passes. Calls remain individually bounded and no additional retry or
+  uncontrolled provider-call loop was introduced.
+
+Windows repository-script correction:
+
+- `scripts/run-project-python.mjs` resolves the repository-local interpreter as
+  `.venv\\Scripts\\python.exe` on Windows or `.venv/bin/python` elsewhere,
+  invokes it without a shell, preserves arguments/cwd/exit status, and refuses
+  to fall back to ambient Python.
+- All Python-backed `package.json` scripts, including pytest, Ruff, mypy, phase
+  checks, and live-check entrypoints, now use that runner. No machine-specific
+  absolute path was added.
+
+Files changed by this continuation:
+
+- `package.json`;
+- `python/ai_vastu/media_validation_adapter.py`;
+- `python/ai_vastu/plan_intake/nvidia_nim_provider.py`;
+- `scripts/check-phase29c-live.py`;
+- `scripts/run-project-python.mjs` (new);
+- `tests/provider_media/test_nvidia_plan_raster.py` (new);
+- `tests/plan_intake/test_nvidia_nim_provider.py`;
+- `tests/production/test_phase29c_operations.py`;
+- `docs/CURRENT_HANDOFF.md`.
+
+No payment, Supabase, frozen Vastu, OR-Tools/deterministic geometry,
+`PlanDocument`, production billing-security, PDF-renderer, or Git metadata file
+was changed by this continuation. Contract regeneration during validation
+produced no contract diff.
+
+Offline validation:
+
+- final focused NVIDIA/media/plan-intake/checker/policy suite: **135 passed**,
+  one existing pytest cache warning;
+- affected subsystem suite before the final vendor-boundary adjustment:
+  **162 passed**; the final focused rerun includes and passes that boundary;
+- independent regression/adversarial follow-up: **132 passed**, no material
+  finding;
+- `pnpm phase29c:check`: **PASS_LOCAL**, including NVIDIA factories, bounded PDF
+  rendering, zero network calls, and secret redaction;
+- full authoritative Python suite with the established workspace-local temp
+  compatibility plugin: **1,101 passed**, six warnings;
+- Ruff: **PASS**;
+- mypy: **PASS across 217 source files**;
+- `pnpm python:lint`, `pnpm python:typecheck`, and venv-routed pytest collection:
+  **PASS**;
+- `pnpm validate` used the corrected venv runner: Ruff, mypy, all **1,101**
+  pytest tests, contract checks, frozen-Vastu checks, constraint/planner/
+  geometry/validation/scoring checks passed. It then stopped at
+  `projects:check` because this host denied SQLite access and cleanup under
+  `C:\\Users\\chint\\AppData\\Local\\Temp`; this is the known Windows temp ACL
+  limitation, so `pnpm validate` is **not an overall pass**. The environment
+  also reports Node v20.11.1 while the repository declares Node >=24.
+
+Next canonical live run: execute the single PowerShell command below only in
+the reviewed operator shell that already holds `NVIDIA_API_KEY`. Do not infer
+Phase29C or production qualification unless every independently reported stage
+passes:
+
+```powershell
+& { $env:AI_VASTU_REQUIREMENTS_PROVIDER = "nvidia_nim"; $env:AI_VASTU_ARCHITECT_PROVIDER = "nvidia_nim"; $env:AI_VASTU_VASTU_PROVIDER = "nvidia_nim"; $env:AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER = "nvidia_nim"; $env:AI_VASTU_REVISION_PROVIDER = "nvidia_nim"; $env:AI_VASTU_PLAN_RECOGNITION_PROVIDER = "nvidia_nim"; $env:AI_VASTU_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"; $env:AI_VASTU_NVIDIA_PRIMARY_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"; $env:AI_VASTU_NVIDIA_VISION_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"; $env:AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS = "120"; $env:AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS = "240"; $env:AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS = "0"; $env:AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS = "0"; Remove-Item Env:AI_VASTU_NVIDIA_FALLBACK_MODEL -ErrorAction SilentlyContinue; Remove-Item Env:OPENROUTER_API_KEY -ErrorAction SilentlyContinue; Remove-Item Env:GEMINI_API_KEY -ErrorAction SilentlyContinue; & .\.venv\Scripts\python.exe scripts\check-phase29c-live.py }
+```
+
+### Phase 29E Ollama/Qwen local development provider - 2026-10-03
+
+Status: **PASS_LOCAL for the qualified local requirements and plan-recognition
+paths; NOT PRODUCTION QUALIFIED**
+
+Provider architecture and authority:
+
+- `ollama_local` is a separate first-class provider identity. It does not
+  impersonate or overload NVIDIA, OpenAI, Gemini, or OpenRouter.
+- Thin adapters cover requirements, architectural intelligence, soft-Vastu
+  reasoning, Architectural Brain concepts, revision intent, and plan
+  recognition. The real `RequirementDraft`, advisory contracts, and
+  `PlanRecognitionDraft` schemas are sent through Ollama's native `format`
+  field. All output must be one strict JSON object and then pass the existing
+  application/Pydantic contract; there is no Markdown stripping, reasoning
+  removal, regex extraction, or repair.
+- Application-owned IDs, provider/model provenance, schema versions,
+  reference names, confirmation flags, visual observation sources, advisory
+  authority flags, and content hashes are restored after model output. AI is
+  non-authoritative for dimensions, geometry, frozen Vastu validation, and
+  solver feasibility.
+- PNG and JPEG are validated and sent as their actual raster bytes. PDF still
+  uses the existing bounded local `PdfiumPageRenderer`; only rendered PNG page
+  bytes reach Ollama. The PDF renderer, deterministic OR-Tools geometry,
+  frozen Vastu rules, canonical `PlanDocument`, hard validators, immutable
+  revision semantics, and payment/security contracts were not weakened.
+- Existing NVIDIA provider behavior and evidence remain separate and intact:
+  inventory `PASS_LIVE`, Ultra text `PASS_LIVE`, Nano Omni PNG `PASS_LIVE`,
+  Nano JPEG affected by repeated hosted 503/unavailable responses, Phase29C
+  NVIDIA `PARTIAL_LIVE`, and production NVIDIA entitlement
+  `BLOCKED_HUMAN_ACTION`.
+
+Endpoint, model, and resource policy:
+
+- exact endpoint: `http://127.0.0.1:11434`; localhost aliases, HTTPS, alternate
+  ports, and remote hosts are rejected;
+- exact model: `qwen3-vl:8b-instruct-q4_K_M`; response and inventory identity
+  must agree with the pin, contradictory inventory fields are rejected, and
+  no fallback or model download exists;
+- explicit `APP_ENV=development` is required. All six factories reject local
+  selection in staging and production before HTTP. Production settings and
+  staging preflight remain explicitly NVIDIA-only; there is no localhost
+  fallback;
+- proxy inheritance and redirects are disabled; one attempt, zero hidden
+  retries; `stream=false`; `options.temperature=0`;
+- connect 3 seconds (maximum 10), read 300 (maximum 300), total 360 (maximum
+  360), write 30 (maximum 60), pool 3 (maximum 10); the total deadline covers
+  transport, strict parsing, and application validation result acceptance;
+- request cap 48 MiB and shared response cap 2 MiB; failures are categorized
+  as unavailable, timeout, invalid response/application validation, or other
+  bounded provider categories without prompts, raw output, image bytes, or
+  transport text in exposed exception chains.
+
+Canonical local qualification evidence:
+
+- endpoint/model availability used read-only `/api/version` and `/api/tags`;
+  no model pull/download was attempted;
+- real `RequirementDraft`: schema `24A.1`, provider `ollama_local`, exact model,
+  width `9000 mm`, depth `15000 mm`, bedroom count `2`, north road, and room
+  observations including bedroom; every proposed value remained
+  confirmation-required and no value became `USER_CONFIRMED`. In the observed
+  run the model omitted floor and parking counts, so the draft correctly
+  remained not ready for automatic confirmation;
+- real PNG, actual JPEG, and PDF-to-local-PNG `PlanRecognitionDraft` paths each
+  recognized NORTH, LIVING, KITCHEN, BEDROOM, and TOILET; each preserved schema
+  `26B.5.1`, exact provider/model provenance, the original reference name,
+  confirmation-required `MODEL_INFERENCE` observations, and a valid canonical
+  content hash;
+- independently reported stages all passed: `OLLAMA ENDPOINT`, `OLLAMA MODEL`,
+  `REQUIREMENTS TEXT`, `PLAN PNG`, `PLAN JPEG`, `PLAN PDF-PATH`, `STRICT JSON`,
+  `PROVENANCE`, and `CONTENT HASH`; aggregate
+  `OLLAMA LOCAL QUALIFICATION PASS_LOCAL`;
+- architectural intelligence, soft-Vastu reasoning, Architectural Brain, and
+  revision adapters are contract-tested offline only and are not included in
+  the live `PASS_LOCAL` claim.
+
+Validation evidence:
+
+- final focused Ollama/client/adapter/media/checker/Windows-runner suite:
+  **57 passed**;
+- affected provider/requirements/plan-intake/NVIDIA/production suite before
+  final adversarial hardening: **418 passed**; independent regression review
+  additionally reported **199 passed** and **197 passed** scopes;
+- final authoritative Python suite through `pnpm python:test`: **1,163 passed**,
+  six warnings;
+- Ruff: **PASS**; mypy: **PASS across 224 source files**;
+- `pnpm phase29c:check`: **PASS_LOCAL**, zero network;
+- `pnpm ollama:local`: **PASS_LOCAL** for every required stage;
+- `git diff --check`: **PASS**, with line-ending notices only;
+- `pnpm validate`: the corrected venv/test runner passed Ruff, mypy, all
+  **1,163** Python tests, contract generation/checks, frozen-Vastu checks,
+  deterministic constraints/planner/geometry/validation/scoring, project
+  revisions, editor/API/export/generation, requirements, billing, persistence,
+  auth, and Phase 24 through Phase 29D offline gates. It then stopped at the
+  workspace `format:check` because this host runs unsupported Node v20.11.1
+  while the repository requires Node >=24, and pnpm's packaged child-process
+  spawn returned `EPERM`. A direct retry reproduced the same boundary. This is
+  not an overall `pnpm validate` pass and remains an environment blocker.
+
+Windows repository validation correction:
+
+- every Python-backed package command resolves the repository-local venv
+  interpreter without an absolute machine path and without ambient-Python
+  fallback;
+- pytest uses a repository-local, per-process fixture root on Windows, fixing
+  the prior bare-pytest package import and inaccessible `tmp_path` failures;
+- project-revision, requirements, and billing smoke scripts use the same
+  process-scoped accessible workspace temp policy. Their checks passed. No
+  tests were skipped or weakened.
+
+Files changed for this Ollama continuation:
+
+- `.env.example`, `phase29-ollama-local.env.example`, `package.json`,
+  `pytest_workspace_tmp.py`;
+- `docs/exec-plans/active/phase29e-ollama-local.md`,
+  `docs/CURRENT_HANDOFF.md`;
+- `python/ai_vastu/ollama_local_http.py`,
+  `python/ai_vastu/media_validation_adapter.py`;
+- `python/ai_vastu/requirements/providers/{__init__,ollama_local}.py`,
+  `python/ai_vastu/requirements/service.py`;
+- `python/ai_vastu/plan_intake/{__init__,service,ollama_local_provider}.py`;
+- `python/ai_vastu/architectural_intelligence/providers/{__init__,ollama_local}.py`,
+  `python/ai_vastu/architectural_intelligence/service.py`;
+- `python/ai_vastu/vastu_reasoning/providers/{__init__,ollama_local}.py`,
+  `python/ai_vastu/vastu_reasoning/service.py`;
+- `python/ai_vastu/architectural_brain/{provider,revisions,ollama_local_provider,ollama_local_revision}.py`;
+- `scripts/check-ollama-local.py`, `scripts/run-project-python.mjs`,
+  `scripts/workspace_temp.py`, `scripts/check-project-revisions.py`,
+  `scripts/check-requirements-interpreter.py`, and
+  `scripts/check-billing-entitlements.py`;
+- `tests/ollama_local/test_ollama_local_http.py`,
+  `tests/ollama_local/test_ollama_local_adapters.py`,
+  `tests/ollama_local/test_qualification_script.py`,
+  `tests/plan_intake/test_ollama_local_provider.py`,
+  `tests/production/test_openrouter_settings.py`, and
+  `tests/production/test_phase29c_operations.py`.
+
+Canonical local operator command (no credential is required or read):
+
+```powershell
+& { $env:APP_ENV = "development"; $env:AI_VASTU_REQUIREMENTS_PROVIDER = "ollama_local"; $env:AI_VASTU_ARCHITECT_PROVIDER = "ollama_local"; $env:AI_VASTU_VASTU_PROVIDER = "ollama_local"; $env:AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER = "ollama_local"; $env:AI_VASTU_REVISION_PROVIDER = "ollama_local"; $env:AI_VASTU_PLAN_RECOGNITION_PROVIDER = "ollama_local"; $env:AI_VASTU_OLLAMA_BASE_URL = "http://127.0.0.1:11434"; $env:AI_VASTU_OLLAMA_MODEL = "qwen3-vl:8b-instruct-q4_K_M"; $env:AI_VASTU_OLLAMA_CONNECT_TIMEOUT_SECONDS = "3"; $env:AI_VASTU_OLLAMA_READ_TIMEOUT_SECONDS = "300"; $env:AI_VASTU_OLLAMA_TOTAL_TIMEOUT_SECONDS = "360"; $env:AI_VASTU_OLLAMA_WRITE_TIMEOUT_SECONDS = "30"; $env:AI_VASTU_OLLAMA_POOL_TIMEOUT_SECONDS = "3"; & .\.venv\Scripts\python.exe scripts\check-ollama-local.py; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+```
+
+### Phase 29E optional APINEX development provider - 2026-10-03
+
+Status: **IMPLEMENTED_LOCAL; APINEX overall NOT_QUALIFIED**
+
+Architecture and policy:
+
+- `apinex` is an isolated first-class provider identity for optional, explicit
+  development use. It does not impersonate OpenAI/OpenRouter and does not replace
+  the qualified `ollama_local` Qwen development default.
+- All six selectors support explicit `apinex`: requirements, architectural
+  intelligence, soft-Vastu reasoning, Architectural Brain, revisions, and plan
+  recognition. Each selection requires `APP_ENV=development`; staging and
+  production fail before HTTP. Existing production/staging settings remain
+  NVIDIA-only.
+- The exact base URL is `https://api.apinex.bond/v1`; the exact model is
+  `free/gpt-6-luna`. Alternate scheme, host, path, model, fallback model, catalog
+  substitution, and returned-model mismatch fail closed.
+- The credential exists only in the operator process environment. It is not stored
+  in tracked configuration, fixtures, logs, qualification output, or exception
+  text.
+- HTTP redirects and proxy inheritance are disabled. Runtime uses one attempt and
+  no automatic retry or provider/model fallback. Defaults are connect 5 seconds,
+  read 180, total 240, write 30, and pool 5; maxima are 15, 300, 360, 60, and 15.
+  Requests are capped at 48 MiB and responses at 2 MiB.
+
+Structured and media behavior:
+
+- Schema-bearing calls send `response_format.type=json_schema`, `strict=true`, the
+  real canonical schema, `temperature=0`, and `stream=false`, plus an explicit raw
+  JSON/exact-schema/no-Markdown/no-extra-keys instruction. Provider schema signaling
+  is never trusted as validation: strict duplicate-aware JSON parsing and existing
+  Pydantic/application validation still fail closed. No Markdown stripping, regex
+  extraction, reasoning removal, coercive repair, or application bypass exists.
+- Real `RequirementDraft` application authority overwrites draft/user/project IDs,
+  prompt, references, provider, and model. Model-proposed values stay
+  confirmation-required and cannot become `USER_CONFIRMED`.
+- Real `PlanRecognitionDraft` application authority preserves schema `26B.5.1`,
+  project/intake IDs, reference names, exact provider/model, confirmation-required
+  visual observations, safe source normalization, and canonical content hashes.
+- Valid PNG and JPEG bytes are sent as matching `image_url` data URLs. PDF uses the
+  unchanged bounded local Pdfium renderer and sends only rendered PNG pages; raw PDF
+  bytes never reach APINEX.
+- Real client plans or prompts must not be sent to APINEX merely because the optional
+  development adapter exists. No APINEX privacy or retention guarantee has been
+  verified.
+
+Live-evidence boundary:
+
+- Existing operator evidence remains: endpoint/auth `PASS_LIVE`, exact model
+  inventory `PASS_LIVE`, exact text `PASS_LIVE`, structured text `PASS_LIVE`, first
+  PNG schema probe **FAIL**, and second bounded PNG structured-vision probe
+  `PASS_LIVE`.
+- JPEG, PDF-path, real `RequirementDraft`, real `PlanRecognitionDraft`, and aggregate
+  APINEX qualification remain `NOT_QUALIFIED`. Mock/unit/local validation cannot
+  promote these statuses. No APINEX live call was made by Codex.
+- The dedicated `scripts/check-apinex-live.py` gate uses synthetic data only and
+  independently reports endpoint, inventory, text, structured text, requirements,
+  PNG, JPEG, PDF-path, strict JSON, provenance, and content hash. Every stage is
+  required for aggregate `PASS_LIVE`; dependencies are reported without hiding
+  independent media results.
+
+Local validation evidence (no APINEX/cloud call):
+
+- focused APINEX client/adapter/checker tests: **51 passed**, with one
+  permission-only pytest cache warning;
+- canonical `pnpm python:test`: **1,216 passed**, six warnings; the repository
+  runner and workspace-local pytest fixture completed successfully, with no
+  fallback runner required;
+- Ruff: **PASS**; mypy: **PASS across 231 source files**;
+- `pnpm phase29c:check`: **PASS_LOCAL**, with `network_calls=false`;
+- correctly configured canonical Ollama gate: all nine stages and aggregate
+  **PASS_LOCAL**;
+- `git diff --check`: **PASS**, line-ending notices only;
+- the globally installed `pnpm.exe` still reported its known embedded Node 20.11.1
+  unsupported-engine warning, but it did not block the Python suite, Ruff, mypy,
+  or Phase 29C gates. No fallback runner, APINEX live call, or credential access
+  occurred;
+- the earlier `pnpm validate` attempt was not an overall pass because the managed
+  host failed at workspace `format:check` with `spawn EPERM`. The latest prior real
+  operator Node 24.20.0 / pnpm 10.17.1 `pnpm validate` remains **PASS end-to-end**.
+
+Files changed for APINEX:
+
+- `.env.example`, `phase29-apinex.env.example`, `package.json`;
+- `docs/exec-plans/active/phase29e-apinex-optional.md`,
+  `docs/CURRENT_HANDOFF.md`;
+- `python/ai_vastu/apinex_http.py`;
+- requirements: `providers/apinex.py`, `providers/__init__.py`, `service.py`;
+- plan intake: `apinex_provider.py`, `__init__.py`, `service.py`;
+- architectural intelligence: `providers/apinex.py`, `providers/__init__.py`,
+  `service.py`;
+- soft-Vastu reasoning: `providers/apinex.py`, `providers/__init__.py`,
+  `service.py`;
+- Architectural Brain: `apinex_provider.py`, `apinex_revision.py`, `provider.py`,
+  `revisions.py`;
+- `scripts/check-apinex-live.py`;
+- `tests/apinex/{__init__,test_apinex_http,test_adapters,test_qualification_script}.py`.
+
+Canonical APINEX operator command (run only in the reviewed shell where the
+credential is already present):
+
+```powershell
+& { & .\.venv\Scripts\python.exe scripts\check-apinex-live.py; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+```
+
+### Phase 29E Ollama local reproducibility requalification - 2026-10-03
+
+Status: **PASS_LOCAL after 3/3 consecutive complete canonical passes; NOT
+PRODUCTION QUALIFIED**
+
+The fresh Windows operator result that triggered this continuation remains
+part of the evidence: endpoint, model, requirements, JPEG, PDF-PATH, and strict
+JSON passed, while PNG surfaced only a generic `PlanIntakeProviderError` and
+the aggregate provenance/hash probes surfaced generic `RuntimeError`. That run
+was not green and the earlier one-run qualification claim was not treated as
+reproducible.
+
+Root cause and diagnosis:
+
+- PNG, JPEG, and PDF-PATH use the same model, native schema, temperature zero,
+  strict parser, application validator, and authority normalization. The PNG
+  and JPEG checker images are the same 1000x1400 RGB drawing; the accepted PNG
+  is a real 20,155-byte PNG and the accepted JPEG is a real 96,099-byte JPEG.
+  The PDF path independently renders a 21,580-byte PNG through the unchanged
+  bounded `PdfiumPageRenderer`.
+- A pre-adjustment three-run diagnostic series showed transport timeout
+  failures migrating between formats: run 1 passed PNG but timed out JPEG and
+  PDF-PATH; run 2 reproduced the operator pattern with PNG timing out while
+  JPEG and PDF-PATH passed; run 3 passed. Each failed call had
+  `category=timeout`, `stage=provider_transport_http`, and `attempts=1`.
+  Therefore this was not a deterministic PNG signature, MIME, request-schema,
+  Pydantic, normalization, provenance, reference-name, or hash defect. It was
+  variable local Qwen vision latency exceeding the prior 180-second read /
+  240-second total development budget.
+- The bounded development policy now uses a 300-second read deadline and a
+  360-second total deadline, which were already the enforced maxima. Connect
+  remains 3 seconds, write 30, pool 3, response 2 MiB, request 48 MiB, and each
+  stage still has exactly one attempt. No retry, fallback, model change,
+  permissive repair, schema relaxation, or validation bypass was added.
+- The canonical checker now recovers only sanitized Ollama category/stage,
+  timeout kind, attempt count, safe HTTP status, and at most eight allowlisted
+  Pydantic location/type pairs through a bounded exception-chain walk. The
+  exception constructor re-sanitizes even preconstructed diagnostic metadata.
+  Raw model output, prompts, image bytes/base64, credentials, validator input,
+  messages, contexts, and arbitrary field names are never printed or retained
+  in the exposed exception chain.
+- Qualification assertions now use fixed safe reason codes. `PROVENANCE` and
+  `CONTENT HASH` report `BLOCKED_DEPENDENCY missing=<stage>` when a required
+  media draft is unavailable. In the operator failure they were cascading
+  dependency failures, not independent provenance or hash defects. The final
+  aggregate still fails whenever any required stage fails or is blocked.
+
+Reproducibility evidence with the corrected policy:
+
+| Run | Endpoint | Model | Requirements | PNG | JPEG | PDF-PATH | Strict JSON | Provenance | Hash | Aggregate |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS_LOCAL |
+| 2 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS_LOCAL |
+| 3 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS_LOCAL |
+
+Validation evidence:
+
+- focused final Ollama diagnostic/client/checker/adapter tests: **48 passed**;
+- full Ollama + plan-intake + requirements regression: **142 passed**;
+- full Python suite: **1,165 passed**, six warnings;
+- independent NVIDIA/Ollama regression scope: **132 passed**;
+- Ruff: **PASS**; mypy: **PASS across 224 source files**;
+- `pnpm phase29c:check`: **PASS_LOCAL**, zero network;
+- `git diff --check`: **PASS**, with line-ending notices only;
+- repository `pnpm validate`: the latest canonical Windows Node 24.20.0 /
+  pnpm 10.17.1 operator run is **PASS end-to-end**. It was not rerun in the
+  managed Node 20 shell because that shell is below the repository's Node 24
+  requirement; the affected Python/full gates above are green after this
+  change.
+
+Files changed in this continuation:
+
+- `.env.example`;
+- `phase29-ollama-local.env.example`;
+- `docs/exec-plans/active/phase29e-ollama-local.md`;
+- `docs/CURRENT_HANDOFF.md`;
+- `python/ai_vastu/ollama_local_http.py`;
+- `scripts/check-ollama-local.py`;
+- `tests/ollama_local/test_ollama_local_http.py`;
+- `tests/ollama_local/test_ollama_local_adapters.py`;
+- `tests/ollama_local/test_qualification_script.py`.
+
+No NVIDIA/OpenRouter/Gemini call, cloud credential access, Supabase mutation,
+payment call, Git metadata mutation, frozen-Vastu change, OR-Tools geometry
+change, canonical-model weakening, JSON repair, or output extraction was made.
+
+Final canonical operator confirmation command:
+
+```powershell
+& { $env:APP_ENV = "development"; $env:AI_VASTU_REQUIREMENTS_PROVIDER = "ollama_local"; $env:AI_VASTU_ARCHITECT_PROVIDER = "ollama_local"; $env:AI_VASTU_VASTU_PROVIDER = "ollama_local"; $env:AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER = "ollama_local"; $env:AI_VASTU_REVISION_PROVIDER = "ollama_local"; $env:AI_VASTU_PLAN_RECOGNITION_PROVIDER = "ollama_local"; $env:AI_VASTU_OLLAMA_BASE_URL = "http://127.0.0.1:11434"; $env:AI_VASTU_OLLAMA_MODEL = "qwen3-vl:8b-instruct-q4_K_M"; $env:AI_VASTU_OLLAMA_CONNECT_TIMEOUT_SECONDS = "3"; $env:AI_VASTU_OLLAMA_READ_TIMEOUT_SECONDS = "300"; $env:AI_VASTU_OLLAMA_TOTAL_TIMEOUT_SECONDS = "360"; $env:AI_VASTU_OLLAMA_WRITE_TIMEOUT_SECONDS = "30"; $env:AI_VASTU_OLLAMA_POOL_TIMEOUT_SECONDS = "3"; & .\.venv\Scripts\python.exe scripts\check-ollama-local.py; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+```
+
+### Phase 29E local-development AI qualification checkpoint - 2026-10-04
+
+Status: **LOCAL OLLAMA QUALIFIED; APINEX NOT_QUALIFIED; HOSTED/PRODUCTION AI
+NOT QUALIFIED**
+
+This checkpoint freezes the verified local-development provider policy without
+making a new cloud call or changing provider runtime behavior:
+
+- `ollama_local` with `qwen3-vl:8b-instruct-q4_K_M` at the exact loopback
+  endpoint remains the local-development default. The canonical qualification
+  completed three consecutive full `PASS_LOCAL` runs.
+- The Ollama evidence covers endpoint, exact model, real `RequirementDraft`, PNG
+  and JPEG `PlanRecognitionDraft`, PDF through the existing bounded Pdfium-to-PNG
+  path, strict JSON, exact provider/model provenance, reference identity,
+  confirmation-required `MODEL_INFERENCE` semantics, and canonical content hash.
+- NVIDIA evidence remains separate and unchanged: model inventory, Ultra text,
+  and Nano Omni PNG have `PASS_LIVE` evidence, while hosted vision has also
+  experienced intermittent provider-side failures. Overall NVIDIA hosted
+  qualification remains incomplete, and production entitlement remains
+  `BLOCKED_HUMAN_ACTION`.
+- APINEX implementation and offline validation remain `PASS_LOCAL`. Historical
+  manual endpoint/catalog and limited inference evidence remains chronological,
+  but the latest canonical qualification result controls current status.
+
+The canonical APINEX operator qualification was run twice. Both runs produced:
+
+- `APINEX ENDPOINT PASS_LIVE`;
+- `APINEX MODEL INVENTORY PASS_LIVE`;
+- `APINEX TEXT`, `APINEX STRUCTURED TEXT`, `REQUIREMENTS TEXT`, `PLAN PNG`,
+  `PLAN JPEG`, `PLAN PDF-PATH`, and `STRICT JSON`: `category=request_rejected`,
+  `stage=provider_transport_http`, `attempts=1`, `http_status=402`;
+- `PROVENANCE BLOCKED_DEPENDENCY` and `CONTENT HASH BLOCKED_DEPENDENCY`;
+- aggregate `APINEX LIVE QUALIFICATION FAIL`.
+
+This proves authentication/API reachability and catalog access, while current
+inference is `BLOCKED_PROVIDER_HTTP_402`. It is not evidence of a Vastudraw
+schema, media, or provider-adapter defect. The exact billing, quota, or account
+cause is not inferred without provider evidence. APINEX remains optional,
+development-only, fail-closed, and `NOT_QUALIFIED`; it does not replace Ollama.
+No further APINEX live call is required for this checkpoint.
+
+Repository evidence frozen at this checkpoint:
+
+- focused Ollama: **48 passed**, one permission-only pytest cache warning;
+- focused APINEX: **51 passed**, one permission-only pytest cache warning;
+- affected provider/requirements/plan-intake suite through the canonical runner:
+  **418 passed, three warnings**;
+- complete Python suite: **1,216 passed, six warnings**;
+- Ruff: **PASS**;
+- mypy: **PASS across 231 source files**;
+- Phase 29C offline gate: **PASS_LOCAL**, `network_calls=false`;
+- durable memory validation: **PASS**, 22 nodes and 19 edges;
+- fresh canonical localhost Ollama qualification: endpoint, exact model,
+  requirements, PNG, JPEG, PDF-path, strict JSON, provenance, content hash, and
+  aggregate all **PASS_LOCAL**;
+- `git diff --check`: **PASS**, line-ending notices only.
+
+An initial affected-suite invocation reported 141 setup errors because it omitted
+the repository's required workspace temp-root environment. This was a harness-only
+error: the identical suite passed through the canonical repository runner with all
+418 tests green.
+
+The managed-shell `pnpm validate` rerun passed Ruff, mypy, all 1,216 Python tests,
+contracts, frozen Vastu, deterministic constraint/planner/geometry/validation/
+scoring gates, project/editor/export/intake/requirements/billing/persistence/auth
+checks, 32 web tests, and Phase 24 through Phase 29D. It then stopped at workspace
+`format:check` because the native `pnpm.exe` used embedded Node v20.11.1 and its
+child-process spawn returned Windows `EPERM`. Therefore that managed-shell rerun is
+not a complete `pnpm validate` pass.
+
+The authoritative checkpoint repository result remains the separately verified
+operator run under Node v24.20.0 and pnpm 10.17.1: `pnpm validate` **PASS**.
+
+The provider examples now express three non-overlapping profiles: explicit
+Ollama local development by default, optional explicit APINEX development use,
+and separately configured NVIDIA hosted staging/production-shaped use.
+Production settings remain NVIDIA-only and fail closed; there is no silent
+production fallback to local Ollama or APINEX. Legacy OpenRouter, direct Gemini,
+and NVIDIA qualification contracts remain retained.
+
+Exact checkpoint status:
+
+```text
+REPOSITORY
+pnpm validate                       PASS
+
+LOCAL DEVELOPMENT AI
+ollama_local / Qwen3-VL 8B Q4      PASS_LOCAL
+canonical reliability              3/3 PASS_LOCAL
+
+NVIDIA HOSTED
+separate existing partial live evidence
+production entitlement             BLOCKED_HUMAN_ACTION
+
+APINEX
+implementation/offline tests       PASS_LOCAL
+endpoint/model inventory           PASS_LIVE
+inference                          BLOCKED_PROVIDER_HTTP_402
+overall                            NOT_QUALIFIED
+
+PRODUCTION
+NOT QUALIFIED / NOT FROZEN FOR LIVE AI PROVIDERS
+```
+
+No production qualification or live-provider freeze is claimed. No NVIDIA,
+APINEX, OpenRouter, Gemini, payment, Supabase, or other cloud call was made for
+this finalization, and no credentials were requested or accessed.

@@ -14,6 +14,7 @@ dependencies = [
   "networkx==3.6.1",
   "ortools==9.15.6755",
   "Pillow==12.3.0",
+  "pypdfium2==5.13.0",
   "PyJWT[crypto]>=2.10,<3",
   "psycopg[binary,pool]>=3.2,<4",
   "pydantic>=2.11,<3",
@@ -56,3 +57,7 @@ python_version = "3.12"
 strict = true
 mypy_path = ["python", "apps/api"]
 packages = ["ai_vastu", "app"]
+
+[[tool.mypy.overrides]]
+module = ["pypdfium2", "pypdfium2.raw"]
+ignore_missing_imports = true

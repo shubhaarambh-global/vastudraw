@@ -224,7 +224,34 @@ def interpret_revision(
             base_revision_id=base_revision_id,
             request=request,
         )
-    raise RuntimeError("AI_VASTU_REVISION_PROVIDER must be deterministic, openrouter, or gemini.")
+    if provider == "nvidia_nim":
+        from .nvidia_nim_revision import interpret_revision_with_nvidia_nim
+
+        return interpret_revision_with_nvidia_nim(
+            project_id=project_id,
+            base_revision_id=base_revision_id,
+            request=request,
+        )
+    if provider == "ollama_local":
+        from .ollama_local_revision import interpret_revision_with_ollama_local
+
+        return interpret_revision_with_ollama_local(
+            project_id=project_id,
+            base_revision_id=base_revision_id,
+            request=request,
+        )
+    if provider == "apinex":
+        from .apinex_revision import interpret_revision_with_apinex
+
+        return interpret_revision_with_apinex(
+            project_id=project_id,
+            base_revision_id=base_revision_id,
+            request=request,
+        )
+    raise RuntimeError(
+        "AI_VASTU_REVISION_PROVIDER must be deterministic, openrouter, gemini, "
+        "nvidia_nim, ollama_local, or apinex."
+    )
 
 
 def _room_type(value: str) -> RoomType | None:

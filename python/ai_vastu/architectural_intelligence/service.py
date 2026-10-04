@@ -5,10 +5,13 @@ import os
 from .errors import ArchitecturalIntelligenceConfigurationError
 from .models import ArchitecturalDesignIntent
 from .providers import (
+    ApinexArchitecturalIntelligenceProvider,
     ArchitecturalIntelligenceProvider,
     ArchitecturalReasoningInput,
     FixtureArchitecturalIntelligenceProvider,
     GeminiArchitecturalIntelligenceProvider,
+    NvidiaNimArchitecturalIntelligenceProvider,
+    OllamaLocalArchitecturalIntelligenceProvider,
     OpenAIResponsesArchitecturalIntelligenceProvider,
     OpenRouterArchitecturalIntelligenceProvider,
 )
@@ -39,9 +42,16 @@ def create_architectural_intelligence_provider() -> ArchitecturalIntelligencePro
         return OpenAIResponsesArchitecturalIntelligenceProvider.from_environment()
     if provider_name == "openrouter":
         return OpenRouterArchitecturalIntelligenceProvider.from_environment()
+    if provider_name == "nvidia_nim":
+        return NvidiaNimArchitecturalIntelligenceProvider.from_environment()
+    if provider_name == "ollama_local":
+        return OllamaLocalArchitecturalIntelligenceProvider.from_environment()
+    if provider_name == "apinex":
+        return ApinexArchitecturalIntelligenceProvider.from_environment()
     raise ArchitecturalIntelligenceConfigurationError(
         "Unsupported AI_VASTU_ARCHITECT_PROVIDER: "
-        f"{provider_name or '<blank>'}. Use disabled, fixture, gemini, openai, or openrouter."
+        f"{provider_name or '<blank>'}. Use disabled, fixture, gemini, nvidia_nim, "
+        "ollama_local, apinex, openai, or openrouter."
     )
 
 

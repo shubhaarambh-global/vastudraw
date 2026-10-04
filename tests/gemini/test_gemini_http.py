@@ -42,6 +42,11 @@ class _LateChunkStream(httpx.SyncByteStream):
         yield b'{"ok":true}'
 
 
+class _MislabeledDeflateStream(httpx.SyncByteStream):
+    def __iter__(self) -> Iterator[bytes]:
+        yield b'{"not-really-deflate":true}'
+
+
 @pytest.fixture(autouse=True)
 def _clear_gemini_budget_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for suffix in (
@@ -90,6 +95,38 @@ def test_success_is_returned_without_retry_or_sleep() -> None:
     assert response.json() == {"ok": True}
     assert calls == 1
     assert clock.sleeps == []
+
+
+def test_request_requires_identity_content_encoding() -> None:
+    observed_accept_encoding: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed_accept_encoding.append(request.headers["Accept-Encoding"])
+        return httpx.Response(200, json={"ok": True})
+
+    response = _call(handler)
+
+    assert response.json() == {"ok": True}
+    assert observed_accept_encoding == ["identity"]
+
+
+def test_decode_failure_is_invalid_response_without_retry() -> None:
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            headers={"Content-Encoding": "deflate"},
+            stream=_MislabeledDeflateStream(),
+        )
+
+    with pytest.raises(ProviderRuntimeError) as captured:
+        _call(handler)
+
+    assert calls == 1
+    assert captured.value.category is ProviderFailureCategory.INVALID_RESPONSE
 
 
 def test_default_helper_budget_is_loaded_from_environment(

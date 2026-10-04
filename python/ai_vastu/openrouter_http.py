@@ -6,6 +6,7 @@ import os
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, TypeVar
 
 import httpx
@@ -47,8 +48,24 @@ class OpenRouterConfigurationError(RuntimeError):
     pass
 
 
+class OpenRouterFailureReason(StrEnum):
+    MODEL_UNAVAILABLE = "model_unavailable"
+
+
 class OpenRouterRequestError(ProviderRuntimeError):
-    def __init__(self, category: ProviderFailureCategory) -> None:
+    def __init__(
+        self,
+        category: ProviderFailureCategory,
+        *,
+        http_status: int | None = None,
+        reason: OpenRouterFailureReason | None = None,
+    ) -> None:
+        self.http_status = (
+            http_status
+            if isinstance(http_status, int) and 100 <= http_status <= 599
+            else None
+        )
+        self.reason = reason
         super().__init__(category, "openrouter")
 
 
@@ -146,6 +163,38 @@ def _status_category(status_code: int) -> ProviderFailureCategory:
     if 400 <= status_code < 500:
         return ProviderFailureCategory.REQUEST_REJECTED
     return ProviderFailureCategory.UNAVAILABLE
+
+
+def _safe_failure_reason(
+    response_bytes: bytes,
+    *,
+    model: str,
+) -> OpenRouterFailureReason | None:
+    try:
+        payload = json.loads(response_bytes)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return None
+    message = error.get("message")
+    if not isinstance(message, str):
+        return None
+    normalized = " ".join(message.lower().split())
+    normalized_model = model.lower()
+    unavailable_prefixes = (
+        f"no endpoints found for {normalized_model}",
+        f"{normalized_model} is not a valid model",
+        f"model not found: {normalized_model}",
+        f"model is unavailable: {normalized_model}",
+        f"unknown model: {normalized_model}",
+        f"model {normalized_model} does not exist",
+    )
+    if normalized.startswith(unavailable_prefixes):
+        return OpenRouterFailureReason.MODEL_UNAVAILABLE
+    return None
 
 
 def _transport_category(exc: httpx.TransportError) -> ProviderFailureCategory:
@@ -332,11 +381,39 @@ class OpenRouterClient:
 
                         if not response.is_success:
                             category = _status_category(response.status_code)
+                            reason = None
+                            if response.status_code in {400, 404}:
+                                try:
+                                    error_bytes = read_limited_provider_response(
+                                        response,
+                                        provider="openrouter",
+                                        deadline=deadline,
+                                        monotonic=self._monotonic,
+                                    )
+                                except ProviderRuntimeError as exc:
+                                    if exc.category is ProviderFailureCategory.TIMEOUT:
+                                        raise OpenRouterRequestError(
+                                            ProviderFailureCategory.TIMEOUT
+                                        ) from None
+                                else:
+                                    reason = _safe_failure_reason(
+                                        error_bytes,
+                                        model=model,
+                                    )
+                            if (
+                                reason is OpenRouterFailureReason.MODEL_UNAVAILABLE
+                                and has_fallback
+                            ):
+                                continue
                             if category in {
                                 ProviderFailureCategory.AUTHENTICATION,
                                 ProviderFailureCategory.REQUEST_REJECTED,
                             } or not has_fallback:
-                                raise OpenRouterRequestError(category)
+                                raise OpenRouterRequestError(
+                                    category,
+                                    http_status=response.status_code,
+                                    reason=reason,
+                                )
                             continue
 
                         response_bytes = read_limited_provider_response(
@@ -346,6 +423,8 @@ class OpenRouterClient:
                             monotonic=self._monotonic,
                         )
                 except ProviderRuntimeError as exc:
+                    if isinstance(exc, OpenRouterRequestError):
+                        raise
                     if (
                         has_fallback
                         and exc.category is ProviderFailureCategory.INVALID_RESPONSE

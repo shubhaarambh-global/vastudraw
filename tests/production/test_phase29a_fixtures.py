@@ -132,7 +132,7 @@ def test_invalid_model_policy_error_does_not_echo_environment_value(
     qualified_production_environment: dict[str, str],
 ) -> None:
     secret_shaped_value = "secret-shaped-invalid-model"
-    qualified_production_environment["AI_VASTU_OPENROUTER_PRIMARY_MODEL"] = (
+    qualified_production_environment["AI_VASTU_NVIDIA_PRIMARY_MODEL"] = (
         secret_shaped_value
     )
 

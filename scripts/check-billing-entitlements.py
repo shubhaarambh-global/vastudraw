@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
+
+from workspace_temp import workspace_temporary_directory
 
 from ai_vastu.billing.catalog import get_product
 from ai_vastu.billing.service import BillingService
@@ -18,8 +19,8 @@ assert get_product("project_pack_10").amount_paise == 339_900
 assert get_product("pro_monthly").amount_paise == 249_900
 assert get_product("pro_yearly").amount_paise == 2_499_900
 
-with tempfile.TemporaryDirectory() as directory:
-    repository = SqliteBillingRepository(Path(directory) / "billing.sqlite3")
+with workspace_temporary_directory("billing-check") as directory:
+    repository = SqliteBillingRepository(directory / "billing.sqlite3")
     service = BillingService(repository)
 
     assert service.register_project(user, free_project) == "free_trial_pending"

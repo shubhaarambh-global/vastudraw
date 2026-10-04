@@ -27,19 +27,13 @@ _REQUIRED_CONFIGURATION = (
     "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER",
     "AI_VASTU_REVISION_PROVIDER",
     "AI_VASTU_PLAN_RECOGNITION_PROVIDER",
-    "AI_VASTU_PLAN_RECOGNITION_MODEL",
-    "AI_VASTU_GEMINI_MODEL",
-    "AI_VASTU_OPENROUTER_PRIMARY_MODEL",
-    "AI_VASTU_OPENROUTER_VISION_MODEL",
-    "AI_VASTU_OPENROUTER_FALLBACK_MODEL",
-    "AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS",
-    "AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS",
-    "AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS",
-    "AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS",
-    "AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS",
-    "AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS",
-    "AI_VASTU_GEMINI_RETRY_DELAY_SECONDS",
-    "AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS",
+    "AI_VASTU_NVIDIA_BASE_URL",
+    "AI_VASTU_NVIDIA_PRIMARY_MODEL",
+    "AI_VASTU_NVIDIA_VISION_MODEL",
+    "AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS",
+    "AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS",
+    "AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS",
+    "AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS",
     "AI_VASTU_RATE_LIMIT_INTERPRET_PER_HOUR",
     "AI_VASTU_RATE_LIMIT_GENERATION_PER_HOUR",
     "AI_VASTU_RATE_LIMIT_PLAN_ANALYSIS_PER_HOUR",
@@ -55,8 +49,7 @@ _REQUIRED_CONFIGURATION = (
 
 _REQUIRED_CREDENTIALS = (
     "AI_VASTU_DATABASE_URL",
-    "OPENROUTER_API_KEY",
-    "GEMINI_API_KEY",
+    "NVIDIA_API_KEY",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
 )
 
@@ -87,8 +80,9 @@ _EVIDENCE_GATE_IDS = frozenset(
     {
         "postgres_tls_migrations_grants_rls",
         "supabase_jwt_jwks_ownership_cors_rate_limit",
-        "openrouter_text_reasoning",
-        "gemini_jpg_png_pdf_recognition",
+        "nvidia_text",
+        "nvidia_vision",
+        "nvidia_nim_production_entitlement",
         "backup_database_requirements_uploads",
         "disposable_restore",
         "non_payment_end_to_end",
@@ -187,8 +181,15 @@ def validate_staging_evidence(document: object) -> None:
         status = gate.get("status")
         if status not in _ALLOWED_STATUSES:
             raise ValueError("Phase 29E evidence gate status is invalid.")
-        if gate["id"] == "phonepe_razorpay_live" and status != "BLOCKED_HUMAN_ACTION":
-            raise ValueError("Payment live qualification must remain human-blocked.")
+        if gate["id"] in {
+            "phonepe_razorpay_live",
+            "disposable_restore",
+            "nvidia_nim_production_entitlement",
+        } and status != "BLOCKED_HUMAN_ACTION":
+            raise ValueError(
+                "Payment, restore, and NVIDIA production entitlement gates "
+                "must remain human-blocked."
+            )
         if status == "PASS_LIVE":
             top_level_required = (
                 "checkpoint_commit",
@@ -295,8 +296,9 @@ def evaluate_staging_preflight(environment: Mapping[str, str]) -> dict[str, Any]
         "failures": failures,
         "live_gates": {
             "database_supabase": "BLOCKED_CREDENTIALS",
-            "openrouter": "BLOCKED_CREDENTIALS",
-            "gemini": "BLOCKED_CREDENTIALS",
+            "nvidia_text": "BLOCKED_CREDENTIALS",
+            "nvidia_vision": "BLOCKED_CREDENTIALS",
+            "nvidia_nim_production_entitlement": "BLOCKED_HUMAN_ACTION",
             "backup": "BLOCKED_CREDENTIALS",
             "restore_deployment": "BLOCKED_HUMAN_ACTION",
             "payments": "BLOCKED_HUMAN_ACTION",

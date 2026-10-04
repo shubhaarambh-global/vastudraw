@@ -388,6 +388,19 @@ def create_architectural_brain_provider() -> ArchitecturalBrainProvider:
         return GeminiArchitecturalBrainProvider.from_environment()
     if name == "openrouter":
         return OpenRouterArchitecturalBrainProvider.from_environment()
+    if name == "nvidia_nim":
+        from .nvidia_nim_provider import NvidiaNimArchitecturalBrainProvider
+
+        return NvidiaNimArchitecturalBrainProvider.from_environment()
+    if name == "ollama_local":
+        from .ollama_local_provider import OllamaLocalArchitecturalBrainProvider
+
+        return OllamaLocalArchitecturalBrainProvider.from_environment()
+    if name == "apinex":
+        from .apinex_provider import ApinexArchitecturalBrainProvider
+
+        return ApinexArchitecturalBrainProvider.from_environment()
     raise ArchitecturalBrainConfigurationError(
-        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER must be fixture/deterministic/gemini/openrouter."
+        "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER must be "
+        "fixture/deterministic/gemini/openrouter/nvidia_nim/ollama_local/apinex."
     )

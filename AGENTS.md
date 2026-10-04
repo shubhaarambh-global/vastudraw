@@ -23,7 +23,12 @@ Vastudraw is an already-qualified production system. Inspect first; preserve qua
 - Project revisions remain immutable/ancestry-aware.
 - Structural engineering remains outside V1.
 - PhonePe is the launch payment direction; Razorpay stays optional/future.
-- OpenRouter handles text/reasoning; direct Gemini handles plan vision in the qualified hybrid profile.
+- The Phase 29 local-development AI default is `ollama_local` with the qualified
+  Qwen3-VL pin. APINEX is optional, explicit, development-only, and not qualified.
+- NVIDIA NIM remains the separately configured hosted staging/production-shaped
+  profile; production entitlement is still blocked. No hosted/production profile
+  may silently fall back to Ollama or APINEX.
+- OpenRouter and direct Gemini are retained legacy/inactive adapters.
 - Dev billing bypass must never work in production.
 
 ## Git safety

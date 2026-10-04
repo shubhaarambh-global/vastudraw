@@ -13,6 +13,7 @@ from ai_vastu.openrouter_http import (
     VISION_PLAN_MODEL,
     OpenRouterClient,
     OpenRouterConfigurationError,
+    OpenRouterFailureReason,
     OpenRouterModelPolicy,
     OpenRouterRequestError,
     image_url_part,
@@ -46,6 +47,11 @@ class _LateChunkStream(httpx.SyncByteStream):
     def __iter__(self) -> Iterator[bytes]:
         self._clock.now = 6.0
         yield b'{"choices":[{"message":{"content":"{\\"ok\\":true}"}}]}'
+
+
+class _MislabeledDeflateStream(httpx.SyncByteStream):
+    def __iter__(self) -> Iterator[bytes]:
+        yield b'{"error":{"message":"not compressed"}}'
 
 
 def _response(content: str) -> httpx.Response:
@@ -111,6 +117,118 @@ def test_reasoning_falls_back_only_to_approved_free_model() -> None:
         PRIMARY_ARCHITECTURAL_MODEL,
         FALLBACK_REASONING_MODEL,
     ]
+
+
+@pytest.mark.parametrize(
+    "message",
+    (
+        f"No endpoints found for {PRIMARY_ARCHITECTURAL_MODEL}.",
+        f"{PRIMARY_ARCHITECTURAL_MODEL} is not a valid model ID.",
+    ),
+)
+def test_unavailable_primary_model_uses_approved_fallback(message: str) -> None:
+    requested_models: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        model = str(json.loads(request.content)["model"])
+        requested_models.append(model)
+        if model == PRIMARY_ARCHITECTURAL_MODEL:
+            return httpx.Response(400, json={"error": {"code": 400, "message": message}})
+        return _response('{"ok": true}')
+
+    result = OpenRouterClient(
+        api_key="test-key",
+        transport=httpx.MockTransport(handler),
+    ).complete_validated_json(
+        messages=({"role": "user", "content": "return JSON"},),
+        models=OpenRouterModelPolicy().reasoning_chain,
+        validator=lambda payload, model: (payload, model),
+        temperature=0.0,
+    )
+
+    assert result == ({"ok": True}, FALLBACK_REASONING_MODEL)
+    assert requested_models == [PRIMARY_ARCHITECTURAL_MODEL, FALLBACK_REASONING_MODEL]
+
+
+def test_final_unavailable_model_exposes_only_safe_diagnostic_metadata() -> None:
+    provider_body = (
+        f"No endpoints found for {PRIMARY_ARCHITECTURAL_MODEL}; private prompt secret-key"
+    )
+
+    with pytest.raises(OpenRouterRequestError) as raised:
+        OpenRouterClient(
+            api_key="secret-key",
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(
+                    404,
+                    json={"error": {"code": 404, "message": provider_body}},
+                )
+            ),
+        ).complete_validated_json(
+            messages=({"role": "user", "content": "private prompt"},),
+            models=(PRIMARY_ARCHITECTURAL_MODEL,),
+            validator=lambda payload, _model: payload,
+            temperature=0.0,
+        )
+
+    assert raised.value.category is ProviderFailureCategory.REQUEST_REJECTED
+    assert raised.value.http_status == 404
+    assert raised.value.reason is OpenRouterFailureReason.MODEL_UNAVAILABLE
+    assert provider_body not in str(raised.value)
+    assert "secret-key" not in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    "response",
+    (
+        httpx.Response(400, text="not-json private prompt secret-key"),
+        httpx.Response(
+            400,
+            json={
+                "error": {
+                    "message": "No endpoints found for unrelated/model:free."
+                }
+            },
+        ),
+        httpx.Response(
+            400,
+            headers={"Content-Length": str(MAX_PROVIDER_RESPONSE_BYTES + 1)},
+            content=b"{}",
+        ),
+        httpx.Response(
+            400,
+            headers={"Content-Encoding": "deflate"},
+            stream=_MislabeledDeflateStream(),
+        ),
+    ),
+)
+def test_untrusted_error_payload_cannot_enable_model_fallback(
+    response: httpx.Response,
+) -> None:
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return response
+
+    with pytest.raises(OpenRouterRequestError) as raised:
+        OpenRouterClient(
+            api_key="secret-key",
+            transport=httpx.MockTransport(handler),
+        ).complete_validated_json(
+            messages=({"role": "user", "content": "private prompt"},),
+            models=OpenRouterModelPolicy().reasoning_chain,
+            validator=lambda payload, _model: payload,
+            temperature=0.0,
+        )
+
+    assert calls == 1
+    assert raised.value.category is ProviderFailureCategory.REQUEST_REJECTED
+    assert raised.value.http_status == 400
+    assert raised.value.reason is None
+    assert "private prompt" not in str(raised.value)
+    assert "secret-key" not in str(raised.value)
 
 
 def test_invalid_primary_json_triggers_free_fallback() -> None:
@@ -200,6 +318,7 @@ def test_non_retryable_status_fails_fast_and_sanitized(
 
     assert calls == 1
     assert raised.value.category is category
+    assert raised.value.http_status == status_code
     assert str(raised.value) == f"openrouter request failed ({category.value})."
     assert "secret-key" not in str(raised.value)
     assert "private prompt" not in str(raised.value)
@@ -265,6 +384,7 @@ def test_final_fallback_failure_has_typed_category(
 
     assert calls == 2
     assert raised.value.category is category
+    assert raised.value.http_status == status_code
     assert "raw provider secret" not in str(raised.value)
 
 

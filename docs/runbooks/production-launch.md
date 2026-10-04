@@ -16,10 +16,10 @@ for a PhonePe profile.
   absolute durable paths;
 - `AI_VASTU_DEV_BILLING_BYPASS` is unset or false;
 - `AI_VASTU_PAYMENT_GATEWAY` is explicit;
-- OpenRouter handles text/reasoning and direct Gemini handles plan recognition,
-  using the qualified pinned models.
-- OpenRouter and Gemini have explicit per-attempt and total deadlines. Retry
-  counts are fixed in application code and are not operator-configurable.
+- NVIDIA NIM handles text/reasoning and plan recognition through the fixed
+  hosted API Catalog base URL `https://integrate.api.nvidia.com/v1`.
+- NVIDIA NIM has explicit per-attempt and total deadlines. Its single same-model
+  transient retry count is fixed in application code and is not operator-configurable.
 - `AI_VASTU_RATE_LIMIT_PLAN_ANALYSIS_PER_HOUR` limits only `POST` requests to
   persisted plan analysis. Analysis reads and plan confirmation remain outside
   that scope.
@@ -63,35 +63,38 @@ Before public launch:
 - keep webhook processing idempotent;
 - test subscription lifecycle and webhook retries before enabling live checkout.
 
-### OpenRouter and direct Gemini
+### NVIDIA NIM
 
-- keep both API credentials server-side only;
-- use OpenRouter for requirements, architectural reasoning, Vastu reasoning,
-  Architectural Brain and revisions;
-- use direct Gemini for the persisted Analyze Plan recognition route;
-- retain the existing `/requirements/interpret` compatibility behavior: visual
-  requirements attachments use the pinned OpenRouter vision model. This is
-  separate from persisted Analyze Plan, but whether it should remain on
-  OpenRouter is an unresolved launch decision;
+- keep `NVIDIA_API_KEY` server-side only and never expose it to the web app;
+- use `nvidia/nemotron-3-ultra-550b-a55b` as the sole active primary for
+  requirements and architectural reasoning;
+- keep `nvidia/nemotron-3.5-lightning-30b-a3b` inactive and marked
+  `NOT_QUALIFIED_TIMEOUT`; do not configure it as a fallback;
+- use `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` for plan recognition;
+- render PDF pages locally to bounded images before recognition; never send raw
+  PDF bytes to NVIDIA or introduce another cloud document provider;
+- `/requirements/interpret` remains API-compatible with reference uploads, but
+  its NVIDIA text adapter uses filenames as context only and does not claim to
+  inspect file contents. Use persisted Analyze Plan for visual plan recognition;
+- keep OpenRouter and direct Gemini adapters legacy/inactive. Their credentials
+  are not part of the NVIDIA profile and production settings reject routing to
+  them;
 - retain structured schema validation and non-authoritative AI boundaries;
 - enforce application + edge rate limits and monitor cost/usage.
 
 Configure the bounded runtime values explicitly (seconds):
 
 ```text
-AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS=120
-AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS=240
-AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS=0
-AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS=0
-AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS=90
-AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS=181
-AI_VASTU_GEMINI_RETRY_DELAY_SECONDS=1
-AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS=5
+AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS=120
+AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS=240
+AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS=0
+AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS=0
 ```
 
-Do not add environment variables for attempt counts. OpenRouter may try its
-pinned primary once and its approved fallback once. Gemini may make one bounded
-retry for a transient failure and never switches provider or model.
+Do not add environment variables for attempt counts. NVIDIA NIM may retry the
+same pinned model once only after `unavailable` or `timeout`, within the same
+total deadline. It never substitutes a text or vision model and never crosses
+providers.
 
 ## Phase 29C provider evidence
 
@@ -101,8 +104,8 @@ Offline factory and synthetic-response check (no credentials or network calls):
 pnpm phase29c:check
 ```
 
-Live provider check, only after loading reviewed credentials and the exact
-hybrid provider switches:
+Live provider check, only after loading a reviewed NVIDIA credential and the
+exact NVIDIA-only provider switches:
 
 ```powershell
 pnpm phase29c:live
@@ -128,7 +131,10 @@ against a provider account or target that has not been explicitly reviewed.
    incorrect proxy trust chain can collapse users into one shared bucket.
    Schedule retention cleanup for expired `ai_vastu_rate_limit_windows` rows.
 6. Run `pnpm validate`.
-7. Run `pnpm phase29c:live` only against explicitly reviewed provider accounts.
+7. Run `pnpm phase29c:live` only against an explicitly reviewed NVIDIA account.
+   A hosted API Catalog pass qualifies development/staging only; keep
+   `NVIDIA_NIM_PRODUCTION_ENTITLEMENT = BLOCKED_HUMAN_ACTION` until an
+   appropriate NVIDIA AI Enterprise or production endpoint arrangement exists.
 8. Run `pnpm phase25:launch` only against an explicitly reviewed target. The
    command connects to PostgreSQL and writes/removes storage probes.
 9. Run staging payment/webhook and full generation smoke tests.
@@ -142,7 +148,7 @@ against a provider account or target that has not been explicitly reviewed.
 - generation success/error/latency;
 - PostgreSQL connection saturation;
 - 429 and 503 rate;
-- OpenRouter/Gemini spend and request volume;
+- NVIDIA NIM spend and request volume;
 - selected payment-gateway webhook failures/retries;
 - failed auth volume;
 - storage capacity;

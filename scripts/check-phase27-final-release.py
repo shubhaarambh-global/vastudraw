@@ -15,6 +15,7 @@ REQUIRED_FILES = (
     "PHASE26_COMPLETE.md",
     "PHASE26_OPENROUTER.md",
     "python/ai_vastu/openrouter_http.py",
+    "python/ai_vastu/nvidia_nim_http.py",
     "python/ai_vastu/production/settings.py",
     "python/ai_vastu/requirements/candidate_orchestrator.py",
     "python/ai_vastu/requirements/generation_adapter.py",
@@ -81,10 +82,37 @@ for match in re.finditer(
         )
 
 settings = (ROOT / "python/ai_vastu/production/settings.py").read_text(encoding="utf-8").lower()
-if "openrouter" not in settings or "openrouter_api_key" not in settings:
+for token in (
+    "nvidia_nim",
+    "nvidia_api_key",
+    "nvidia_nim_api_base",
+    "ai_vastu_nvidia_primary_model",
+    "ai_vastu_nvidia_vision_model",
+):
+    if token not in settings:
+        raise SystemExit(f"Production NVIDIA NIM contract is missing: {token}")
+if "openrouter_api_key" in settings or "gemini_api_key" in settings:
     raise SystemExit(
-        "Production settings are not launch-consistent with the validated OpenRouter stack."
+        "Production settings still require a legacy AI-provider credential."
     )
+
+nvidia_client = (ROOT / "python/ai_vastu/nvidia_nim_http.py").read_text(
+    encoding="utf-8"
+)
+for pin in (
+    "https://integrate.api.nvidia.com/v1",
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+):
+    if pin not in nvidia_client:
+        raise SystemExit(f"NVIDIA NIM client pin is missing: {pin}")
+
+production_env = (ROOT / ".env.production.example").read_text(encoding="utf-8")
+if "NVIDIA_API_KEY=" not in production_env:
+    raise SystemExit("Production NVIDIA credential contract is missing.")
+if "OPENROUTER_API_KEY" in production_env or "GEMINI_API_KEY" in production_env:
+    raise SystemExit("Production example still exposes a legacy AI credential.")
 
 orchestrator = (ROOT / "python/ai_vastu/requirements/candidate_orchestrator.py").read_text(
     encoding="utf-8"
@@ -148,7 +176,7 @@ if not bool(bundle.get("production")):
 print(
     "Phase 27 final V1 offline gate passed: "
     "auth=true, persistence=true, billing=true, requirements=true, "
-    "openrouter_free_only=true, architectural_brain=true, "
+    "active_ai=nvidia_nim, legacy_openrouter_free_only=true, architectural_brain=true, "
     "deterministic_geometry_authority=true, hard_validation=true, "
     "frozen_vastu=true, immutable_revisions=true, editor=true, exports=true, "
     "multifloor_v1=true, floors_1_to_4=true, structural_v2=true"

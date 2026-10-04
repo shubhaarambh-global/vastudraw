@@ -4,6 +4,7 @@ import os
 
 from ai_vastu.provider_runtime import ProviderRuntimeError
 
+from .apinex_provider import ApinexPlanRecognitionProvider
 from .audit import build_plan_analysis
 from .errors import PlanIntakeConfigurationError, PlanIntakeProviderError
 from .models import (
@@ -12,6 +13,8 @@ from .models import (
     PlanRecognitionDraft,
     PlanReferenceKind,
 )
+from .nvidia_nim_provider import NvidiaNimPlanRecognitionProvider
+from .ollama_local_provider import OllamaLocalPlanRecognitionProvider
 from .openrouter_provider import OpenRouterPlanRecognitionProvider
 from .provider import (
     FixturePlanRecognitionProvider,
@@ -144,9 +147,16 @@ def create_plan_recognition_provider() -> PlanRecognitionProvider:
         return GeminiPlanRecognitionProvider.from_environment()
     if name == "openrouter":
         return OpenRouterPlanRecognitionProvider.from_environment()
+    if name == "nvidia_nim":
+        return NvidiaNimPlanRecognitionProvider.from_environment()
+    if name == "ollama_local":
+        return OllamaLocalPlanRecognitionProvider.from_environment()
+    if name == "apinex":
+        return ApinexPlanRecognitionProvider.from_environment()
     raise PlanIntakeConfigurationError(
         "Unsupported AI_VASTU_PLAN_RECOGNITION_PROVIDER: "
-        f"{name or '<blank>'}. Use fixture, gemini, or openrouter."
+        f"{name or '<blank>'}. Use nvidia_nim, ollama_local, apinex, or fixture; gemini "
+        "and openrouter are legacy adapters."
     )
 
 

@@ -19,8 +19,11 @@ def test_phase27_live_gate_is_fail_closed_and_reuses_existing_gates() -> None:
     assert "production_qualification=false" in source
     assert "RELEASE QUALIFICATION PASSED" not in source
     hybrid_source = (ROOT / "scripts/check-phase29c-live.py").read_text(encoding="utf-8")
-    assert "OPENROUTER BLOCKED_CREDENTIALS" in hybrid_source
-    assert "GEMINI BLOCKED_CREDENTIALS" in hybrid_source
+    assert "NVIDIA TEXT PRIMARY" in hybrid_source
+    assert "NVIDIA VISION PDF-PATH" in hybrid_source
+    assert "PHASE29C NVIDIA_NIM BLOCKED_CREDENTIALS" in hybrid_source
+    assert "OPENROUTER_API_KEY" not in hybrid_source
+    assert "GEMINI_API_KEY" not in hybrid_source
     assert "AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER" in hybrid_source
 
 

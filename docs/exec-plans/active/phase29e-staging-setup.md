@@ -13,7 +13,7 @@ Current gate state:
 | Gate | Status | Reason |
 | --- | --- | --- |
 | Local development workflow | `PASS_LOCAL` | Fixture-backed Phase 29E workflow passed locally. |
-| PostgreSQL/Supabase, auth, OpenRouter, and Gemini staging | `BLOCKED_CREDENTIALS` | No reviewed staging target or credentials are loaded. |
+| PostgreSQL/Supabase, auth, and separately configured NVIDIA hosted staging | `BLOCKED_CREDENTIALS` | No reviewed staging target or credentials are loaded. |
 | Staging mutation, deployment, and restore | `BLOCKED_HUMAN_ACTION` | Target selection and explicit operator authorization are required. |
 | PhonePe and Razorpay live/sandbox qualification | `BLOCKED_HUMAN_ACTION` | Explicitly deferred by development payment policy; this is expected, not a failure. |
 
@@ -118,36 +118,28 @@ AI_VASTU_DEV_BILLING_BYPASS
 No PhonePe or Razorpay variable is required or permitted for this
 qualification.
 
-### OpenRouter routing and runtime budgets
+### NVIDIA NIM-only routing and runtime budgets
 
 ```text
-OPENROUTER_API_KEY
+NVIDIA_API_KEY
 AI_VASTU_REQUIREMENTS_PROVIDER
 AI_VASTU_ARCHITECT_PROVIDER
 AI_VASTU_VASTU_PROVIDER
 AI_VASTU_ARCHITECTURAL_BRAIN_PROVIDER
 AI_VASTU_REVISION_PROVIDER
-AI_VASTU_OPENROUTER_PRIMARY_MODEL
-AI_VASTU_OPENROUTER_VISION_MODEL
-AI_VASTU_OPENROUTER_FALLBACK_MODEL
-AI_VASTU_OPENROUTER_ATTEMPT_TIMEOUT_SECONDS
-AI_VASTU_OPENROUTER_TOTAL_TIMEOUT_SECONDS
-AI_VASTU_OPENROUTER_RETRY_DELAY_SECONDS
-AI_VASTU_OPENROUTER_MAX_RETRY_AFTER_SECONDS
-```
-
-### Direct Gemini plan recognition and runtime budgets
-
-```text
-GEMINI_API_KEY
 AI_VASTU_PLAN_RECOGNITION_PROVIDER
-AI_VASTU_PLAN_RECOGNITION_MODEL
-AI_VASTU_GEMINI_MODEL
-AI_VASTU_GEMINI_ATTEMPT_TIMEOUT_SECONDS
-AI_VASTU_GEMINI_TOTAL_TIMEOUT_SECONDS
-AI_VASTU_GEMINI_RETRY_DELAY_SECONDS
-AI_VASTU_GEMINI_MAX_RETRY_AFTER_SECONDS
+AI_VASTU_NVIDIA_BASE_URL
+AI_VASTU_NVIDIA_PRIMARY_MODEL
+AI_VASTU_NVIDIA_VISION_MODEL
+AI_VASTU_NVIDIA_ATTEMPT_TIMEOUT_SECONDS
+AI_VASTU_NVIDIA_TOTAL_TIMEOUT_SECONDS
+AI_VASTU_NVIDIA_RETRY_DELAY_SECONDS
+AI_VASTU_NVIDIA_MAX_RETRY_AFTER_SECONDS
 ```
+
+All six provider switches must be `nvidia_nim`. Do not configure or load
+Ollama, APINEX, OpenRouter, or Gemini credentials into the qualification
+process.
 
 ### Production-like application controls
 
@@ -214,9 +206,9 @@ They must not be added to tracked configuration.
 12. Configure exact proxy trust, trusted hosts, CORS origins, and conservative
     rate limits. The rate test window must be approved and must not affect other
     staging users.
-13. Create staging-scoped, low-quota OpenRouter and Gemini credentials in the
-    approved secret manager. Apply the qualified hybrid routing: OpenRouter for
-    text/reasoning and direct Gemini for persisted plan recognition.
+13. Configure a staging-scoped, low-quota NVIDIA credential through the approved
+    secret manager. Apply the explicit NVIDIA-only hosted profile. Do not load
+    Ollama, APINEX, OpenRouter, or Gemini credentials into this process.
 14. Mount isolated encrypted requirements and upload roots. Create an encrypted
     backup destination outside both roots. Resolve and record each absolute path
     before any write.
@@ -239,7 +231,7 @@ Run these steps serially. Record a status for each gate using only
    target. Stop if any identity is ambiguous.
 2. **Configuration preflight, no provider request.** Start the deployment and
    run `python scripts/check-phase29e-staging-preflight.py`, then inspect only
-   redacted readiness/configuration output. Verify exact host/CORS, hybrid
+   redacted readiness/configuration output. Verify exact host/CORS, NVIDIA-only
    provider routing, timeouts, storage roots, and database identity.
    Do not run `pnpm phase25:launch`: that production launch gate intentionally
    rejects disabled payments and is outside this non-payment qualification.
@@ -269,12 +261,12 @@ Run these steps serially. Record a status for each gate using only
    correlation, timing, and status evidence. The command's PNG probe does not
    complete JPG/PDF qualification.
 9. **JPG/PNG/PDF recognition.** Upload the three prepared fixtures through the
-   owner API workflow and invoke persisted plan analysis for each. Verify direct
-   Gemini routing, MIME/content validation, bounded timeouts/errors, sanitized
+   owner API workflow and invoke persisted plan analysis for each. Verify NVIDIA
+   vision routing, MIME/content validation, bounded timeouts/errors, sanitized
    failures, uncertainty, and mandatory human confirmation. Reject provider
    output that attempts to become canonical geometry.
-10. **OpenRouter interpretation.** Submit the synthetic requirements brief and
-    verify the qualified text/reasoning route, schema validation, safe timeout/
+10. **NVIDIA interpretation.** Submit the synthetic requirements brief and
+    verify the configured hosted text/reasoning route, schema validation, safe timeout/
     error behavior, and human confirmation. Do not retain prompt or raw response
     bodies in the evidence bundle.
 11. **Non-payment workflow E2E.** As owner A, execute auth -> project creation ->
@@ -394,7 +386,7 @@ Stop immediately, preserve sanitized evidence, and do not claim `PASS_LIVE` if:
 - CORS, trusted-host, proxy identity, or rate-limit behavior is unsafe;
 - any secret, token, credential, connection string, or sensitive payload appears
   in a tracked file, log, screenshot, command history, or evidence artifact;
-- provider routing/model policy differs from the qualified hybrid profile,
+- provider routing/model policy differs from the explicit NVIDIA hosted profile,
   retries/cost exceed the approved ceiling, or an external service is unstable;
 - AI output becomes authoritative geometry, bypasses confirmation/validation, or
   changes deterministic, Vastu, unit, ranking, or revision contracts;

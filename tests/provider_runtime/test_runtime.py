@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterator
 
+import httpx
 import pytest
 
 from ai_vastu.provider_runtime import (
@@ -10,7 +12,13 @@ from ai_vastu.provider_runtime import (
     ProviderFailureCategory,
     ProviderRuntimeError,
     load_provider_budget,
+    read_limited_provider_response,
 )
+
+
+class _MislabeledDeflateStream(httpx.SyncByteStream):
+    def __iter__(self) -> Iterator[bytes]:
+        yield b'{"not-really-deflate":true}'
 
 
 def test_failure_categories_are_stable_wire_values() -> None:
@@ -34,6 +42,23 @@ def test_runtime_error_exposes_only_typed_sanitized_context() -> None:
     assert error.provider == "provider"
     assert str(error) == "provider request failed (authentication)."
     assert "secret-key" not in str(error)
+
+
+def test_response_content_decoding_failure_is_sanitized() -> None:
+    request = httpx.Request("GET", "https://provider.example/response")
+    response = httpx.Response(
+        200,
+        headers={"Content-Encoding": "deflate"},
+        stream=_MislabeledDeflateStream(),
+        request=request,
+    )
+
+    with pytest.raises(ProviderRuntimeError) as captured:
+        read_limited_provider_response(response, provider="gemini")
+
+    assert captured.value.category is ProviderFailureCategory.INVALID_RESPONSE
+    assert str(captured.value) == "gemini request failed (invalid_response)."
+    assert "not-really-deflate" not in str(captured.value)
 
 
 @pytest.mark.parametrize(

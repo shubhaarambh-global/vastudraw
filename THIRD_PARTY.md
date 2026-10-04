@@ -148,6 +148,17 @@ Phase 11 adds no third-party runtime dependency. Its reference persistence adapt
 - Architecture boundary: imported only by `python/ai_vastu/exporting/jpeg_exporter.py`.
 - Raster pixels are presentation output only and never canonical geometry.
 
+### pypdfium2 5.13.0 / PDFium
+- Purpose: bounded local rendering of uploaded plan PDF pages to PNG before
+  NVIDIA NIM vision analysis; raw PDFs never cross the provider boundary.
+- Upstream: https://github.com/pypdfium2-team/pypdfium2
+- pypdfium2 license: Apache-2.0 or BSD-3-Clause. Bundled PDFium license: BSD-3-Clause.
+- Architecture boundary: imported only by `python/ai_vastu/pdf_render_adapter.py`.
+- Authority: rendered pixels and AI observations are advisory and require user
+  confirmation before they can affect canonical geometry.
+- Upgrade policy: retain malformed/encrypted input, page/pixel/byte bound, and
+  plan-intake confirmation regressions before changing the pinned version.
+
 
 ### types-reportlab 5.0.0.20260911 (development only)
 - Purpose: static typing stubs for ReportLab used by strict MyPy validation.
