@@ -12,6 +12,7 @@ from .shapely_validator import (
     ShapelyGeometryValidator,
     measure_site_partition,
     measure_site_residual_rectangles,
+    measure_vehicle_access_failures,
 )
 from .site_residuals import measure_site_residual_polygons, polygon_has_usable_core
 from .types import (
@@ -46,6 +47,7 @@ __all__ = [
     "measure_site_partition",
     "measure_site_residual_polygons",
     "measure_site_residual_rectangles",
+    "measure_vehicle_access_failures",
     "polygon_has_usable_core",
     "signed_area2_ring",
 ]

@@ -19,6 +19,7 @@ from ai_vastu.architectural_geometry import (
     validate_circulation,
     validate_whole_building,
 )
+from ai_vastu.architectural_geometry.circulation import _BEDROOM_TYPES
 from ai_vastu.constraints import (
     AdjacencyProhibitionConstraint,
     CompiledConstraintProblem,
@@ -271,6 +272,85 @@ def _interior_circulation_anchor(
     ).id
 
 
+def _vehicle_access_walls(
+    geometry: ArchitecturalGeometryResult,
+    request: ArchitecturalGenerationRequest,
+) -> tuple[Wall, ...]:
+    """Find direct road-to-bay access without traversing any occupied room."""
+    planning = request.planner_config.residential_planning
+    if not planning.enabled or not planning.require_road_connected_parking:
+        return ()
+    if request.floor_index != 0 or planning.road_boundary_side is None:
+        raise GenerationInputError("[VEHICLE_ACCESS_INVALID] Parking requires a ground road edge.")
+    walls: list[Wall] = []
+    for room in sorted(geometry.floor.rooms, key=lambda item: str(item.id)):
+        if room.room_type.value not in {"parking", "garage"}:
+            continue
+        min_x = min(point.x_mm for point in room.polygon.outer)
+        max_x = max(point.x_mm for point in room.polygon.outer)
+        min_y = min(point.y_mm for point in room.polygon.outer)
+        max_y = max(point.y_mm for point in room.polygon.outer)
+        candidates = tuple(
+            wall for wall in geometry.floor.walls
+            if wall.category is WallCategory.EXTERNAL
+            and _adjacent_room_ids(wall, geometry.floor.rooms) == (room.id,)
+            and _wall_on_boundary_side(wall, request, planning.road_boundary_side)
+            and all(
+                min_x <= point.x_mm <= max_x and min_y <= point.y_mm <= max_y
+                for point in (wall.axis.start, wall.axis.end)
+            )
+            and _wall_length_mm(wall) >= planning.parking_min_frontage_mm
+            + 2 * request.circulation_config.edge_margin_mm
+        )
+        if not candidates:
+            raise GenerationInputError(
+                "[VEHICLE_ACCESS_INVALID] Parking has no vehicle-width direct road opening."
+            )
+        walls.append(min(candidates, key=_wall_sort_key))
+    return tuple(walls)
+
+
+def _synthesize_vehicle_openings(
+    geometry: ArchitecturalGeometryResult,
+    request: ArchitecturalGenerationRequest,
+) -> tuple[OpeningBuildRequest, ...]:
+    width = request.planner_config.residential_planning.parking_min_frontage_mm
+    return tuple(
+        OpeningBuildRequest(
+            wall_id=wall.id,
+            kind=OpeningKind.OPENING,
+            offset_from_wall_start_mm=(_wall_length_mm(wall) - width) // 2,
+            width_mm=width,
+            height_mm=request.wall_config.wall_height_mm,
+            sill_height_mm=0,
+        )
+        for wall in _vehicle_access_walls(geometry, request)
+    )
+
+
+def _validate_vehicle_openings(
+    geometry: ArchitecturalGeometryResult,
+    request: ArchitecturalGenerationRequest,
+) -> None:
+    width = request.planner_config.residential_planning.parking_min_frontage_mm
+    margin = request.circulation_config.edge_margin_mm
+    for wall in _vehicle_access_walls(geometry, request):
+        if not any(
+            opening.wall_id == wall.id
+            and opening.kind is OpeningKind.OPENING
+            and opening.width_mm >= width
+            and opening.height_mm >= 2100
+            and opening.sill_height_mm == 0
+            and opening.offset_from_wall_start_mm >= margin
+            and opening.offset_from_wall_start_mm + opening.width_mm
+            <= _wall_length_mm(wall) - margin
+            for opening in geometry.floor.openings
+        ):
+            raise GenerationInputError(
+                "[VEHICLE_ACCESS_INVALID] Road-facing parking wall lacks a usable vehicle opening."
+            )
+
+
 def _centered_opening(
     wall: Wall,
     *,
@@ -325,6 +405,7 @@ def _build_circulation_context(
         for candidate in walls
         if candidate.wall.category is WallCategory.EXTERNAL
         and len(candidate.adjacent_room_ids) == 1
+        and room_index[candidate.adjacent_room_ids[0]].room_type.value not in {"parking", "garage"}
         and _wall_length_mm(candidate.wall)
         >= config.external_door_width_mm + 2 * config.edge_margin_mm
     ]
@@ -369,6 +450,10 @@ def _build_circulation_context(
                 for candidate in walls
                 if candidate.wall.category is WallCategory.INTERNAL
                 and len(candidate.adjacent_room_ids) == 2
+                and all(
+                    room_index[room_id].room_type.value not in {"parking", "garage"}
+                    for room_id in candidate.adjacent_room_ids
+                )
                 and _wall_length_mm(candidate.wall)
                 >= config.internal_door_width_mm + 2 * config.edge_margin_mm
             ),
@@ -411,6 +496,12 @@ def _candidate_topology_analysis(context: _CirculationContext) -> CirculationTop
         root_room_ids=(context.root_room_id,),
         required_room_ids=tuple(sorted(context.required_room_ids, key=str)),
         sanitary_room_ids=tuple(sorted(context.sanitary_room_ids, key=str)),
+        bedroom_room_ids=tuple(
+            room.id for room in context.rooms if room.room_type in _BEDROOM_TYPES
+        ),
+        attached_toilet_room_ids=tuple(
+            room.id for room in context.rooms if room.room_type is RoomType.ATTACHED_TOILET
+        ),
     )
 
 
@@ -465,6 +556,15 @@ def _synthesize_circulation_openings(
             if (
                 (candidate.adjacent_room_ids[0] in visited)
                 != (candidate.adjacent_room_ids[1] in visited)
+            )
+        )
+        crossing = tuple(
+            candidate for candidate in crossing
+            if all(
+                context.room_index[source_id].room_type not in _BEDROOM_TYPES
+                or context.room_index[target_id].room_type is RoomType.ATTACHED_TOILET
+                for source_id in candidate.adjacent_room_ids if source_id in visited
+                for target_id in candidate.adjacent_room_ids if target_id not in visited
             )
         )
         if not crossing:
@@ -593,6 +693,7 @@ def _circulation_repair_candidates(
         room_id
         for room_id in sorted(reachable & context.required_room_ids, key=str)
         if room_id not in context.sanitary_room_ids
+        and context.room_index[room_id].room_type not in _BEDROOM_TYPES
     )
     disconnected_non_sanitary = tuple(
         room_id
@@ -751,7 +852,7 @@ def _generate_single_floor_plan(
                     generated_openings = _synthesize_circulation_openings(
                         geometry_result,
                         active_request,
-                    )
+                    ) + _synthesize_vehicle_openings(geometry_result, active_request)
                     break
                 except CirculationGenerationError as circulation_error:
                     planning = active_request.planner_config.residential_planning
@@ -842,6 +943,7 @@ def _generate_single_floor_plan(
                     f"{circulation.message}"
                 )
 
+        _validate_vehicle_openings(geometry_result, request)
         validation_result = validate_architectural_geometry(
             ArchitecturalValidationRequest(
                 plot_boundary=request.plot_boundary,

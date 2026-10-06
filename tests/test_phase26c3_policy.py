@@ -43,7 +43,7 @@ def test_phase26c3_ui_binds_wizard_to_candidate_workspace() -> None:
     assert "selectConfirmedAlternative" in client
 
 
-def test_phase26c3_keeps_revision_chat_and_structure_outside_v1() -> None:
+def test_phase26c3_structure_stays_outside_v1_and_local_revision_is_explicit() -> None:
     wizard = (ROOT / "apps/web/src/components/generation/Phase26CProjectWizard.tsx").read_text(
         encoding="utf-8"
     )
@@ -52,4 +52,10 @@ def test_phase26c3_keeps_revision_chat_and_structure_outside_v1() -> None:
     ).read_text(encoding="utf-8")
 
     assert "Structural planning is reserved for V2" in " ".join(wizard.split())
-    assert "Phase 26D" in workspace
+    assert "RevisionChatPanel" in workspace
+    revision_route = (ROOT / "apps/api/app/revision_chat_routes.py").read_text(encoding="utf-8")
+    assert 'os.getenv("APP_ENV", "development").strip().lower() != "development"' in revision_route
+    assert (
+        'os.getenv("AI_VASTU_REVISION_PROVIDER", "").strip().lower() != "ollama_local"'
+        in revision_route
+    )

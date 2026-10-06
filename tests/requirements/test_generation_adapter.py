@@ -45,6 +45,7 @@ def test_compiler_targets_existing_generation_request_exactly() -> None:
     assert compiled.request.plot_boundary.outer[2].y_mm == 15240
     assert compiled.request.planner_config.num_search_workers == 1
     assert compiled.request.planner_config.random_seed == 0
+    assert compiled.request.planner_config.residential_planning.require_horizontal_circulation
     assert len(compiled.request.room_requirements) == 5
     assert any(
         requirement.room_type.value == "lobby" for requirement in compiled.request.room_requirements

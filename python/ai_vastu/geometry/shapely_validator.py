@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from math import hypot
 
 from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 from shapely.validation import explain_validity
 
-from ai_vastu.plan_schema import AxisSegment, IntPoint, IntPolygon
+from ai_vastu.plan_schema import (
+    AxisSegment,
+    Floor,
+    IntPoint,
+    IntPolygon,
+    OpeningKind,
+    PlanDocument,
+    Wall,
+    WallCategory,
+)
 
 from .errors import (
     GeometryKernelDisagreementError,
@@ -36,6 +46,8 @@ def to_shapely(polygon: IntPolygon) -> Polygon:
 def measure_site_partition(
     envelope: IntPolygon,
     classified_polygons: tuple[IntPolygon, ...],
+    *,
+    walls: tuple[Wall, ...] = (),
 ) -> SitePartitionMeasurement:
     """Measure a site partition without leaking Shapely types to callers."""
 
@@ -48,17 +60,28 @@ def measure_site_partition(
     for shape in classified_shapes:
         if not envelope_shape.covers(shape):
             raise ValueError(
-                "Canonical classified geometry extends outside the confirmed "
-                "buildable envelope."
+                "Canonical classified geometry extends outside the confirmed buildable envelope."
             )
 
-    if classified_shapes:
-        classified_union = unary_union(classified_shapes)
-        classified_union_area_mm2 = round(classified_union.area)
-        residual_geometry = envelope_shape.difference(classified_union)
-    else:
-        classified_union_area_mm2 = 0
-        residual_geometry = envelope_shape
+    classified_union = unary_union(classified_shapes)
+    base_classified_area_mm2 = round(classified_union.area)
+    # Wall axes are canonical centre lines. Flat ends and the actual half
+    # thickness describe material, without extending axes or filling voids.
+    wall_shapes = tuple(
+        LineString(
+            [(wall.axis.start.x_mm, wall.axis.start.y_mm), (wall.axis.end.x_mm, wall.axis.end.y_mm)]
+        ).buffer(wall.thickness_mm / 2, cap_style="flat")
+        for wall in walls
+    )
+    wall_material = (
+        unary_union(wall_shapes).intersection(envelope_shape).difference(classified_union)
+    )
+    classified_union = classified_union.union(wall_material)
+    classified_union_area_mm2 = round(classified_union.area)
+    # Quantize the partition consistently. Rounding wall area independently
+    # can disagree by one mm2 with rounding the full union at half-mm edges.
+    wall_material_area_mm2 = classified_union_area_mm2 - base_classified_area_mm2
+    residual_geometry = envelope_shape.difference(classified_union)
 
     residual_polygons: tuple[Polygon, ...]
     if residual_geometry.is_empty:
@@ -95,6 +118,7 @@ def measure_site_partition(
         envelope_area_mm2=round(envelope_shape.area),
         classified_union_area_mm2=classified_union_area_mm2,
         classified_item_areas_mm2=tuple(round(shape.area) for shape in classified_shapes),
+        wall_material_area_mm2=wall_material_area_mm2,
         residual_regions=tuple(
             sorted(
                 residual_regions,
@@ -115,9 +139,7 @@ def _polygon_components(geometry: BaseGeometry) -> tuple[Polygon, ...]:
         return ()
     if isinstance(geometry, Polygon):
         return (geometry,)
-    polygons = tuple(
-        item for item in getattr(geometry, "geoms", ()) if isinstance(item, Polygon)
-    )
+    polygons = tuple(item for item in getattr(geometry, "geoms", ()) if isinstance(item, Polygon))
     return tuple(sorted(polygons, key=lambda item: item.bounds))
 
 
@@ -199,9 +221,7 @@ def measure_site_residual_rectangles(
                     polygon.boundary.intersection(envelope_shape.boundary).length > 0
                 ),
                 road_boundary_shared_length_mm=(
-                    round(polygon.boundary.intersection(road).length)
-                    if road is not None
-                    else 0
+                    round(polygon.boundary.intersection(road).length) if road is not None else 0
                 ),
                 adjacent_polygon_indexes=tuple(
                     index
@@ -222,8 +242,7 @@ def _integral_coordinate(value: float) -> int:
     rounded = round(value)
     if abs(value - rounded) > 1e-9:
         raise NonIntegralGeometryError(
-            "Residual-site measurement produced a non-integral millimetre coordinate "
-            f"{value!r}."
+            f"Residual-site measurement produced a non-integral millimetre coordinate {value!r}."
         )
     return int(rounded)
 
@@ -369,9 +388,7 @@ def measure_site_residual_polygons_shapely(
                     shape.boundary.intersection(envelope_shape.boundary).length > 0
                 ),
                 road_boundary_shared_length_mm=(
-                    round(shape.boundary.intersection(road).length)
-                    if road is not None
-                    else 0
+                    round(shape.boundary.intersection(road).length) if road is not None else 0
                 ),
                 adjacent_polygon_indexes=tuple(
                     index
@@ -467,3 +484,192 @@ class ShapelyGeometryValidator:
             raise GeometryKernelDisagreementError(
                 f"Clipper2/Shapely containment disagreement: primary={actual}, verifier={expected}."
             )
+
+
+def _route_crosses_wall(floor: Floor, route: Polygon) -> bool:
+    if route.area == 0:
+        return False
+    for wall in floor.walls:
+        a, b = wall.axis.start, wall.axis.end
+        length = hypot(b.x_mm - a.x_mm, b.y_mm - a.y_mm)
+        if not length:
+            continue
+        gaps = sorted(
+            (
+                opening.offset_from_wall_start_mm,
+                opening.offset_from_wall_start_mm + opening.width_mm,
+            )
+            for opening in floor.openings
+            if opening.wall_id == wall.id
+            and opening.kind is OpeningKind.OPENING
+            and opening.sill_height_mm == 0
+            and opening.height_mm >= 2100
+        )
+        cursor = 0.0
+        for lo, hi in (*gaps, (length, length)):
+            if lo > cursor:
+                segment = LineString(
+                    (
+                        (
+                            a.x_mm + (b.x_mm - a.x_mm) * cursor / length,
+                            a.y_mm + (b.y_mm - a.y_mm) * cursor / length,
+                        ),
+                        (
+                            a.x_mm + (b.x_mm - a.x_mm) * lo / length,
+                            a.y_mm + (b.y_mm - a.y_mm) * lo / length,
+                        ),
+                    )
+                )
+                if route.intersection(segment).difference(route.boundary).length > 0:
+                    return True
+            cursor = max(cursor, hi)
+    return False
+
+
+def measure_vehicle_access_failures(document: PlanDocument) -> tuple[str, ...]:
+    """Return bounded failures; vehicle routes never traverse occupied rooms.
+
+    An existing OPENING is an unobstructed, full-height wall gap, so vehicle
+    clearance needs no new schema kind or reinterpretation of a pedestrian door.
+    """
+    road_ids = {edge for road in document.roads for edge in road.plot_edge_ids}
+    plot = document.plot.boundary.outer
+    site = Polygon(
+        [(point.x_mm, point.y_mm) for point in plot],
+        holes=[
+            [(point.x_mm, point.y_mm) for point in ring] for ring in document.plot.boundary.holes
+        ],
+    )
+    roads = tuple(
+        (plot[index], plot[(index + 1) % len(plot)])
+        for index, edge_id in enumerate(document.plot.edge_ids)
+        if edge_id in road_ids
+    )
+    failures: list[str] = []
+    for floor in document.floors:
+        parking = tuple(
+            room for room in floor.rooms if room.room_type.value in {"parking", "garage"}
+        )
+        if not parking:
+            continue
+        if floor.index != 0:
+            failures.append("VEHICLE_ACCESS_NOT_GROUND")
+            continue
+        walls = {wall.id: wall for wall in floor.walls}
+        for bay in parking:
+            bay_polygon = Polygon([(point.x_mm, point.y_mm) for point in bay.polygon.outer])
+            if bay.polygon.holes or not bay_polygon.equals(bay_polygon.envelope):
+                failures.append("VEHICLE_ACCESS_INVALID")
+                continue
+            if _route_crosses_wall(floor, bay_polygon) or any(
+                room.id != bay.id
+                and bay_polygon.intersection(
+                    Polygon(
+                        [(point.x_mm, point.y_mm) for point in room.polygon.outer],
+                        holes=[
+                            [(point.x_mm, point.y_mm) for point in ring]
+                            for ring in room.polygon.holes
+                        ],
+                    )
+                ).area > 0
+                for room in floor.rooms
+            ):
+                failures.append("VEHICLE_ACCESS_INVALID")
+                continue
+            min_x, min_y, max_x, max_y = bay_polygon.bounds
+            insets = {"west": 0.0, "east": 0.0, "south": 0.0, "north": 0.0}
+            for boundary_wall in floor.walls:
+                a, b = boundary_wall.axis.start, boundary_wall.axis.end
+                if a.x_mm == b.x_mm and max(a.y_mm, b.y_mm) > min_y and min(a.y_mm, b.y_mm) < max_y:
+                    side = "west" if a.x_mm == min_x else "east" if a.x_mm == max_x else None
+                elif (
+                    a.y_mm == b.y_mm and max(a.x_mm, b.x_mm) > min_x and min(a.x_mm, b.x_mm) < max_x
+                ):
+                    side = "south" if a.y_mm == min_y else "north" if a.y_mm == max_y else None
+                else:
+                    side = None
+                if side is not None:
+                    insets[side] = max(insets[side], boundary_wall.thickness_mm / 2)
+            clear_width = max_x - min_x - insets["west"] - insets["east"]
+            clear_depth = max_y - min_y - insets["south"] - insets["north"]
+            usable = False
+            for opening in floor.openings:
+                wall = walls.get(opening.wall_id)
+                if (
+                    wall is None
+                    or wall.category is not WallCategory.EXTERNAL
+                    or opening.kind is not OpeningKind.OPENING
+                    or opening.width_mm < 3000
+                    or opening.height_mm < 2100
+                    or opening.sill_height_mm != 0
+                ):
+                    continue
+                a, b = wall.axis.start, wall.axis.end
+                horizontal = a.y_mm == b.y_mm
+                vertical = a.x_mm == b.x_mm
+                if not horizontal and not vertical:
+                    continue
+                if (horizontal and (clear_width < 3000 or clear_depth < 5500)) or (
+                    vertical and (clear_depth < 3000 or clear_width < 5500)
+                ):
+                    continue
+                length = abs(b.x_mm - a.x_mm) + abs(b.y_mm - a.y_mm)
+                offset = opening.offset_from_wall_start_mm
+                if offset < 0 or offset + opening.width_mm > length:
+                    continue
+                sign = 1 if (b.x_mm > a.x_mm if horizontal else b.y_mm > a.y_mm) else -1
+                start = (
+                    (a.x_mm + sign * offset, a.y_mm)
+                    if horizontal
+                    else (a.x_mm, a.y_mm + sign * offset)
+                )
+                end = (
+                    (start[0] + sign * opening.width_mm, start[1])
+                    if horizontal
+                    else (start[0], start[1] + sign * opening.width_mm)
+                )
+                boundary_contact = bay_polygon.boundary.intersection(LineString((start, end)))
+                if boundary_contact.length < opening.width_mm:
+                    continue
+                for road_start, road_end in roads:
+                    if horizontal:
+                        if road_start.y_mm != road_end.y_mm:
+                            continue
+                        lo, hi = sorted((road_start.x_mm, road_end.x_mm))
+                        if min(start[0], end[0]) < lo or max(start[0], end[0]) > hi:
+                            continue
+                        road_fixed, wall_fixed = road_start.y_mm, a.y_mm
+                        centre = bay_polygon.centroid.y
+                        projected = ((end[0], road_fixed), (start[0], road_fixed))
+                    else:
+                        if road_start.x_mm != road_end.x_mm:
+                            continue
+                        lo, hi = sorted((road_start.y_mm, road_end.y_mm))
+                        if min(start[1], end[1]) < lo or max(start[1], end[1]) > hi:
+                            continue
+                        road_fixed, wall_fixed = road_start.x_mm, a.x_mm
+                        centre = bay_polygon.centroid.x
+                        projected = ((road_fixed, end[1]), (road_fixed, start[1]))
+                    if (road_fixed - wall_fixed) * (centre - wall_fixed) > 0:
+                        continue
+                    route = Polygon((start, end, *projected))
+                    if route.area > 0 and not site.covers(route):
+                        continue
+                    if _route_crosses_wall(floor, route):
+                        continue
+                    if any(
+                        room.id != bay.id
+                        and route.intersection(
+                            Polygon([(point.x_mm, point.y_mm) for point in room.polygon.outer])
+                        ).area
+                        > 0
+                        for room in floor.rooms
+                    ):
+                        continue
+                    usable = True
+                    break
+                if usable:
+                    break
+            if not usable:
+                failures.append("VEHICLE_ACCESS_INVALID")
+    return tuple(failures)

@@ -15,6 +15,9 @@ import { loadProjectWorkspace } from "../../editor/project-workspace.ts";
 import type { EditorChangeSet } from "../../editor/types.ts";
 import { PlanEditor } from "./PlanEditor.tsx";
 import { ProjectContextPanel } from "./ProjectContextPanel.tsx";
+import { RevisionChatPanel } from "./RevisionChatPanel.tsx";
+import { RevisionHistoryPanel } from "./RevisionHistoryPanel.tsx";
+import { RevisionExportPanel } from "./RevisionExportPanel.tsx";
 
 interface ProjectEditorPageProps {
   readonly projectId: string | null;
@@ -24,6 +27,10 @@ interface LoadedWorkspace {
   readonly project: ProjectRecord;
   readonly revision: RevisionRecord | null;
 }
+
+type DimensionChange = Awaited<
+  ReturnType<ProjectApiClient["reviseSavedPlan"]>
+>["dimension_change"];
 
 export function ProjectEditorPage({ projectId }: ProjectEditorPageProps) {
   const api = useMemo(
@@ -38,6 +45,35 @@ export function ProjectEditorPage({ projectId }: ProjectEditorPageProps) {
   const [status, setStatus] = useState("Loading project");
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savedDimensionChange, setSavedDimensionChange] = useState<{
+    readonly projectId: string;
+    readonly revisionNumber: number;
+    readonly change: DimensionChange;
+  } | null>(null);
+
+  async function saveEdits() {
+    if (!submitted || !projectId) return;
+    setSavingEdits(true);
+    setEditError(null);
+    try {
+      const result = await api.applyEditorCommands(projectId, submitted);
+      if (result.revision.parent_revision_id !== submitted.base_revision_id) {
+        throw new Error(
+          "Saved revision ancestry does not match the editor base.",
+        );
+      }
+      setSubmitted(null);
+      setReloadToken((value) => value + 1);
+    } catch (cause: unknown) {
+      setEditError(
+        cause instanceof Error ? cause.message : "Could not save exact edits.",
+      );
+    } finally {
+      setSavingEdits(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -223,10 +259,46 @@ export function ProjectEditorPage({ projectId }: ProjectEditorPageProps) {
         }}
       />
 
+      <RevisionChatPanel
+        key={`chat:${workspace.revision.revision_id}`}
+        api={api}
+        projectId={workspace.project.project_id}
+        baseRevisionId={workspace.revision.revision_id}
+        onRevised={(revision, change) => {
+          setSavedDimensionChange({
+            projectId: revision.project_id,
+            revisionNumber: revision.revision_number,
+            change,
+          });
+          setReloadToken((value) => value + 1);
+        }}
+      />
+      {savedDimensionChange?.projectId === workspace.project.project_id ? (
+        <p role="status">
+          Revision {String(savedDimensionChange.revisionNumber)} saved:{" "}
+          {savedDimensionChange.change.room_type}{" "}
+          {savedDimensionChange.change.axis.toLowerCase()}{" "}
+          {String(savedDimensionChange.change.applied_mm)} mm (requested{" "}
+          {String(savedDimensionChange.change.requested_mm)} mm; rounded upward{" "}
+          {String(savedDimensionChange.change.rounding_mm)} mm).
+        </p>
+      ) : null}
+
       <PlanEditor
         key={document.revision_id}
         document={document}
         onSubmitChangeSet={setSubmitted}
+      />
+
+      <RevisionHistoryPanel
+        api={api}
+        projectId={workspace.project.project_id}
+        currentRevisionId={workspace.revision.revision_id}
+      />
+      <RevisionExportPanel
+        key={`exports:${workspace.revision.revision_id}`}
+        api={api}
+        revision={workspace.revision}
       />
 
       {submitted === null ? null : (
@@ -239,13 +311,23 @@ export function ProjectEditorPage({ projectId }: ProjectEditorPageProps) {
                 {submitted.base_revision_id}
               </h2>
             </div>
-            <span className="status-pill">Not persisted</span>
+            <button
+              type="button"
+              disabled={savingEdits}
+              onClick={() => {
+                void saveEdits();
+              }}
+            >
+              {savingEdits ? "Saving exact edits..." : "Save exact edits"}
+            </button>
           </div>
           <p className="dashboard-muted">
-            Phase 19.5 does not silently mutate the canonical PlanDocument.
-            These commands remain staged until a server-side command-application
-            workflow is explicitly implemented.
+            Save room locks or one exact room dimension at a time. Dimension
+            edits regenerate the layout with deterministic validation; other
+            edit types are not supported for persistence yet. The prior revision
+            stays unchanged.
           </p>
+          {editError ? <p role="alert">{editError}</p> : null}
           <pre>{JSON.stringify(submitted, null, 2)}</pre>
         </section>
       )}

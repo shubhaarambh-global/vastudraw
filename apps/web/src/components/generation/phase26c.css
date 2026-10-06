@@ -461,6 +461,21 @@
   }
 }
 
+@media (max-width: 600px) {
+  .phase26c-entry {
+    padding: 32px 16px;
+  }
+
+  .phase26c-entry-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .phase26c-entry-grid > button {
+    min-width: 0;
+    padding: 24px;
+  }
+}
+
 /* Phase 26C � professional design-intent controls */
 
 .phase26c-design-intent-step {

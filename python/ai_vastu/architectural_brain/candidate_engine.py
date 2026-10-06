@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from ai_vastu.multi_candidate import (
     CandidateArtifact,
     CandidateExclusion,
     CandidateResult,
     CandidateRunResult,
+    CandidateStrategy,
     MultiCandidateGenerationError,
     MultiCandidateGenerationOutcome,
     default_candidate_strategies,
@@ -12,6 +15,7 @@ from ai_vastu.multi_candidate import (
 )
 from ai_vastu.plan_schema import (
     AdjacencyPreference,
+    PlanDocument,
     RoomType,
 )
 from ai_vastu.precedents import PrecedentMatch
@@ -29,9 +33,48 @@ from .candidate_dedup import (
 )
 from .critic import critique_plan
 from .errors import ArchitecturalBrainConfigurationError, ArchitecturalBrainProviderError
+from .models import ArchitecturalConcept
 from .precedent_topology import bind_precedent_topologies
 from .scoring import score_plan_document
 from .service import ArchitecturalBrainService
+
+
+def _distinct_documents(candidates: list[PlanDocument]) -> int:
+    unique: list[PlanDocument] = []
+    for document in candidates:
+        if not any(spatially_equivalent(document, prior) for prior in unique):
+            unique.append(document)
+    return len(unique)
+
+
+def _candidate_search_schedule(
+    concepts: tuple[ArchitecturalConcept, ...],
+    strategies: tuple[CandidateStrategy, ...],
+    accepted_documents: list[PlanDocument],
+    max_alternatives: int,
+) -> Iterator[tuple[ArchitecturalConcept, CandidateStrategy]]:
+    """Explore at most two existing search variants per validated concept.
+
+    The second bounded pass changes deterministic solver search, never the
+    advisory input, validators, critic or material spatial equivalence checks.
+    Rejected attempts remain explicit; no provider is called again.
+    """
+    yield from zip(concepts, strategies, strict=False)
+    if _distinct_documents(accepted_documents) >= max_alternatives:
+        return
+    for index, (concept, strategy) in enumerate(zip(concepts, strategies, strict=False)):
+        alternate = strategies[(index + 3) % len(strategies)]
+        yield concept, strategy.model_copy(
+            update={
+                "strategy_id": f"{strategy.strategy_id}-search-{alternate.kind.value}",
+                "kind": alternate.kind,
+                "deterministic_ordinal": len(strategies) + index,
+                "description": (
+                    "Second bounded deterministic search for the same validated concept; "
+                    "all architectural checks and spatial deduplication remain required."
+                ),
+            }
+        )
 
 
 def _unique_adjacency_preferences(
@@ -222,8 +265,13 @@ def run_architectural_brain_candidates(
     exclusions: list[CandidateExclusion] = []
     diagnostics: list[str] = []
     planning_mode = None
+    accepted_documents: list[PlanDocument] = []
+    attempted_count = 0
 
-    for concept, strategy in zip(concepts, strategies, strict=False):
+    for concept, strategy in _candidate_search_schedule(
+        concepts, strategies, accepted_documents, max_alternatives
+    ):
+        attempted_count += 1
         concept_compiled = _normalize_concept_adjacency(
             apply_architectural_concept(
                 compiled,
@@ -353,6 +401,7 @@ def run_architectural_brain_candidates(
             )
         )
         exclusions.extend(run.run.exclusions)
+        accepted_documents.append(document)
 
     if not accepted or planning_mode is None:
         diagnostic_text = "\n".join(f"- {item}" for item in diagnostics)
@@ -473,8 +522,8 @@ def run_architectural_brain_candidates(
         planning_mode=planning_mode,
         candidates=candidates,
         exclusions=tuple(exclusions),
-        attempted_candidate_count=len(concepts),
-        rejected_candidate_count=max(0, len(concepts) - len(candidates)),
+        attempted_candidate_count=attempted_count,
+        rejected_candidate_count=max(0, attempted_count - len(candidates)),
     ).with_content_hash()
     return MultiCandidateGenerationOutcome(
         run=result,

@@ -193,7 +193,7 @@ def test_chat_request_uses_native_schema_temperature_zero_and_stream_false() -> 
         "messages": [{"role": "user", "content": "hello"}],
         "stream": False,
         "format": SCHEMA,
-        "options": {"temperature": 0, "num_predict": 321},
+        "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 321},
     }
 
 

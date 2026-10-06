@@ -47,6 +47,10 @@ def test_ninety_percent_room_coverage_is_still_rejected_when_blank() -> None:
 
     bad_floor = floor.model_copy(
         update={
+            # This case measures a genuinely blank strip, without canonical
+            # perimeter wall material contributing to its accounting.
+            "walls": (),
+            "openings": (),
             "rooms": (
                 living,
                 smaller_kitchen,

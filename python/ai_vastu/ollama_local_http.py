@@ -21,6 +21,7 @@ from ai_vastu.provider_runtime import (
 OLLAMA_LOCAL_PROVIDER = "ollama_local"
 OLLAMA_LOCAL_BASE_URL = "http://127.0.0.1:11434"
 OLLAMA_LOCAL_MODEL = "qwen3-vl:8b-instruct-q4_K_M"
+OLLAMA_LOCAL_CONTEXT_LENGTH = 8192
 
 DEFAULT_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_READ_TIMEOUT_SECONDS = 300.0
@@ -530,7 +531,10 @@ class OllamaLocalClient:
         ):
             raise OllamaLocalConfigurationError("Ollama max_tokens must be a positive integer.")
 
-        options: dict[str, Any] = {"temperature": 0}
+        options: dict[str, Any] = {
+            "temperature": 0,
+            "num_ctx": OLLAMA_LOCAL_CONTEXT_LENGTH,
+        }
         if max_tokens is not None:
             options["num_predict"] = max_tokens
         body: dict[str, Any] = {

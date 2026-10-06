@@ -74,6 +74,7 @@ _SANITARY_WET_ROOM_TYPES = frozenset(
 def _wet_stack_group(room_type: RoomType) -> str:
     return "SANITARY" if room_type in _SANITARY_WET_ROOM_TYPES else "SERVICE"
 
+
 @dataclass(frozen=True)
 class _RectangleBounds:
     min_x_mm: int
@@ -310,9 +311,7 @@ def _apply_vertical_core_reservation(
             "Vertical-core reservation must lie on the configured solver lattice."
         )
 
-    x_cells, y_cells, width_cells, depth_cells = (
-        value // step for value in values_mm
-    )
+    x_cells, y_cells, width_cells, depth_cells = (value // step for value in values_mm)
     room = room_vars[staircase_rooms[0].id]
     model.add(room.x == x_cells)
     model.add(room.y == y_cells)
@@ -344,10 +343,7 @@ def _append_wet_stack_objectives(
     planning = config.residential_planning
     fallback_anchor = planning.wet_stack_anchor
     stack_targets = planning.wet_stack_targets
-    if (
-        fallback_anchor is None
-        and not stack_targets
-    ) or planning.wet_stack_weight == 0:
+    if (fallback_anchor is None and not stack_targets) or planning.wet_stack_weight == 0:
         return
 
     step = config.solver_step_mm
@@ -658,20 +654,89 @@ def _append_hard_residential_circulation(
     if not config.residential_planning.require_horizontal_circulation:
         return
 
-    present = {room.room_type for room in problem.room_instances}
+    bedroom_types = {
+        RoomType.BEDROOM,
+        RoomType.MASTER_BEDROOM,
+        RoomType.PARENTS_BEDROOM,
+        RoomType.GUEST_BEDROOM,
+        RoomType.CHILDREN_BEDROOM,
+    }
+    if config.residential_planning.vertical_core_footprint is None:
+        public_rooms = tuple(
+            room
+            for room in sorted(problem.room_instances, key=lambda item: str(item.id))
+            if room.room_type
+            not in bedroom_types | _SANITARY_WET_ROOM_TYPES | {RoomType.PARKING, RoomType.GARAGE}
+        )
+        entry = _entry_room(problem)
+        if entry is None and public_rooms:
+            entry = public_rooms[0]
+        if len(public_rooms) > 1 and entry is not None:
+            ranks = {
+                room.id: model.new_int_var(
+                    0, len(public_rooms) - 1, f"public_circulation_rank_{room.id.hex}"
+                )
+                for room in public_rooms
+            }
+            model.add(ranks[entry.id] == 0)
+            for room in public_rooms:
+                if room.id == entry.id:
+                    continue
+                model.add(ranks[room.id] >= 1)
+                parents = []
+                for parent_room in public_rooms:
+                    if parent_room.id == room.id:
+                        continue
+                    prefix = f"public_circulation_{room.id.hex}_{parent_room.id.hex}"
+                    parent = model.new_bool_var(prefix)
+                    penalty = _adjacency_pair_penalty(
+                        model,
+                        room_vars[room.id],
+                        room_vars[parent_room.id],
+                        config=config,
+                        buildable_width_cells=width_cells,
+                        buildable_depth_cells=depth_cells,
+                        objective=_AdjacencyTargetSpec(max_gap_mm=0, min_shared_length_mm=1_000),
+                        name=prefix,
+                    )
+                    model.add(penalty == 0).only_enforce_if(parent)
+                    model.add(ranks[parent_room.id] < ranks[room.id]).only_enforce_if(parent)
+                    parents.append(parent)
+                model.add_bool_or(parents)
     added = 0
     for room in sorted(problem.room_instances, key=lambda item: str(item.id)):
         if room.room_type in {RoomType.PARKING, RoomType.GARAGE}:
             continue
-        target = _topology_target(room.room_type, present)
-        if target is None:
-            continue
-        target_room_type, _weight, shared_length_mm = target
-        targets = tuple(
+        # Hard access requires a public doorway, not a particular soft topology target.
+        # Forcing every bedroom/toilet to one lobby can reject valid compact plans.
+        public_targets = tuple(
             item
             for item in problem.room_instances
-            if item.room_type is target_room_type and item.id != room.id
+            if item.id != room.id
+            and item.room_type
+            not in bedroom_types | _SANITARY_WET_ROOM_TYPES | {RoomType.PARKING, RoomType.GARAGE}
         )
+        ensuite_targets = tuple(
+            item for item in problem.room_instances if item.room_type in bedroom_types
+        )
+        targets = (
+            ensuite_targets
+            if room.room_type is RoomType.ATTACHED_TOILET and ensuite_targets
+            else public_targets
+        )
+        shared_length_mm = 1_000
+        if config.residential_planning.vertical_core_footprint is not None:
+            # Retain the qualified multi-floor core circulation relations.
+            target = _topology_target(
+                room.room_type, {item.room_type for item in problem.room_instances}
+            )
+            if target is not None:
+                target_type, _weight, shared_length_mm = target
+                targets = tuple(
+                    item
+                    for item in problem.room_instances
+                    if item.id != room.id and item.room_type is target_type
+                )
         if not targets:
             continue
         penalties = [
@@ -746,10 +811,7 @@ def _append_circulation_repair_constraints(
                 max_gap_mm=0,
                 min_shared_length_mm=pair.min_shared_length_mm,
             ),
-            name=(
-                "circulation_repair_"
-                f"{pair.first_room_id.hex}_{pair.second_room_id.hex}"
-            ),
+            name=(f"circulation_repair_{pair.first_room_id.hex}_{pair.second_room_id.hex}"),
         )
         model.add(penalty == 0)
         added += 1

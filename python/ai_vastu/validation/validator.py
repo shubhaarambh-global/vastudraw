@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import combinations
 from uuid import UUID
 
+from ai_vastu.architectural_geometry.circulation import (
+    _BEDROOM_TYPES,
+    _SANITARY_ROOM_TYPES,
+    _VEHICLE_ROOM_TYPES,
+    analyze_room_access_graph,
+)
 from ai_vastu.constraints import (
     DimensionAxis,
     MinimumAreaConstraint,
@@ -22,6 +28,7 @@ from ai_vastu.plan_schema import (
     Opening,
     OpeningKind,
     RoomGeometry,
+    RoomType,
     ValidationReport,
     ValidationResult,
     ValidationSeverity,
@@ -856,15 +863,34 @@ def _validate_circulation(
             graph[str(first)].add(str(second))
             graph[str(second)].add(str(first))
 
+    pedestrian_ids = {room.id for room in floor.rooms if room.room_type not in _VEHICLE_ROOM_TYPES}
+    roots = tuple(
+        sorted(
+            {UUID(room_id) for room_id in graph[_OUTSIDE] if UUID(room_id) in pedestrian_ids}
+            | (set(request.circulation_anchor_room_ids) & pedestrian_ids),
+            key=str,
+        )
+    )
+    analysis = analyze_room_access_graph(
+        room_ids=tuple(sorted(pedestrian_ids, key=str)),
+        edges=tuple(
+            (room_id, UUID(neighbor))
+            for room_id in sorted(pedestrian_ids, key=str)
+            for neighbor in sorted(graph[str(room_id)])
+            if neighbor != _OUTSIDE and UUID(neighbor) in pedestrian_ids
+        ),
+        root_room_ids=roots,
+        required_room_ids=tuple(sorted(pedestrian_ids, key=str)),
+        sanitary_room_ids=tuple(
+            room.id for room in floor.rooms if room.room_type in _SANITARY_ROOM_TYPES
+        ),
+        bedroom_room_ids=tuple(room.id for room in floor.rooms if room.room_type in _BEDROOM_TYPES),
+        attached_toilet_room_ids=tuple(
+            room.id for room in floor.rooms if room.room_type is RoomType.ATTACHED_TOILET
+        ),
+    )
     anchor_nodes = {str(room_id) for room_id in request.circulation_anchor_room_ids}
-    visited = {_OUTSIDE, *anchor_nodes}
-    queue = deque([_OUTSIDE, *sorted(anchor_nodes)])
-    while queue:
-        current = queue.popleft()
-        for neighbour in sorted(graph[current]):
-            if neighbour not in visited:
-                visited.add(neighbour)
-                queue.append(neighbour)
+    visited = {str(room_id) for room_id in analysis.reachable_room_ids}
 
     for room in floor.rooms:
         if room.room_type.value in {"parking", "garage"}:

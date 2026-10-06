@@ -92,7 +92,7 @@ for token in (
     "Vastu",
     "Coverage",
     "Select this plan",
-    "Phase 26D",
+    "RevisionChatPanel",
 ):
     if token not in workspace:
         raise SystemExit(f"Phase 26C.3 workspace missing: {token}")
@@ -129,5 +129,5 @@ print(
     "strategies=6, hard_validation=true, architecture_scoring=true, "
     "soft_vastu=true, coverage=true, comparison_workspace=true, "
     "selection_persistence=true, billing_after_persistence=true, "
-    "revision_chat=phase26d, structural_v2=true"
+    "revision_chat=phase29f_local_development, structural_v2=true"
 )

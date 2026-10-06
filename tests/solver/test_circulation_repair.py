@@ -8,7 +8,13 @@ from ai_vastu.solver import (
     solve_rectangular_problem,
 )
 
-from .helpers import bedroom_requirement, compiled_problem, config, living_requirement
+from .helpers import (
+    bedroom_requirement,
+    compiled_problem,
+    config,
+    dining_requirement,
+    living_requirement,
+)
 
 
 def _shared_wall_length_mm(first: RoomPlacement, second: RoomPlacement) -> int:
@@ -60,3 +66,31 @@ def test_system_derived_circulation_repair_enforces_door_capable_adjacency() -> 
     placements = {item.room_type.value: item for item in result.placements}
     assert _shared_wall_length_mm(placements["living"], placements["bedroom"]) >= 1_000
     assert "CIRCULATION_REPAIR_ENFORCED" in {notice.code for notice in result.notices}
+
+
+def test_hard_circulation_keeps_dining_on_public_room_network() -> None:
+    requirements = tuple(
+        room.model_copy(update={"adjacency_preferences": ()})
+        for room in (living_requirement(), dining_requirement(), bedroom_requirement())
+    )
+    problem = compiled_problem(requirements=requirements)
+    planner_config = config().model_copy(
+        update={
+            "residential_planning": ResidentialPlanningConfig(
+                enabled=True,
+                require_horizontal_circulation=True,
+                target_occupied_area_basis_points=7000,
+            ),
+        }
+    )
+    result = solve_rectangular_problem(problem, config=planner_config)
+    assert result.status in (PlannerStatus.OPTIMAL, PlannerStatus.FEASIBLE)
+    placements = {item.room_type.value: item for item in result.placements}
+    assert _shared_wall_length_mm(placements["living"], placements["dining"]) >= 1000
+    assert (
+        max(
+            _shared_wall_length_mm(placements[public], placements["bedroom"])
+            for public in ("living", "dining")
+        )
+        >= 1000
+    )

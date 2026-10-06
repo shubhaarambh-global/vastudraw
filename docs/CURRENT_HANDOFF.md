@@ -1,5 +1,42 @@
 # Current Handoff
 
+## Current local qualification - Phase 29F GREEN (2026-10-05)
+
+Phase 29F local full-stack acceptance is qualified. Phase 29E remains frozen at
+1940b09fe729fb5d37ac007598c7e245d0fdacdf; no Git staging/history operation occurred.
+See [the exact acceptance report](phase29f-local-acceptance.md) for the full
+59-file inventory, root causes, commands and local evidence. Earlier NOT GREEN
+entries below describe historical checkpoints, superseded by this entry.
+
+Final: 1319 Python tests PASS (six dependency warnings); focused148 PASS including
+Ollama79; earlier dedicated affected405 PASS, final affected317 included in full;
+Ruff PASS; mypy236 files PASS; web33 tests PASS; contracts1 test PASS;
+web build/lint/typecheck/format PASS; pnpm.cmd validate exit0; diff whitespace PASS.
+Node24.20.0 / pnpm10.17.1 used. Actual Vastu3/3 and recovery3/3 evidence retained.
+
+Deterministic fixes prevent bedroom/parking transit, preserve ensuite access,
+connect public circulation, generate canonical road-facing 3000mm vehicle
+openings, reject obstructed bays and unsupported internal/exterior doorway spans.
+Bounded existing-concept/variant search returns four valid alternatives; AI stays
+advisory, without provider/model fallback or response repair/retry.
+Dev-only Ollama revision chat regenerates exact dimensions, correctly converts
+clear/envelope wall reserve and discloses pre-generation grid rounding.
+Immutable ancestry, manual lock/exact-dimension save, history and exact-revision
+editor exports remain canonical. Frozen rules/schema/wet-stack softness unchanged.
+
+Real desktop1440/tablet768/mobile390 browser journey, undo/redo/save/history,
+loading/empty/error states, outage503/recovery, exports, navigation and final
+API/web restart persistence PASS. Project f2603dae-292e-4d38-b110-ee2aec730dae
+has eight revisions; latest57ad4c12-8855-4164-894f-9858b2684bd8 hash
+ d9077c0a947edeea4ac05da90a2be97fdf35231138cdeff4963edb358785787d.
+Isolated entitlement exhaustion proves liveHTTP402 with disabled gateways and
+staging/production bypass denial, preserving operator data.
+
+API8000 and development web3000 remain running. No human-only local step remains.
+Operator owns Git. Hosted/production readiness, structural work and arbitrary
+wall/opening revision command application are not claimed.
+
+
 ## Completed phase
 
 Stage 2D9J - baseline reconciliation and full repository green - is complete.
@@ -2224,3 +2261,47 @@ NOT QUALIFIED / NOT FROZEN FOR LIVE AI PROVIDERS
 No production qualification or live-provider freeze is claimed. No NVIDIA,
 APINEX, OpenRouter, Gemini, payment, Supabase, or other cloud call was made for
 this finalization, and no credentials were requested or accessed.
+
+## Phase 29F local acceptance continuation — 2026-10-05
+
+Status: NOT GREEN / PARTIAL LOCAL ACCEPTANCE. Phase 29E checkpoint and Git
+history remain untouched. Detailed evidence and browser checklist:
+`docs/phase29f-local-acceptance.md`; sanitized local reports/artifacts:
+`.local/phase29f-evidence`.
+
+Retained pinned Ollama 8192 context after proven exact 4096-token truncation.
+Replaced prompt-only Vastu policy guidance with catalog-derived private keyed
+schema, per-rule enums/fixed non-adjustable weights, strict local checks and
+bounded private text. Public profiles/catalog/hashes/normalizer unchanged.
+Brain decoding now uses actual-program room/endpoint enums with application-owned
+metadata. Real wall material is accounted through canonical clipped footprints;
+area-rounding parity prevents false overlap. No geometry mutation, relaxed
+critic, repair, retries or fallback introduced.
+
+Final pnpm.cmd validate PASS: 1254 Python tests (5 warnings), Ruff PASS, mypy PASS
+231 files, 32 web tests, build and all offline gates. Affected suites 225 PASS;
+focused Ollama 74 PASS, combined wall/critic/geometry focus 89 PASS. Diff check
+PASS. Node 24.20.0/pnpm 10.17.1; no native managed-shell infrastructure failure.
+
+Live Vastu 3/3 PASS, plus 3/3 PASS after actual Ollama outage HTTP503/recovery.
+Confirmed generation PASS4 alternatives. Requirements text/confirmation,
+PNG/JPEG/PDF recognition, malformed422/corrupt422/oversized413, selection/save,
+immutable ancestry/history/stale409, reopen and exact-revision JPG/PDF/DXF hashes
+PASS. Current saved child revision 0048eb7c-04fd-4ec1-8c6a-90196e57b430.
+Development bypass/no quota consumption and actual entitlement denial PASS;
+live limit exhaustion unexercised. API/web restart and persisted revision/hash
+PASS. Direct AI revision advisory interpretation PASS; geometry unchanged.
+
+Ollama tray restart reports0.35.1 versus supplied0.35.0 baseline; exact pinned
+qwen3-vl:8b-instruct-q4_K_M retained. No installer/model/provider fallback used.
+API127.0.0.1:8000, web127.0.0.1:3000 and Ollama remain running with persistent
+Phase29F SQLite. No hosted AI, Supabase or live payment calls were made.
+
+Remaining blockers: no browser automation available, manual editor/undo/redo,
+responsive/loading/empty/error UI acceptance unexercised; revision chat remains
+explicitly disabled Phase26D UI. Canonical door graphs reveal bedroom-transit
+privacy issues in all four alternatives, explicitly unevaluated by current
+qualified policy. Parking frontage validated but vehicle aperture not drawn.
+These existing policy gaps require explicit architectural qualification; no
+silent product-contract rewrite performed during acceptance. No GREEN/phase
+freeze claim, commit, tag, branch, staging, push or archive deletion.

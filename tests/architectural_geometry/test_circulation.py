@@ -1,5 +1,7 @@
 from uuid import UUID
 
+import pytest
+
 from ai_vastu.architectural_geometry import analyze_room_access_graph, validate_circulation
 from ai_vastu.plan_schema import (
     AxisSegment,
@@ -203,3 +205,80 @@ def test_networkx_access_analysis_does_not_use_sanitary_room_as_bridge() -> None
     assert analysis.reachable_room_ids == (living_id, toilet_id)
     assert analysis.disconnected_room_ids == (bedroom_id,)
     assert analysis.connected_components == ((living_id,), (bedroom_id,))
+
+
+@pytest.mark.parametrize("destination", [RoomType.KITCHEN, RoomType.COMMON_TOILET,
+                                     RoomType.BATH, RoomType.BEDROOM, RoomType.STAIRCASE])
+def test_bedroom_cannot_provide_common_or_other_bedroom_access(destination: RoomType) -> None:
+    living = _room(1, RoomType.LIVING, 0, 0, 4000, 4000)
+    bedroom = _room(2, RoomType.MASTER_BEDROOM, 4000, 0, 8000, 4000)
+    other = _room(3, destination, 8000, 0, 12000, 4000)
+    entry = _wall(1, 0, 0, 4000, 0, WallCategory.EXTERNAL)
+    first = _wall(2, 4000, 0, 4000, 4000, WallCategory.INTERNAL)
+    second = _wall(3, 8000, 0, 8000, 4000, WallCategory.INTERNAL)
+    result = validate_circulation(_floor(
+        (living, bedroom, other), (entry, first, second),
+        (_door(1, entry), _door(2, first), _door(3, second)),
+    ))
+    assert result.graph.reachable_room_ids == (living.id, bedroom.id)
+    assert result.graph.disconnected_room_ids == (other.id,)
+    assert not result.accepted
+
+
+def test_explicit_attached_toilet_can_be_reached_through_its_bedroom() -> None:
+    living_id, bedroom_id, ensuite_id = (UUID(int=index) for index in (1, 2, 3))
+    analysis = analyze_room_access_graph(
+        room_ids=(living_id, bedroom_id, ensuite_id),
+        edges=((living_id, bedroom_id), (bedroom_id, ensuite_id)),
+        root_room_ids=(living_id,), required_room_ids=(living_id, bedroom_id, ensuite_id),
+        sanitary_room_ids=(ensuite_id,), bedroom_room_ids=(bedroom_id,),
+        attached_toilet_room_ids=(ensuite_id,),
+    )
+    assert analysis.disconnected_room_ids == ()
+
+
+def test_bedroom_door_does_not_block_room_with_independent_public_access() -> None:
+    living_id, bedroom_id, kitchen_id = (UUID(int=index) for index in (1, 2, 3))
+    analysis = analyze_room_access_graph(
+        room_ids=(living_id, bedroom_id, kitchen_id),
+        edges=((living_id, bedroom_id), (bedroom_id, kitchen_id), (living_id, kitchen_id)),
+        root_room_ids=(living_id,), required_room_ids=(living_id, bedroom_id, kitchen_id),
+        bedroom_room_ids=(bedroom_id,),
+    )
+    assert analysis.disconnected_room_ids == ()
+
+
+@pytest.mark.parametrize("reversed_wall", [False, True])
+def test_full_wall_cannot_supply_a_door_outside_actual_shared_room_boundary(reversed_wall) -> None:
+    living = _room(1, RoomType.LIVING, 0, 0, 4000, 4000)
+    bedroom = _room(2, RoomType.BEDROOM, 4000, 0, 8000, 500)
+    entry = _wall(1, 0, 0, 4000, 0, WallCategory.EXTERNAL)
+    shared = (_wall(2, 4000, 4000, 4000, 0, WallCategory.INTERNAL) if reversed_wall
+              else _wall(2, 4000, 0, 4000, 4000, WallCategory.INTERNAL))
+    result = validate_circulation(_floor(
+        (living, bedroom), (entry, shared), (_door(1, entry), _door(2, shared)),
+    ))
+    assert not result.accepted
+    assert result.graph.disconnected_room_ids == (bedroom.id,)
+
+
+@pytest.mark.parametrize("reversed_wall", [False, True])
+def test_real_shared_door_span_remains_valid_in_either_wall_direction(reversed_wall) -> None:
+    living = _room(1, RoomType.LIVING, 0, 0, 4000, 4000)
+    bedroom = _room(2, RoomType.BEDROOM, 4000, 0, 8000, 4000)
+    entry = _wall(1, 0, 0, 4000, 0, WallCategory.EXTERNAL)
+    shared = (_wall(2, 4000, 4000, 4000, 0, WallCategory.INTERNAL) if reversed_wall
+              else _wall(2, 4000, 0, 4000, 4000, WallCategory.INTERNAL))
+    assert validate_circulation(_floor(
+        (living, bedroom), (entry, shared), (_door(1, entry), _door(2, shared)),
+    )).accepted
+
+
+@pytest.mark.parametrize("room_width,door_offset", [(4000, 3500), (500, 100)])
+def test_external_entry_requires_a_real_door_span_on_room_and_wall(room_width, door_offset) -> None:
+    living = _room(1, RoomType.LIVING, 0, 0, room_width, 4000)
+    entry = _wall(1, 0, 0, 4000, 0, WallCategory.EXTERNAL)
+    door = _door(1, entry).model_copy(update={"offset_from_wall_start_mm": door_offset})
+    result = validate_circulation(_floor((living,), (entry,), (door,)))
+    assert not result.accepted
+    assert result.reason_code == "CIRCULATION_ENTRY_MISSING"

@@ -1,5 +1,15 @@
 import type { PlanDocument } from "@ai-vastu/contracts";
 
+export interface DimensionChangeSummary {
+  readonly room_type: string;
+  readonly axis: "WIDTH" | "DEPTH";
+  readonly previous_mm: number;
+  readonly requested_mm: number;
+  readonly applied_mm: number;
+  readonly rounding_mm: number;
+  readonly solver_step_mm: number;
+}
+
 export interface ProjectRecord {
   readonly project_id: string;
   readonly name: string;
@@ -17,6 +27,7 @@ export interface RevisionRecord {
   readonly document: PlanDocument;
   readonly plan_document_hash: string;
   readonly payload_hash: string;
+  readonly source_candidate_id?: string | null;
 }
 
 export interface PaymentOrderSummary {
@@ -493,6 +504,29 @@ export class ProjectApiClient {
     );
   }
 
+  async reviseSavedPlan(
+    projectId: string,
+    baseRevisionId: string,
+    request: string,
+  ): Promise<{
+    readonly revision: RevisionRecord;
+    readonly editor_path: string;
+    readonly dimension_change: DimensionChangeSummary;
+  }> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectId)}/revision-chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base_revision_id: baseRevisionId, request }),
+      },
+    );
+  }
+
+  async listRevisions(projectId: string): Promise<readonly RevisionRecord[]> {
+    return this.request(`/projects/${encodeURIComponent(projectId)}/revisions`);
+  }
+
   async createGenerationIntake(
     projectId: string,
     prompt: string,
@@ -651,6 +685,20 @@ export class ProjectApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     });
+  }
+
+  async applyEditorCommands(
+    projectId: string,
+    changeSet: unknown,
+  ): Promise<{ revision: RevisionRecord }> {
+    return this.request<{ revision: RevisionRecord }>(
+      `/projects/${encodeURIComponent(projectId)}/editor-commands`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changeSet),
+      },
+    );
   }
 }
 

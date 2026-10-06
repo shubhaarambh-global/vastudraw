@@ -157,7 +157,8 @@ def analyze_floor_site_accounting(
 
     Classified land is the geometric union of:
     - canonical room/program polygons; and
-    - explicit PurposefulSiteSpace polygons.
+    - explicit PurposefulSiteSpace polygons; and
+    - actual canonical wall material clipped to the envelope.
 
     No residual geometry is silently promoted to open space. Purposeful site
     polygons must be explicit, inside the confirmed envelope, and must not
@@ -168,7 +169,7 @@ def analyze_floor_site_accounting(
         *(room.polygon for room in floor.rooms),
         *(space.polygon for space in floor.site_spaces),
     )
-    measurement = measure_site_partition(envelope, classified_polygons)
+    measurement = measure_site_partition(envelope, classified_polygons, walls=floor.walls)
     room_areas = measurement.classified_item_areas_mm2[: len(floor.rooms)]
     site_space_areas = measurement.classified_item_areas_mm2[len(floor.rooms) :]
 
@@ -198,10 +199,18 @@ def analyze_floor_site_accounting(
         )
     )
 
-    allocations = (
-        *room_allocations,
-        *site_space_allocations,
+    wall_allocations = (
+        (
+            SpaceAllocation(
+                category="WALL",
+                label="Canonical wall material outside room/site polygons",
+                area_mm2=measurement.wall_material_area_mm2,
+            ),
+        )
+        if measurement.wall_material_area_mm2
+        else ()
     )
+    allocations = (*room_allocations, *site_space_allocations, *wall_allocations)
 
     allocation_sum = sum(item.area_mm2 for item in allocations)
 

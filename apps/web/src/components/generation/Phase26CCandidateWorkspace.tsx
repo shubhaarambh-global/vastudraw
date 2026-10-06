@@ -10,6 +10,7 @@ import {
   type SelectAlternativeResponse,
 } from "../../api/client.ts";
 import { ProfessionalPlanCanvas } from "./ProfessionalPlanCanvas.tsx";
+import { RevisionChatPanel } from "../editor/RevisionChatPanel.tsx";
 
 interface CandidateWorkspaceProps {
   readonly api: ProjectApiClient;
@@ -428,18 +429,15 @@ export function Phase26CCandidateWorkspace({
         <button type="button" onClick={onStartOver}>
           Start another project
         </button>
-        <div className="phase26c3-revision-preview">
-          <span>Revision chat</span>
-          <input
-            disabled
-            value=""
-            placeholder="Phase 26D: e.g. make dining 1 ft wider…"
-            readOnly
+        {selection ? (
+          <RevisionChatPanel
+            api={api}
+            projectId={projectId}
+            baseRevisionId={selection.revision_id}
           />
-          <button type="button" disabled>
-            Send
-          </button>
-        </div>
+        ) : (
+          <p>Save a candidate to enable revision chat.</p>
+        )}
       </footer>
     </section>
   );

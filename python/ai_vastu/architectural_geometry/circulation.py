@@ -8,12 +8,17 @@ import networkx as nx  # type: ignore[import-untyped]
 from ai_vastu.plan_schema import (
     Floor,
     OpeningKind,
+    RoomGeometry,
     RoomType,
     Wall,
     WallCategory,
 )
 
 _VEHICLE_ROOM_TYPES = frozenset({RoomType.PARKING, RoomType.GARAGE})
+_BEDROOM_TYPES = frozenset(
+    {RoomType.BEDROOM, RoomType.MASTER_BEDROOM, RoomType.PARENTS_BEDROOM,
+     RoomType.GUEST_BEDROOM, RoomType.CHILDREN_BEDROOM}
+)
 _SANITARY_ROOM_TYPES = frozenset(
     {
         RoomType.ATTACHED_TOILET,
@@ -70,12 +75,15 @@ def analyze_room_access_graph(
     root_room_ids: tuple[UUID, ...],
     required_room_ids: tuple[UUID, ...],
     sanitary_room_ids: tuple[UUID, ...] = (),
+    bedroom_room_ids: tuple[UUID, ...] = (),
+    attached_toilet_room_ids: tuple[UUID, ...] = (),
 ) -> CirculationTopologyAnalysis:
     """Analyze circulation topology without asserting geometric validity.
 
     Callers remain responsible for proving that every supplied edge represents a
     physically door-capable relationship. Sanitary rooms may be reachable leaves,
     but are removed from the transit graph so they cannot bridge unrelated rooms.
+    Bedrooms are destinations; only explicitly attached toilets may extend their access.
     """
 
     known_room_ids = set(room_ids)
@@ -83,6 +91,8 @@ def analyze_room_access_graph(
         set(root_room_ids)
         | set(required_room_ids)
         | set(sanitary_room_ids)
+        | set(bedroom_room_ids)
+        | set(attached_toilet_room_ids)
         | {room_id for edge in edges for room_id in edge}
     )
     unknown_room_ids = referenced_room_ids - known_room_ids
@@ -95,23 +105,30 @@ def analyze_room_access_graph(
     graph.add_edges_from(edges)
 
     sanitary = set(sanitary_room_ids)
+    bedrooms = set(bedroom_room_ids)
     roots = tuple(sorted(set(root_room_ids), key=str))
     required = tuple(sorted(set(required_room_ids), key=str))
 
     transit_graph = graph.copy()
-    transit_graph.remove_nodes_from(sanitary)
+    transit_graph.remove_nodes_from(sanitary | bedrooms)
 
     reachable_non_sanitary: set[UUID] = set()
     for root in roots:
-        if root in sanitary or root not in transit_graph:
+        if root not in transit_graph:
             continue
         reachable_non_sanitary.update(nx.node_connected_component(transit_graph, root))
 
-    reachable = set(reachable_non_sanitary) | (set(roots) & sanitary)
+    reachable = set(reachable_non_sanitary) | (set(roots) & (sanitary | bedrooms))
+    for room_id in bedrooms:
+        if any(neighbor in reachable_non_sanitary for neighbor in graph.neighbors(room_id)):
+            reachable.add(room_id)
     for room_id in sorted(sanitary, key=str):
         if room_id not in graph:
             continue
-        if any(neighbor in reachable_non_sanitary for neighbor in graph.neighbors(room_id)):
+        allowed_sources = reachable_non_sanitary
+        if room_id in attached_toilet_room_ids:
+            allowed_sources = allowed_sources | (reachable & bedrooms)
+        if any(neighbor in allowed_sources for neighbor in graph.neighbors(room_id)):
             reachable.add(room_id)
 
     disconnected = tuple(room_id for room_id in required if room_id not in reachable)
@@ -193,6 +210,41 @@ def _door_record(
     )
 
 
+def _room_supports_door_span(
+    room: RoomGeometry, wall: Wall, *, offset_mm: int, width_mm: int, margin_mm: int,
+) -> bool:
+    edge = _edge_signature(
+        wall.axis.start.x_mm, wall.axis.start.y_mm,
+        wall.axis.end.x_mm, wall.axis.end.y_mm,
+    )
+    if edge is None:
+        return False
+    orientation, fixed, _lo, _hi = edge
+    origin = wall.axis.start.x_mm if orientation == "H" else wall.axis.start.y_mm
+    end = wall.axis.end.x_mm if orientation == "H" else wall.axis.end.y_mm
+    direction = 1 if end > origin else -1
+    start = origin + direction * offset_mm
+    stop = start + direction * width_mm
+    span_lo, span_hi = min(start, stop) - margin_mm, max(start, stop) + margin_mm
+    intervals: list[tuple[int, int]] = []
+    points = room.polygon.outer
+    for index, first in enumerate(points):
+        second = points[(index + 1) % len(points)]
+        boundary = _edge_signature(first.x_mm, first.y_mm, second.x_mm, second.y_mm)
+        if boundary is not None and boundary[:2] == (orientation, fixed):
+            intervals.append((boundary[2], boundary[3]))
+    cursor = span_lo
+    for lo, hi in sorted(intervals):
+        if hi <= cursor:
+            continue
+        if lo > cursor:
+            return False
+        cursor = hi
+        if cursor >= span_hi:
+            return True
+    return False
+
+
 def build_circulation_graph(
     floor: Floor,
     *,
@@ -219,7 +271,20 @@ def build_circulation_graph(
             continue
         room_ids = _wall_room_ids(wall, floor)
         if wall.category is WallCategory.EXTERNAL:
-            if len(room_ids) == 1 and room_by_id[room_ids[0]].room_type not in _VEHICLE_ROOM_TYPES:
+            length = abs(wall.axis.end.x_mm - wall.axis.start.x_mm) + abs(
+                wall.axis.end.y_mm - wall.axis.start.y_mm
+            )
+            if (
+                len(room_ids) == 1
+                and room_by_id[room_ids[0]].room_type not in _VEHICLE_ROOM_TYPES
+                and opening.offset_from_wall_start_mm >= edge_margin_mm
+                and opening.offset_from_wall_start_mm + opening.width_mm <= length - edge_margin_mm
+                and _room_supports_door_span(
+                    room_by_id[room_ids[0]], wall,
+                    offset_mm=opening.offset_from_wall_start_mm,
+                    width_mm=opening.width_mm, margin_mm=edge_margin_mm,
+                )
+            ):
                 entries.append(room_ids[0])
             else:
                 invalid = True
@@ -231,6 +296,23 @@ def build_circulation_graph(
             wall.axis.end.y_mm - wall.axis.start.y_mm
         )
         if shared_length < required_length or opening.width_mm + 2 * edge_margin_mm > shared_length:
+            invalid = True
+            continue
+        if (
+            opening.offset_from_wall_start_mm < edge_margin_mm
+            or opening.offset_from_wall_start_mm + opening.width_mm
+            > shared_length - edge_margin_mm
+        ):
+            invalid = True
+            continue
+        if not all(
+            _room_supports_door_span(
+                room_by_id[room_id], wall,
+                offset_mm=opening.offset_from_wall_start_mm,
+                width_mm=opening.width_mm, margin_mm=edge_margin_mm,
+            )
+            for room_id in room_ids
+        ):
             invalid = True
             continue
         doors.append(_door_record(opening.id, wall, room_ids))
@@ -250,12 +332,16 @@ def build_circulation_graph(
         ),
         root_room_ids=tuple(entries) + tuple(anchor_room_ids),
         required_room_ids=required,
+        bedroom_room_ids=tuple(room.id for room in floor.rooms if room.room_type in _BEDROOM_TYPES),
+        attached_toilet_room_ids=tuple(
+            room.id for room in floor.rooms if room.room_type is RoomType.ATTACHED_TOILET
+        ),
         sanitary_room_ids=tuple(
             sorted(
                 (
                     room_id
                     for room_id, room in room_by_id.items()
-                    if room.room_type in _SANITARY_ROOM_TYPES
+                    if room.room_type in _SANITARY_ROOM_TYPES | _VEHICLE_ROOM_TYPES
                 ),
                 key=str,
             )

@@ -113,6 +113,19 @@ code {
   background: #eaecf0;
   flex: 0 0 1px;
 }
+
+.submitted-panel > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.submitted-panel > label > input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
 .toolbar-spacer {
   flex: 1;
 }
@@ -1898,6 +1911,15 @@ code {
 
   .saas-project-table-row > .saas-status-badge {
     justify-self: start;
+  }
+
+  .saas-card-heading {
+    flex-wrap: wrap;
+  }
+
+  .saas-card-heading > div {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .saas-check-list-large li,

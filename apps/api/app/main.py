@@ -80,7 +80,9 @@ from ai_vastu.runtime_environment import parse_runtime_environment
 from app.auth_dependencies import CurrentUserDependency, require_project_owner
 from app.billing_routes import router as billing_router
 from app.confirmed_generation_routes import router as confirmed_generation_router
+from app.editor_command_routes import router as editor_command_router
 from app.requirements_routes import router as requirements_router
+from app.revision_chat_routes import router as revision_chat_router
 
 
 class CreateProjectRequest(BaseModel):
@@ -506,9 +508,21 @@ def create_app(
     ) -> RevisionRecord:
         _require_project_owner(service, project_id, user)
         try:
+            current = service.get_project(project_id).current_revision_id
+            if current != payload.expected_parent_revision_id:
+                raise RevisionConflictError(
+                    "Reload the current saved revision before saving changes."
+                )
             document = PlanDocument.model_validate_json(
                 json.dumps(payload.document, sort_keys=True, separators=(",", ":"))
             )
+            if current is not None:
+                from ai_vastu.validation.revision_access import validate_changed_revision_access
+
+                validate_changed_revision_access(
+                    prior=service.get_revision(project_id, current).document,
+                    document=document,
+                )
             command = AppendRevisionCommand(
                 project_id=project_id,
                 document=document,
@@ -640,6 +654,8 @@ def create_app(
     app.include_router(billing_router)
     app.include_router(requirements_router)
     app.include_router(confirmed_generation_router)
+    app.include_router(revision_chat_router)
+    app.include_router(editor_command_router)
     app.add_middleware(ProductionHardeningMiddleware)
     app.add_middleware(
         CORSMiddleware,

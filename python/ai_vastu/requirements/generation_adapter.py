@@ -445,7 +445,7 @@ def compile_confirmed_requirements(
                 "parking_min_frontage_mm": 3000,
                 "parking_min_depth_mm": 5500,
                 "require_entrance_boundary_access": True,
-                "require_horizontal_circulation": confirmed.floor_count > 1,
+                "require_horizontal_circulation": True,
             },
             "max_time_ms": 5000,
             "max_conflicts": 100000,

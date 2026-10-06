@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
 
+import httpx
 import pytest
 
 from ai_vastu.architectural_brain.errors import ArchitecturalBrainConfigurationError
@@ -52,14 +54,18 @@ from ai_vastu.requirements.providers.fixture import FixtureRequirementsProvider
 from ai_vastu.requirements.providers.ollama_local import OllamaLocalRequirementsProvider
 from ai_vastu.requirements.service import create_provider
 from ai_vastu.vastu_reasoning.catalog import load_soft_vastu_catalog
-from ai_vastu.vastu_reasoning.errors import VastuReasoningConfigurationError
+from ai_vastu.vastu_reasoning.errors import (
+    VastuReasoningConfigurationError,
+    VastuReasoningProviderError,
+)
 from ai_vastu.vastu_reasoning.models import VastuReasoningProfile
 from ai_vastu.vastu_reasoning.providers.base import VastuReasoningInput
 from ai_vastu.vastu_reasoning.providers.fixture import FixtureVastuReasoningProvider
 from ai_vastu.vastu_reasoning.providers.ollama_local import (
     OllamaLocalVastuReasoningProvider,
+    _catalog_output_schema,
 )
-from ai_vastu.vastu_reasoning.service import create_vastu_reasoning_provider
+from ai_vastu.vastu_reasoning.service import _normalize_profile, create_vastu_reasoning_provider
 
 PROJECT_ID = UUID("30000000-0000-0000-0000-000000000029")
 DRAFT_ID = UUID("10000000-0000-0000-0000-000000000029")
@@ -109,17 +115,21 @@ def test_requirements_adapter_uses_real_schema_and_restores_authority() -> None:
         prompt="9000 x 15000 mm, north road, 2 bedrooms, one-car parking.",
         references=(ReferenceAsset("brief.txt", "text/plain", b"sentinel"),),
     )
-    payload = FixtureRequirementsProvider().interpret(request).model_dump(
-        mode="json",
-        exclude={
-            "draft_id",
-            "user_id",
-            "project_id",
-            "prompt",
-            "reference_names",
-            "provider",
-            "model",
-        },
+    payload = (
+        FixtureRequirementsProvider()
+        .interpret(request)
+        .model_dump(
+            mode="json",
+            exclude={
+                "draft_id",
+                "user_id",
+                "project_id",
+                "prompt",
+                "reference_names",
+                "provider",
+                "model",
+            },
+        )
     )
     payload["plot_width_mm"]["source"] = "user_confirmed"
     payload["plot_width_mm"]["requires_confirmation"] = False
@@ -150,17 +160,21 @@ def test_requirements_adapter_preserves_prompt_room_evidence() -> None:
         prompt="Two bedrooms are explicitly requested.",
         references=(),
     )
-    payload = FixtureRequirementsProvider().interpret(request).model_dump(
-        mode="json",
-        exclude={
-            "draft_id",
-            "user_id",
-            "project_id",
-            "prompt",
-            "reference_names",
-            "provider",
-            "model",
-        },
+    payload = (
+        FixtureRequirementsProvider()
+        .interpret(request)
+        .model_dump(
+            mode="json",
+            exclude={
+                "draft_id",
+                "user_id",
+                "project_id",
+                "prompt",
+                "reference_names",
+                "provider",
+                "model",
+            },
+        )
     )
     payload["rooms"] = [
         {
@@ -171,9 +185,9 @@ def test_requirements_adapter_preserves_prompt_room_evidence() -> None:
         }
     ]
 
-    draft = OllamaLocalRequirementsProvider(
-        client=cast(Any, RecordingClient(payload))
-    ).interpret(request)
+    draft = OllamaLocalRequirementsProvider(client=cast(Any, RecordingClient(payload))).interpret(
+        request
+    )
 
     assert draft.rooms[0].source is EvidenceSource.PROMPT
 
@@ -184,15 +198,17 @@ def test_architectural_adapter_uses_real_advisory_contract_schema() -> None:
         original_prompt="Functional two-bedroom home.",
         precedent_context=(),
     )
-    payload = FixtureArchitecturalIntelligenceProvider().reason(request).model_dump(
-        mode="json",
-        exclude={"project_id", "draft_id", "provider", "model", "content_hash"},
+    payload = (
+        FixtureArchitecturalIntelligenceProvider()
+        .reason(request)
+        .model_dump(
+            mode="json",
+            exclude={"project_id", "draft_id", "provider", "model", "content_hash"},
+        )
     )
     client = RecordingClient(payload)
 
-    intent = OllamaLocalArchitecturalIntelligenceProvider(
-        client=cast(Any, client)
-    ).reason(request)
+    intent = OllamaLocalArchitecturalIntelligenceProvider(client=cast(Any, client)).reason(request)
 
     assert client.calls[0]["schema"] == ArchitecturalDesignIntent.model_json_schema()
     assert intent.project_id == PROJECT_ID
@@ -202,25 +218,198 @@ def test_architectural_adapter_uses_real_advisory_contract_schema() -> None:
     assert intent.content_hash == intent.compute_content_hash()
 
 
-def test_vastu_adapter_uses_real_soft_contract_schema() -> None:
+def _vastu_request() -> VastuReasoningInput:
+    return VastuReasoningInput(
+        confirmed=_confirmed(),
+        original_prompt="Balanced soft Vastu.",
+        catalog=load_soft_vastu_catalog(),
+    )
+
+
+def _vastu_wire(request: VastuReasoningInput) -> dict[str, Any]:
+    profile = FixtureVastuReasoningProvider().reason(request)
+    return {
+        "rules": {item.rule_id: item.model_dump(mode="json") for item in profile.rules},
+        "notes": list(profile.notes),
+    }
+
+
+def test_vastu_adapter_uses_catalog_derived_soft_contract_schema() -> None:
     request = VastuReasoningInput(
         confirmed=_confirmed(),
         original_prompt="Balanced soft Vastu.",
         catalog=load_soft_vastu_catalog(),
     )
-    payload = FixtureVastuReasoningProvider().reason(request).model_dump(
-        mode="json",
-        exclude={"project_id", "draft_id", "provider", "model", "content_hash"},
-    )
+    payload = _vastu_wire(request)
     client = RecordingClient(payload)
 
     profile = OllamaLocalVastuReasoningProvider(client=cast(Any, client)).reason(request)
 
-    assert client.calls[0]["schema"] == VastuReasoningProfile.model_json_schema()
+    schema = client.calls[0]["schema"]
+    assert schema == _catalog_output_schema(request.catalog)
+    assert set(schema["properties"]) == {"rules", "notes"}
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["notes"]["maxItems"] == 3
+    assert schema["properties"]["notes"]["items"]["maxLength"] == 160
+    rules = schema["properties"]["rules"]
+    assert rules["required"] == [rule.rule_id for rule in request.catalog.rules]
+    assert rules["additionalProperties"] is False
+    for rule in request.catalog.rules:
+        fields = rules["properties"][rule.rule_id]["properties"]
+        assert fields["rule_id"]["enum"] == [rule.rule_id]
+        assert fields["importance"]["enum"] == [v.value for v in rule.allowed_importance]
+        assert fields["flexibility"]["enum"] == [v.value for v in rule.allowed_flexibility]
+        assert fields["weight_multiplier_basis_points"]["minimum"] == 0
+        assert fields["weight_multiplier_basis_points"]["maximum"] == 15000
+        assert fields["rationale"]["minLength"] == 1
+        assert fields["rationale"]["maxLength"] == 256
+        assert (
+            VastuReasoningProfile.model_json_schema()["$defs"]["VastuRuleReasoning"]["properties"][
+                "rationale"
+            ]["maxLength"]
+            == 1000
+        )
+        if not rule.reasoning_adjustable:
+            assert fields["importance"]["enum"] == [rule.default_importance.value]
+            assert fields["flexibility"]["enum"] == [rule.default_flexibility.value]
+            assert fields["weight_multiplier_basis_points"]["enum"] == [10000]
+    assert (
+        "STRONGLY_PREFERRED"
+        not in rules["properties"]["SOFT_BEDROOM_ZONE"]["properties"]["flexibility"]["enum"]
+    )
+    system_prompt = client.calls[0]["messages"][0]["content"]
+    assert "allowed_importance" in system_prompt
+    assert "allowed_flexibility" in system_prompt
+    assert "default_importance" in system_prompt
+    assert "default_flexibility" in system_prompt
     assert profile.provider == "ollama_local"
     assert profile.model == OLLAMA_LOCAL_MODEL
     assert profile.content_hash == profile.compute_content_hash()
     assert all(rule.hard_constraint is False for rule in request.catalog.rules)
+    assert [item.rule_id for item in profile.rules] == rules["required"]
+    assert VastuReasoningProfile.model_validate_json(profile.model_dump_json()) == profile
+    normalized = _normalize_profile(profile, request)
+    assert normalized.content_hash == normalized.compute_content_hash()
+
+
+def test_vastu_schema_tracks_supplied_catalog_without_mutation() -> None:
+    from ai_vastu.vastu_reasoning.models import RuleFlexibility, RuleImportance
+
+    catalog = load_soft_vastu_catalog()
+    before = catalog.model_dump_json()
+    rule = catalog.rules[0].model_copy(
+        update={
+            "rule_id": "TEST_RULE",
+            "allowed_importance": (RuleImportance.LOW,),
+            "allowed_flexibility": (RuleFlexibility.FLEXIBLE,),
+        }
+    )
+    custom = catalog.model_copy(update={"rules": (rule,)})
+    schema = _catalog_output_schema(custom)["properties"]["rules"]
+    assert schema["required"] == ["TEST_RULE"]
+    fields = schema["properties"]["TEST_RULE"]["properties"]
+    assert fields["importance"]["enum"] == ["LOW"]
+    assert fields["flexibility"]["enum"] == ["FLEXIBLE"]
+    assert catalog.model_dump_json() == before
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "flexibility",
+        "importance",
+        "unknown",
+        "missing",
+        "identity",
+        "fixed_multiplier",
+        "rationale",
+        "bounds",
+        "metadata",
+        "extra_rule_field",
+        "missing_multiplier",
+        "coerced_multiplier",
+        "notes",
+        "long_rationale",
+        "long_notes",
+        "many_notes",
+        "boolean_multiplier",
+        "float_multiplier",
+    ),
+)
+def test_vastu_wire_rejects_invalid_response_once_without_repair(defect: str) -> None:
+    request = _vastu_request()
+    payload = deepcopy(_vastu_wire(request))
+    bedroom = payload["rules"]["SOFT_BEDROOM_ZONE"]
+    if defect == "flexibility":
+        bedroom["flexibility"] = "STRONGLY_PREFERRED"
+    elif defect == "importance":
+        bedroom["importance"] = "CORE"
+    elif defect == "unknown":
+        payload["rules"]["UNKNOWN"] = bedroom
+    elif defect == "missing":
+        del payload["rules"]["SOFT_BEDROOM_ZONE"]
+    elif defect == "identity":
+        bedroom["rule_id"] = "UNKNOWN"
+    elif defect == "fixed_multiplier":
+        fixed = next(rule for rule in request.catalog.rules if not rule.reasoning_adjustable)
+        payload["rules"][fixed.rule_id]["weight_multiplier_basis_points"] = 9999
+    elif defect == "rationale":
+        bedroom["rationale"] = ""
+    elif defect == "bounds":
+        bedroom["weight_multiplier_basis_points"] = 15001
+    elif defect == "metadata":
+        payload["project_id"] = str(PROJECT_ID)
+    elif defect == "missing_multiplier":
+        del bedroom["weight_multiplier_basis_points"]
+    elif defect == "coerced_multiplier":
+        bedroom["weight_multiplier_basis_points"] = "10000"
+    elif defect == "notes":
+        payload["notes"] = "not an array"
+    elif defect == "long_rationale":
+        bedroom["rationale"] = "x" * 257
+    elif defect == "long_notes":
+        payload["notes"] = ["x" * 161]
+    elif defect == "many_notes":
+        payload["notes"] = ["note"] * 4
+    elif defect == "boolean_multiplier":
+        bedroom["weight_multiplier_basis_points"] = True
+    elif defect == "float_multiplier":
+        bedroom["weight_multiplier_basis_points"] = 10000.0
+    else:
+        bedroom["hard_constraint"] = True
+    calls = 0
+
+    def respond(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            json={
+                "model": OLLAMA_LOCAL_MODEL,
+                "done": True,
+                "message": {"content": json.dumps(payload)},
+            },
+        )
+
+    provider = OllamaLocalVastuReasoningProvider(
+        client=OllamaLocalClient(transport=httpx.MockTransport(respond))
+    )
+    with pytest.raises(VastuReasoningProviderError):
+        provider.reason(request)
+    assert calls == 1
+
+
+def test_existing_service_missing_rule_policy_is_preserved() -> None:
+    request = _vastu_request()
+    raw = FixtureVastuReasoningProvider().reason(request)
+    raw = raw.model_copy(update={"rules": (), "content_hash": None})
+    normalized = _normalize_profile(raw, request)
+    assert len(normalized.rules) == len(request.catalog.rules)
+    by_id = {rule.rule_id: rule for rule in request.catalog.rules}
+    for item in normalized.rules:
+        assert item.importance == by_id[item.rule_id].default_importance
+        assert item.flexibility == by_id[item.rule_id].default_flexibility
+        assert "provider omitted" in item.rationale
 
 
 def test_architectural_brain_uses_concepts_batch_schema_and_advisory_output() -> None:
@@ -297,6 +486,47 @@ def test_revision_adapter_overwrites_identity_and_advisory_flags(
     assert intent.authoritative_geometry is False
 
 
+def test_revision_adapter_bounds_guided_schema_to_supported_local_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = RecordingClient({"directives": []})
+    monkeypatch.setattr(
+        OllamaLocalClient,
+        "from_environment",
+        classmethod(lambda _cls: cast(Any, client)),
+    )
+    intent = interpret_revision_with_ollama_local(
+        project_id=PROJECT_ID,
+        base_revision_id=REVISION_ID,
+        request="Increase kitchen width by 100 mm",
+        supported_room_types=("kitchen", "dining"),
+    )
+    assert intent.directives == ()
+    schema = client.calls[0]["schema"]
+    properties = schema["$defs"]["RevisionDirective"]["properties"]
+    assert properties["operation"] == {"const": "INCREASE_DIMENSION"}
+    assert properties["room_type"] == {"type": "string", "enum": ["kitchen", "dining"]}
+    assert properties["axis"] == {"type": "string", "enum": ["WIDTH", "DEPTH"]}
+    assert properties["delta_mm"] == {"type": "integer", "minimum": 1, "maximum": 3000}
+    assert schema["properties"]["directives"]["maxItems"] == 1
+    assert schema["$defs"]["RevisionDirective"]["required"] == [
+        "operation",
+        "room_type",
+        "axis",
+        "delta_mm",
+    ]
+    for field in ("target_mm", "target_side", "related_room_type", "quantity"):
+        assert properties[field] == {"type": "null"}
+    assert (
+        properties.keys()
+        == StructuredRevisionIntent.model_json_schema()["$defs"]["RevisionDirective"][
+            "properties"
+        ].keys()
+    )
+    assert schema["$defs"]["RevisionDirective"]["additionalProperties"] is False
+    assert len(client.calls) == 1
+
+
 def _select_all_ollama(monkeypatch: pytest.MonkeyPatch, app_env: str) -> None:
     monkeypatch.setenv("APP_ENV", app_env)
     monkeypatch.setenv("AI_VASTU_OLLAMA_BASE_URL", OLLAMA_LOCAL_BASE_URL)
@@ -360,6 +590,7 @@ def test_dedicated_profile_has_all_six_selectors_and_no_credentials() -> None:
     assert "AI_VASTU_OLLAMA_TOTAL_TIMEOUT_SECONDS=360" in values
     assert "API_KEY" not in values
     assert "AI_VASTU_PAYMENT_" not in values
-    assert json.loads((root / "package.json").read_text(encoding="utf-8"))["scripts"][
-        "ollama:local"
-    ] == "node scripts/run-project-python.mjs scripts/check-ollama-local.py"
+    assert (
+        json.loads((root / "package.json").read_text(encoding="utf-8"))["scripts"]["ollama:local"]
+        == "node scripts/run-project-python.mjs scripts/check-ollama-local.py"
+    )

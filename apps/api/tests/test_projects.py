@@ -67,3 +67,35 @@ def test_project_revision_api_is_append_only_and_loadable() -> None:
         str(REVISION_2),
     ]
     repository.close()
+
+
+def test_confirmed_geometry_save_checks_access_after_parent_conflict(monkeypatch) -> None:
+    from tests.validation.test_revision_access import document
+
+    import ai_vastu.validation.revision_access as access
+
+    repository = SqliteProjectRepository(":memory:")
+    client = TestClient(create_app(repository, DevelopmentAccessTokenVerifier(TOKEN, USER_ID)))
+    client.post("/projects", json={"name": "Access fixture", "project_id": str(PROJECT_ID)},
+                headers=AUTH)
+    prior = document().model_copy(update={"revision_id": REVISION_1}).with_content_hash()
+    first = client.post(f"/projects/{PROJECT_ID}/revisions",
+                        json={"document": prior.model_dump(mode="json")}, headers=AUTH)
+    assert first.status_code == 201
+    changed_floor = prior.floors[0].model_copy(update={"openings": ()})
+    changed = prior.model_copy(update={"revision_id": REVISION_2,
+        "floors": (changed_floor,), "content_hash": None}).with_content_hash()
+    payload = {"document": changed.model_dump(mode="json"),
+               "expected_parent_revision_id": str(REVISION_1)}
+    rejected = client.post(f"/projects/{PROJECT_ID}/revisions", json=payload, headers=AUTH)
+    assert rejected.status_code == 422
+    assert len(client.get(f"/projects/{PROJECT_ID}/revisions", headers=AUTH).json()) == 1
+
+    def forbidden(**kwargs):
+        raise AssertionError("Stale parent must fail before access validation")
+
+    monkeypatch.setattr(access, "validate_changed_revision_access", forbidden)
+    stale = client.post(f"/projects/{PROJECT_ID}/revisions",
+                        json={"document": changed.model_dump(mode="json")}, headers=AUTH)
+    assert stale.status_code == 409
+    repository.close()

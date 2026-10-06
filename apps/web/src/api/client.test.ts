@@ -21,6 +21,52 @@ function requestUrl(input: Parameters<typeof fetch>[0]): string {
   return input.url;
 }
 
+void test("revision chat sends saved base ancestry and returns the persisted revision", async () => {
+  let sent: RequestInit | undefined;
+  const fetchImpl: typeof fetch = (input, init) => {
+    assert.equal(
+      requestUrl(input),
+      "http://api.example.test/projects/project-1/revision-chat",
+    );
+    sent = init;
+    return Promise.resolve(
+      jsonResponse({
+        revision: {
+          revision_id: "revision-2",
+          parent_revision_id: "revision-1",
+        },
+        editor_path: "/editor?project=project-1",
+        dimension_change: {
+          room_type: "dining",
+          axis: "WIDTH",
+          previous_mm: 3000,
+          requested_mm: 3305,
+          applied_mm: 3310,
+          rounding_mm: 5,
+          solver_step_mm: 10,
+        },
+      }),
+    );
+  };
+  const client = new ProjectApiClient("http://api.example.test", fetchImpl);
+  const result = await client.reviseSavedPlan(
+    "project-1",
+    "revision-1",
+    "make dining 1 ft wider",
+  );
+  assert.equal(result.revision.parent_revision_id, "revision-1");
+  assert.equal(result.dimension_change.requested_mm, 3305);
+  assert.equal(result.dimension_change.applied_mm, 3310);
+  assert.equal(result.dimension_change.rounding_mm, 5);
+  const body = sent?.body;
+  assert.equal(typeof body, "string");
+  if (typeof body !== "string") throw new Error("Expected JSON request body");
+  assert.deepEqual(JSON.parse(body), {
+    base_revision_id: "revision-1",
+    request: "make dining 1 ft wider",
+  });
+});
+
 void test("project API client uses immutable revision endpoints", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const fetchImpl: typeof fetch = (input, init) => {

@@ -39,6 +39,7 @@ class SitePartitionMeasurement:
     classified_union_area_mm2: int
     classified_item_areas_mm2: tuple[int, ...]
     residual_regions: tuple[MeasuredGeometryRegion, ...]
+    wall_material_area_mm2: int = 0
 
 
 @dataclass(frozen=True, slots=True)

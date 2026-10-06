@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from .models import ConfirmedRequirements, RequirementDraft
 
@@ -80,3 +80,16 @@ class RequirementsStore:
         if not path.exists():
             raise KeyError(str(draft_id))
         return ConfirmedRequirements.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def confirmed_for_context(
+        self, *, project_id: UUID, user_id: UUID, context_ids: set[UUID]
+    ) -> ConfirmedRequirements:
+        """Resolve only the confirmed context recorded in a canonical revision."""
+        for path in self._root.glob("*.confirmed.json"):
+            confirmed = ConfirmedRequirements.model_validate_json(path.read_text(encoding="utf-8"))
+            if confirmed.project_id != project_id or confirmed.user_id != user_id:
+                continue
+            context_id = uuid5(project_id, f"phase24-final:confirmed-context:{confirmed.draft_id}")
+            if context_id in context_ids:
+                return confirmed
+        raise KeyError("Canonical confirmed context is unavailable.")

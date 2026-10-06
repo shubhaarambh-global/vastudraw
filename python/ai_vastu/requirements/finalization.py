@@ -35,6 +35,7 @@ from ai_vastu.plan_schema.models import (
 from ai_vastu.plan_schema.units import quantize_angle_udeg
 from ai_vastu.scoring.models import ScoringCandidate, ScoringConfig, ScoringRequest
 from ai_vastu.scoring.selector import score_and_select_alternatives
+from ai_vastu.validation.vehicle_access import validate_document_vehicle_access
 from ai_vastu.vastu.evaluator import evaluate_bundle
 from ai_vastu.vastu.models import (
     GeometrySemantic,
@@ -655,6 +656,12 @@ def build_canonical_plan_document(
             input_hash=metadata.problem_hash,
         ),
     )
+
+    vehicle_failures = validate_document_vehicle_access(document)
+    if vehicle_failures:
+        raise Phase24FinalizationError(
+            "Final canonical vehicle access failed: " + ", ".join(vehicle_failures)
+        )
 
     return CanonicalGeneration(
         document=document,
