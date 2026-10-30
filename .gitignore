@@ -38,3 +38,15 @@ exports/
 .env.*.local
 .local/
 *.tsbuildinfo
+
+# Local databases and temp data
+*.sqlite3
+*.db
+*.log
+*.tmp
+
+# Phase data directories containing large SQLite databases
+phase*/
+
+# Test artefact directories
+pytest-*

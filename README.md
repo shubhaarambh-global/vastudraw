@@ -1,174 +1,211 @@
-# AI Vastu Architect — Phase 19
+# Vastudraw
 
-Current baseline: authenticated project dashboard, project-level authorization, deterministic generation, immutable revision persistence, and fail-closed production readiness.
+AI-powered residential architecture and floor-plan generation platform with multi-floor planning, intelligent design assistance, deterministic architectural validation, and CAD export.
 
-## Scope
+## Project Overview
 
-- explicit R2018/AC1032 DWG target
-- evidence-backed provider registry
-- ODA Drawings SDK preferred production candidate (runtime not bundled)
-- GNU LibreDWG explicitly rejected as modern production writer
-- version-bound qualification reports
-- DWG signature, units, layer, scene-hash, semantic-count and extents checks
-- generic `shell=False` external converter/inspector adapter
-- production DWG export remains disabled until a real backend passes qualification
+Vastudraw is a full-stack architectural AI platform that helps users design residential floor plans with deterministic geometry, Vastu reasoning, and intelligent architectural brain assistance. The system combines:
 
-This phase deliberately does not claim that the repository alone can emit a production DWG without an installed qualified provider runtime.
+- **Frontend**: Next.js web application with architectural plan editor, project wizard, generation pages, and review panels.
+- **Backend**: FastAPI API service with deterministic generation pipeline, CP-SAT architectural solver, Vastu reasoning engine, and multi-candidate generation.
+- **AI Reasoning**: OmniRoute gateway for all LLM-backed AI Architect requests, with deterministic fixtures for testing.
+- **Multi-floor Support**: G, G+1, G+2, G+3 configurations with per-floor room assignments and staircase propagation.
+- **Deterministic Validation**: All geometry is authoritative, computed in millimetres, and validated through CP-SAT solver and independent validators.
+- **CAD Export**: DXF, PDF, SVG, and building-package exporters for production drawing output.
 
-## Validation
+## Core Capabilities
 
-```powershell
-pnpm validate
-ruff check python apps/api tests scripts
-mypy
-pytest
+### Architecture
+- **AI Topology / Design Intent**: Advisory only — never overrides authoritative geometry.
+- **Deterministic Geometry**: Authoritative geometry computed in millimetres by the CP-SAT solver.
+- **Architectural Brain**: Concepts applied as non-geometric solver intent; concept size caps must not become hard feasibility caps.
+- **Project Revisions**: Immutable and ancestry-aware; every generation creates a new immutable revision.
+- **Structural Engineering**: Outside V1 scope (V2 planned).
+- **Wet-stack Coordination**: Remains soft (non-authoritative).
+
+### Multi-floor Support
+- Supports G (ground only), G+1, G+2, and G+3 configurations.
+- Per-floor room assignments validated against `available_floors`.
+- Staircases correctly propagate across floors with proper floor preferences.
+- Floor-count contract enforced end-to-end from confirmed requirements through generation.
+
+### Vastu Configuration
+- **Vastu Enabled**: Vastu-forward planning with soft Vastu scoring.
+- **Vastu Disabled**: Maps to practical planning mode; Vastu-aware strategies remain generic, not Vastu-specific.
+- **Vastu Strict**: Strict Vastu rules applied through the reasoning profile.
+
+### AI Model Routing
+- OmniRoute is the exclusive AI model gateway for the product runtime.
+- Every LLM-backed AI Architect request (requirements, design intent, advisory Vastu, architectural brain, revision, plan recognition) goes through `python/ai_vastu/omniroute_http.py`.
+- Six `AI_VASTU_*_PROVIDER` selectors accept `omniroute` or `fixture`; every other historical provider selector is retired and fails loudly.
+- No direct provider fallback, no Ollama fallback, no deterministic fixture fallback in production runtime.
+- Gateway credential is server-side only — never enters browser bundle, logs, or tracked files.
+
+### CAD & Building Package Exports
+- DXF export for architectural drawings.
+- PDF export for documentation and review.
+- SVG export for web preview.
+- Building package export for complete deliverable sets.
+
+## Repository Structure
+
+```
+vastudraw/
+├── apps/
+│   ├── api/          # FastAPI backend API (Python)
+│   └── web/          # Next.js frontend application
+├── docs/             # Project documentation and agent instructions
+│   ├── agent-system/ # Agent OS roles and protected contracts
+│   ├── agent-memory/ # Knowledge graph and memory system
+│   ├── architecture/ # Architecture decision records
+│   ├── exec-plans/   # Execution plans for each phase
+│   └── runbooks/     # Operational runbooks
+├── infra/            # Docker and infrastructure configuration
+│   └── docker/
+├── packages/         # Shared packages
+├── python/
+│   └── ai_vastu/     # Core Python AI reasoning and generation engine
+│       ├── omniroute_http.py       # OmniRoute gateway client
+│       ├── architectural_brain/    # Architectural concept application
+│       ├── multi_candidate/        # Multi-candidate generation engine
+│       ├── generation/             # Deterministic generation pipeline
+│       ├── requirements/           # Requirements intake and confirmation
+│       ├── vastu_reasoning/        # Vastu reasoning engine
+│       ├── drawing/                # CAD and drawing modules
+│       ├── exporting/              # DXF, PDF, SVG exporters
+│       └── production/             # Production settings and middleware
+├── scripts/          # Development and qualification scripts
+├── tests/            # Test suites
+│   ├── api/          # API tests
+│   ├── auth/         # Authentication tests
+│   ├── drawing/      # Drawing tests
+│   ├── exporting/    # Export tests
+│   ├── production/   # Production qualification tests
+│   └── requirements/ # Requirements tests
+└── README.md         # This file
 ```
 
-## Local editor
+## Technology Stack
+
+### Frontend
+- Next.js (React)
+- TypeScript
+- Tailwind CSS
+- Playwright for e2e browser testing
+
+### Backend
+- Python 3.12
+- FastAPI
+- CP-SAT solver (deterministic architecture)
+- Pydantic for data validation
+- pytest for testing
+
+### Infrastructure
+- Docker containers for API and web
+- PostgreSQL / Supabase for production persistence
+- GitHub Actions for CI/CD
+
+## Prerequisites
+
+- Python 3.12+
+- Node.js 18+ and pnpm
+- Docker (optional, for containerized deployment)
+- OmniRoute gateway access (for AI Architect runtime requests)
+
+## Local Development Setup
+
+### Backend
 
 ```powershell
+# Create Python virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r python/ai_vastu/requirements.txt
+pip install -e python/
+
+# Run the API server
+python -m uvicorn apps.api.app.main:app --reload
+```
+
+### Frontend
+
+```powershell
+# Install dependencies
+pnpm install
+
+# Run development server
 pnpm --filter @ai-vastu/web dev
 ```
 
-## Phase 15 — Production MVP release gate
+### Environment Configuration
 
-Phase 15 adds a deterministic, fail-closed public-MVP release-readiness report. The
-engineering CI gate verifies that the readiness mechanism is stable; the separate
-`pnpm mvp:release` promotion command exits non-zero while blockers remain.
+Copy `.env.example` to `.env` and configure:
 
-The current repository is intentionally **BLOCKED** for public production release.
-The principal blockers are the still-DRAFT/empty Vastu Specification v1, missing
-project authorization, absence of the planned production persistence adapter, and
-missing end-to-end generation/API/editor wiring. This is a truthful release gate,
-not a claim that those capabilities already exist.
+```
+APP_ENV=development
+NEXT_PUBLIC_AI_VASTU_API_BASE_URL=http://127.0.0.1:8000
+AI_VASTU_DATABASE_URL=<your-postgres-url>
+AI_VASTU_OMNIROUTE_API_KEY=<server-side-only-gateway-credential>
+AI_VASTU_OMNIROUTE_BASE_URL=http://127.0.0.1:20128
+```
 
+**Security**: The OmniRoute API key and all secrets must be server-side only. Never commit actual credentials to `.env` — `.env.example` contains only placeholders.
 
-## Phase 16 — Deterministic architectural generation API
+## Running Tests
 
-Phase 16 exposes constraint compilation, CP-SAT planning, canonical architectural
-geometry and independent validation through `POST /generation/architectural`.
-It removes the generation-API production blocker without inventing Vastu doctrine;
-Vastu Specification v1 remains DRAFT and therefore production promotion remains blocked.
-
-# Phase 17 — Web/API project workflow
-
-Phase 17 binds the Next.js editor surface to the existing FastAPI project and generation
-contracts without moving authoritative geometry into browser pixels.
-
-Implemented workflow:
-
-- create a project with an explicit project UUID;
-- load the current immutable project revision;
-- save the current canonical PlanDocument as a new immutable revision using optimistic
-  parent-revision concurrency;
-- submit a complete explicit `ArchitecturalGenerationRequest` to the deterministic
-  Phase 16 generation API;
-- local browser-to-API CORS configuration via `AI_VASTU_WEB_ORIGINS`;
-- browser API base URL via `NEXT_PUBLIC_AI_VASTU_API_BASE_URL`.
-
-The editor still stages exact edit commands separately. Phase 17 does not silently apply
-staged commands to canonical geometry and does not invent generation inputs. Those
-boundaries remain explicit.
-
-# Phase 18 — PostgreSQL/Supabase production persistence
-
-Phase 18 removes `PRODUCTION_PERSISTENCE_NOT_IMPLEMENTED` without changing canonical geometry,
-solver behavior, Vastu doctrine, or project revision semantics.
-
-## Adds
-
-- Psycopg 3 production PostgreSQL adapter with connection pooling.
-- Supabase-compatible prepared-statement configuration.
-- PostgreSQL migration for projects + immutable revisions.
-- Transactional `FOR UPDATE` project-head concurrency control.
-- Environment-driven repository factory.
-- Fail-closed production/staging startup without `AI_VASTU_DATABASE_URL`.
-- FastAPI repository lifetime ownership.
-- Deterministic persistence gate and policy tests.
-
-## Release-gate delta
-
-Phase 17 blockers: 5.
-
-Phase 18 blockers: 4.
-
-Removed only:
-
-- `PRODUCTION_PERSISTENCE_NOT_IMPLEMENTED`
-
-Remaining:
-
-- `VASTU_SPEC_NOT_FROZEN`
-- `VASTU_RULESET_EMPTY`
-- `VASTU_RULE_BUNDLE_NOT_PINNED`
-- `AUTHORIZATION_NOT_IMPLEMENTED`
-
-
-# Phase 19 — Authentication, authorization, and first dashboard
-
-Phase 19 removes the authorization release blocker. Production identity uses Supabase Auth
-with asymmetric JWKS verification at the FastAPI boundary. Project ownership is persisted
-separately from canonical PlanDocument content, and all project/revision APIs enforce owner
-isolation.
-
-The Next.js root route is now the first real product dashboard with sign-in, project listing,
-project creation, revision status, and navigation to the deterministic editor at `/editor`.
-The dashboard supplies identity; it is never the authorization authority.
-
-Phase 19 leaves exactly three release blockers, all belonging to Vastu Specification v1:
-
-- `VASTU_SPEC_NOT_FROZEN`
-- `VASTU_RULESET_EMPTY`
-- `VASTU_RULE_BUNDLE_NOT_PINNED`
-
-# Phase 27 — Final V1 Release Qualification
-
-Phase 27 is the final V1 completion gate built on the validated Phase 26 OpenRouter
-checkpoint `40127c3` / `phase26-openrouter-validated`.
-
-It does not replace or weaken any authoritative subsystem.
-
-## V1 authority boundaries
-
-- OpenRouter models interpret requirements, recognize uploaded plans, propose
-  architectural intent/topology, and interpret revisions.
-- AI output is non-authoritative for exact CAD geometry.
-- OR-Tools / deterministic generation remains the exact geometry authority.
-- Hard validation must pass before a candidate can be selected.
-- The frozen production Vastu v1 bundle remains the Vastu runtime authority.
-- Project persistence remains append-only / immutable revision based.
-- Billing success is recorded only after durable selected-revision persistence.
-- Supabase authentication and server-side ownership checks remain authoritative.
-- PDF/JPG/DXF outputs remain presentation/export artifacts derived from canonical
-  PlanDocument geometry.
-- Production DWG remains dependent on a separately installed, qualified backend.
-- Structural engineering and multi-floor generation remain V2 scope and are not
-  silently claimed by V1.
-
-## Added by Phase 27
-
-- one whole-product offline release contract check;
-- one fail-closed live release qualification command;
-- final V1 launch runbook;
-- repository validation integration.
-
-## Commands
-
-Offline repository qualification:
+### Backend Tests
 
 ```powershell
-pnpm phase27:check
+# Run all backend tests
+pytest
+
+# Run specific test suites
+pytest apps/api/tests/
+pytest tests/production/
+pytest tests/requirements/
+```
+
+### Frontend Tests
+
+```powershell
+# Run frontend tests
+pnpm --filter @ai-vastu/web test
+
+# TypeScript typecheck
+pnpm --filter @ai-vastu/web typecheck
+```
+
+### Full Validation
+
+```powershell
 pnpm validate
 ```
 
-Live launch qualification after loading real production secrets:
+## Current Experimental Features and Known Limitations
 
-```powershell
-pnpm phase27:live
-```
+### Multi-floor Generation
+G+1, G+2, and G+3 configurations are supported with per-floor room assignments. Staircase propagation across floors has been corrected (Phase 30.3 fix for UUID collision in floor-requirements partitioning).
 
-`phase27:live` requires the six OpenRouter provider switches to be explicitly set
-to `openrouter`, requires `OPENROUTER_API_KEY`, runs the existing live OpenRouter
-qualification, and then runs the existing Phase 25 production-launch gate.
+### Vastu Disabled Mode
+Vastu disabled correctly maps to practical planning mode through `influence_mode_for_confirmed()`. Vastu-aware strategies remain generic, not Vastu-specific.
 
-No secret is written to disk by Phase 27.
+### OmniRoute Gateway
+All AI Architect requests route through OmniRoute. Direct provider access is retired. The gateway credential must be supplied through the operator process environment or a secret manager.
+
+### Not V1 Scope
+- Structural engineering (V2)
+- Production DWG export (requires separate qualified backend)
+- Direct provider fallback (retired)
+
+## Security
+
+- No secrets are committed to this repository. `.env.example` contains only placeholders.
+- `.env`, `.env.local`, `.env.production` are ignored by `.gitignore`.
+- OmniRoute gateway credential is server-side only.
+- SQLite databases, logs, and runtime artifacts are excluded from publication.
+
+## License
+
+This repository is published as source-available. A public GitHub repository does not automatically grant others permission to reuse its code. No open-source license is included unless explicitly selected.
