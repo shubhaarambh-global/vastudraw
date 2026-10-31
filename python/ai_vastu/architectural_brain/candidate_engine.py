@@ -127,19 +127,8 @@ def _normalize_concept_adjacency(
     if not changed:
         return compiled
 
-    updated_by_id = {item.id: item for item in updated}
-    request = compiled.request.model_copy(
-        update={
-            "room_requirements": tuple(updated),
-            "floor_requirements": tuple(
-                tuple(updated_by_id.get(item.id, item) for item in floor)
-                for floor in compiled.request.floor_requirements
-            ),
-        }
-    )
-
     return CompiledGeneration(
-        request=request,
+        request=compiled.request.model_copy(update={"room_requirements": tuple(updated)}),
         profile_version=compiled.profile_version,
         notices=(
             *compiled.notices,
